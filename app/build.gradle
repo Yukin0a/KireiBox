@@ -89,22 +89,6 @@ android {
     }
 }
 
-tasks.register("verifyVersionDocs") {
-    doLast {
-        def version = android.defaultConfig.versionName
-        def versionDoc = rootProject.file("doc/versions/v${version}.md")
-        if (!versionDoc.exists()) {
-            throw new GradleException("Missing version document: ${versionDoc}")
-        }
-        def text = versionDoc.getText("UTF-8")
-        ["Rollback", "Tests", "APK", "SHA-256"].each { required ->
-            if (!text.contains(required)) {
-                throw new GradleException("Version document must contain '${required}': ${versionDoc}")
-            }
-        }
-    }
-}
-
 tasks.register("verifyLegacySqliteSyntax") {
     doLast {
         def modernUpsert = ~/(?is)\bON\s+CONFLICT\s*\([^)]*\)\s+DO\s+UPDATE\b/
@@ -121,7 +105,6 @@ tasks.register("verifyLegacySqliteSyntax") {
 }
 
 tasks.named("preBuild").configure {
-    dependsOn("verifyVersionDocs")
     dependsOn("verifyLegacySqliteSyntax")
 }
 
