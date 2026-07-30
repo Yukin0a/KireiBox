@@ -1,0 +1,34 @@
+* text=auto
+
+.gitattributes text eol=lf
+.gitignore text eol=lf
+LICENSE text eol=lf
+gradlew text eol=lf
+*.bat text eol=crlf
+*.c text eol=lf
+*.cpp text eol=lf
+*.csb binary
+*.gradle text eol=lf
+*.h text eol=lf
+*.java text eol=lf
+*.kt text eol=lf
+*.kts text eol=lf
+*.md text eol=lf
+*.pro text eol=lf
+*.properties text eol=lf
+*.sh text eol=lf
+*.toml text eol=lf
+*.xml text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+
+*.aar binary
+*.gif binary
+*.ico binary
+*.jpeg binary
+*.jpg binary
+*.otf binary
+*.png binary
+*.so binary
+*.ttf binary
+*.webp binary

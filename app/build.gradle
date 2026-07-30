@@ -1,0 +1,163 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
+plugins {
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.compose)
+}
+
+android {
+    // Keep the source namespace stable for JNI/reflection and imported engine bridges.
+    // The installable identity is the independent com.kireibox.app applicationId above.
+    namespace 'com.yuki.yukihub'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId "com.kireibox.app"
+        minSdk 26
+        targetSdk 33
+        versionCode 7
+        versionName "0.5.0-alpha.1"
+
+        ndk {
+            abiFilters 'arm64-v8a'
+        }
+
+        vectorDrawables {
+            useSupportLibrary true
+        }
+    }
+
+    signingConfigs {
+        release {
+            def ks = rootProject.file("keystore.properties")
+            if (ks.exists()) {
+                def props = new Properties()
+                props.load(new FileInputStream(ks))
+                storeFile file(props['releaseStoreFile'])
+                storePassword props['releaseStorePassword']
+                keyAlias props['releaseKeyAlias']
+                keyPassword props['releaseKeyPassword']
+            } else {
+                storeFile file(System.getProperty("user.home") + '/.android/debug.keystore')
+                storePassword 'android'
+                keyAlias 'androiddebugkey'
+                keyPassword 'android'
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    buildFeatures {
+        // The KireiBox shell is Compose-only.
+        viewBinding false
+        compose true
+    }
+
+    sourceSets {
+        main {
+            // KireiBox no longer keeps a second launcher source tree. The only retained
+            // asset exclusion is an obsolete MIDI SoundFont from historical checkouts.
+            assets.exclude '**/sf.sf2'
+        }
+    }
+
+    androidResources {
+        // AssetManager ignore pattern: the obsolete MIDI SoundFont is intentionally
+        // excluded from this four-engine demo while remaining in source for rollback.
+        ignoreAssetsPattern = "!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~:sf.sf2"
+    }
+
+    packaging {
+        pickFirst 'lib/arm64-v8a/libSDL2.so'
+        jniLibs {
+            useLegacyPackaging true
+        }
+    }
+}
+
+tasks.register("verifyVersionDocs") {
+    doLast {
+        def version = android.defaultConfig.versionName
+        def versionDoc = rootProject.file("doc/versions/v${version}.md")
+        if (!versionDoc.exists()) {
+            throw new GradleException("Missing version document: ${versionDoc}")
+        }
+        def text = versionDoc.getText("UTF-8")
+        ["Rollback", "Tests", "APK", "SHA-256"].each { required ->
+            if (!text.contains(required)) {
+                throw new GradleException("Version document must contain '${required}': ${versionDoc}")
+            }
+        }
+    }
+}
+
+tasks.register("verifyLegacySqliteSyntax") {
+    doLast {
+        def modernUpsert = ~/(?is)\bON\s+CONFLICT\s*\([^)]*\)\s+DO\s+UPDATE\b/
+        def offenders = fileTree("src/main") {
+            include "**/*.kt", "**/*.java", "**/*.xml", "**/*.sql"
+        }.findAll { file -> modernUpsert.matcher(file.getText("UTF-8")).find() }
+        if (!offenders.isEmpty()) {
+            throw new GradleException(
+                "SQLite 3.24 UPSERT syntax is forbidden for legacy OEM compatibility: " +
+                    offenders.collect { it.path }.join(", ")
+            )
+        }
+    }
+}
+
+tasks.named("preBuild").configure {
+    dependsOn("verifyVersionDocs")
+    dependsOn("verifyLegacySqliteSyntax")
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget = JvmTarget.JVM_17
+    }
+}
+
+dependencies {
+    implementation project(':core-yukihub')
+    implementation project(':engine')
+
+    implementation libs.appcompat
+    implementation libs.activity
+    implementation libs.activity.compose
+    implementation libs.lifecycle.viewmodel
+    implementation libs.lifecycle.viewmodel.compose
+    implementation libs.documentfile
+    implementation libs.okhttp
+    implementation libs.coroutines.android
+    implementation libs.kotlin.stdlib
+
+    implementation platform(libs.compose.bom)
+    implementation libs.compose.ui
+    implementation libs.compose.ui.graphics
+    implementation libs.compose.ui.tooling.preview
+    implementation libs.compose.material3
+    implementation libs.compose.material.icons.extended
+    implementation libs.compose.foundation
+    implementation libs.compose.runtime
+    implementation libs.haze
+    debugImplementation libs.compose.ui.tooling
+
+    testImplementation libs.junit
+    testImplementation 'com.squareup.okhttp3:mockwebserver:5.4.0'
+    // JVM unit tests exercise the same org.json parsing used on Android.
+    testImplementation 'org.json:json:20240303'
+}

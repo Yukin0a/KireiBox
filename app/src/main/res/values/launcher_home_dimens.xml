@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 手机竖屏：保持原布局尺寸 -->
+    <dimen name="launcher_home_scroll_bottom_padding">16dp</dimen>
+    <!-- Bottom navigation overlays the Launcher fragment container. -->
+    <dimen name="launcher_nav_overlay_scroll_bottom_padding">101dp</dimen>
+    <dimen name="launcher_home_content_horizontal_padding">20dp</dimen>
+    <dimen name="launcher_home_content_top_padding">25dp</dimen>
+    <dimen name="launcher_home_content_bottom_padding">16dp</dimen>
+
+    <dimen name="launcher_home_header_height">50dp</dimen>
+    <dimen name="launcher_home_avatar_size">45dp</dimen>
+    <dimen name="launcher_home_avatar_text_size">18sp</dimen>
+    <dimen name="launcher_home_header_text_margin_start">13dp</dimen>
+    <dimen name="launcher_home_account_mode_text_size">12sp</dimen>
+    <dimen name="launcher_home_state_title_margin_top">2dp</dimen>
+    <dimen name="launcher_home_state_title_text_size">22sp</dimen>
+    <dimen name="launcher_home_menu_size">40dp</dimen>
+    <dimen name="launcher_home_menu_padding">7.5dp</dimen>
+
+    <dimen name="launcher_home_stats_card_height">153dp</dimen>
+    <dimen name="launcher_home_stats_card_margin_top">22dp</dimen>
+    <dimen name="launcher_home_stats_card_padding">18dp</dimen>
+    <dimen name="launcher_home_stats_label_text_size">12sp</dimen>
+    <dimen name="launcher_home_stats_value_margin_top">4dp</dimen>
+    <dimen name="launcher_home_game_count_text_size">34sp</dimen>
+    <dimen name="launcher_home_stats_column_gap">27dp</dimen>
+    <dimen name="launcher_home_stats_value_text_size">14sp</dimen>
+
+    <dimen name="launcher_home_actions_grid_height">108dp</dimen>
+    <dimen name="launcher_home_actions_grid_margin_top">18dp</dimen>
+    <dimen name="launcher_home_action_height">47dp</dimen>
+    <dimen name="launcher_home_action_half_gap">4dp</dimen>
+    <dimen name="launcher_home_action_row_gap">7dp</dimen>
+    <dimen name="launcher_home_action_horizontal_padding">13dp</dimen>
+    <dimen name="launcher_home_action_icon_size">24dp</dimen>
+    <dimen name="launcher_home_action_text_gap">7dp</dimen>
+    <dimen name="launcher_home_action_text_size">13sp</dimen>
+
+    <dimen name="launcher_home_recent_section_margin_top">22dp</dimen>
+    <dimen name="launcher_home_recent_title_text_size">16sp</dimen>
+    <dimen name="launcher_home_recent_empty_height">68dp</dimen>
+    <dimen name="launcher_home_recent_content_margin_top">11dp</dimen>
+    <dimen name="launcher_home_recent_text_size">13sp</dimen>
+</resources>

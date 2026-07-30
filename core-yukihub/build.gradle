@@ -1,0 +1,55 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
+plugins {
+    alias(libs.plugins.android.library)
+    alias(libs.plugins.kotlin.android)
+}
+
+def escapedEnvironmentValue = { String name ->
+    providers.environmentVariable(name)
+        .orElse("")
+        .get()
+        .replace("\\", "\\\\")
+        .replace("\"", "\\\"")
+}
+
+android {
+    namespace 'com.kireibox.core.yukihub'
+    compileSdk 36
+
+    defaultConfig {
+        minSdk 26
+        buildConfigField "String", "YMGAL_CLIENT_ID",
+            "\"${escapedEnvironmentValue("KIREIBOX_YMGAL_CLIENT_ID")}\""
+        buildConfigField "String", "YMGAL_CLIENT_SECRET",
+            "\"${escapedEnvironmentValue("KIREIBOX_YMGAL_CLIENT_SECRET")}\""
+        buildConfigField "String", "HIKARINAGI_CLIENT_ID",
+            "\"${escapedEnvironmentValue("KIREIBOX_HIKARINAGI_CLIENT_ID")}\""
+        buildConfigField "String", "HIKARINAGI_CLIENT_SECRET",
+            "\"${escapedEnvironmentValue("KIREIBOX_HIKARINAGI_CLIENT_SECRET")}\""
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget = JvmTarget.JVM_17
+    }
+}
+
+dependencies {
+    implementation libs.documentfile
+    implementation libs.okhttp
+    implementation libs.retrofit
+    implementation libs.coroutines.android
+    implementation libs.kotlin.stdlib
+    testImplementation libs.junit
+}

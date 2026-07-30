@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="LauncherManageItem">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">52dp</item>
+        <item name="android:layout_marginBottom">11dp</item>
+        <item name="android:background">@drawable/launcher_white_card</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:orientation">horizontal</item>
+        <item name="android:paddingStart">13dp</item>
+        <item name="android:paddingEnd">13dp</item>
+    </style>
+
+    <!-- Profile-only compact variant. Keeps the manage-row visual language while
+         allowing two independent actions to share one horizontal row. -->
+    <style name="LauncherProfileActionGridItem" parent="LauncherManageItem">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_weight">1</item>
+    </style>
+
+    <style name="LauncherManageIcon">
+        <item name="android:layout_width">25dp</item>
+        <item name="android:layout_height">25dp</item>
+        <item name="android:background">@drawable/launcher_icon_circle</item>
+        <item name="android:gravity">center</item>
+        <item name="android:textColor">@color/launcher_primary_color</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="LauncherProfileActionIcon">
+        <item name="android:layout_width">25dp</item>
+        <item name="android:layout_height">25dp</item>
+        <item name="android:scaleType">centerInside</item>
+        <item name="android:tint">@color/launcher_primary_color</item>
+    </style>
+
+    <style name="LauncherManageTitle">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginStart">11dp</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:textColor">@color/launcher_text_color</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="LauncherManageArrow">
+        <item name="android:layout_width">22dp</item>
+        <item name="android:layout_height">match_parent</item>
+        <item name="android:gravity">center</item>
+        <item name="android:textColor">@color/launcher_text_muted_color</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="LauncherManageArrowIcon">
+        <item name="android:layout_width">22dp</item>
+        <item name="android:layout_height">match_parent</item>
+        <item name="android:padding">3dp</item>
+        <item name="android:scaleType">centerInside</item>
+        <item name="android:tint">@color/launcher_primary_color</item>
+    </style>
+
+    <style name="LauncherToolboxItem">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">74dp</item>
+        <item name="android:layout_columnWeight">1</item>
+        <item name="android:layout_marginStart">5dp</item>
+        <item name="android:layout_marginEnd">5dp</item>
+        <item name="android:layout_marginBottom">11dp</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+        <item name="android:gravity">center</item>
+        <item name="android:orientation">vertical</item>
+    </style>
+
+    <style name="LauncherToolboxIcon">
+        <item name="android:layout_width">36dp</item>
+        <item name="android:layout_height">36dp</item>
+    </style>
+
+    <style name="LauncherToolboxTitle">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">7dp</item>
+        <item name="android:gravity">center</item>
+        <item name="android:textColor">@color/launcher_text_muted_color</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="LauncherAddGameLabel">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">13dp</item>
+        <item name="android:textColor">@color/launcher_text_color</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="LauncherFormInput">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">45dp</item>
+        <item name="android:layout_marginTop">7dp</item>
+        <item name="android:background">@drawable/launcher_account_input</item>
+        <item name="android:paddingStart">13dp</item>
+        <item name="android:paddingEnd">13dp</item>
+        <item name="android:textColor">@color/launcher_text_color</item>
+        <item name="android:textColorHint">@color/launcher_input_hint_color</item>
+        <item name="android:textSize">14sp</item>
+    </style>
+
+    <style name="LauncherAddGameInput" parent="LauncherFormInput">
+        <item name="android:singleLine">true</item>
+    </style>
+
+    <style name="LauncherFormMultilineInput" parent="LauncherFormInput">
+        <item name="android:layout_height">72dp</item>
+        <item name="android:gravity">top|start</item>
+        <item name="android:paddingTop">11dp</item>
+        <item name="android:paddingBottom">11dp</item>
+    </style>
+
+    <style name="LauncherSelectableField">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">45dp</item>
+        <item name="android:layout_marginTop">7dp</item>
+        <item name="android:background">@drawable/launcher_account_input</item>
+        <item name="android:ellipsize">middle</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:paddingStart">13dp</item>
+        <item name="android:paddingEnd">13dp</item>
+        <item name="android:textColor">@color/launcher_text_muted_color</item>
+        <item name="android:textSize">14sp</item>
+    </style>
+
+    <style name="LauncherAddGameInputText" parent="LauncherSelectableField" />
+
+    <style name="LauncherLongActionButton">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">41dp</item>
+        <item name="android:background">@drawable/launcher_account_primary_button</item>
+        <item name="android:gravity">center</item>
+        <item name="android:textColor">@color/launcher_on_primary_color</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="LauncherShortActionButton">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">41dp</item>
+        <item name="android:background">@drawable/launcher_account_primary_button</item>
+        <item name="android:gravity">center</item>
+        <item name="android:paddingStart">12dp</item>
+        <item name="android:paddingEnd">12dp</item>
+        <item name="android:textColor">@color/launcher_on_primary_color</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="LauncherShortSecondaryActionButton" parent="LauncherShortActionButton">
+        <item name="android:background">@drawable/launcher_account_input</item>
+        <item name="android:textColor">@color/launcher_primary_color</item>
+    </style>
+
+    <style name="LauncherInlineActionButton" parent="LauncherShortActionButton">
+        <item name="android:layout_height">45dp</item>
+    </style>
+
+    <style name="LauncherActionRow" parent="LauncherManageItem" />
+
+    <style name="LauncherListCard">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:background">@drawable/launcher_white_card</item>
+        <item name="android:paddingStart">13dp</item>
+        <item name="android:paddingEnd">13dp</item>
+    </style>
+
+    <style name="LauncherActivityAnimation">
+        <item name="android:activityOpenEnterAnimation">@anim/launcher_activity_enter</item>
+        <item name="android:activityOpenExitAnimation">@anim/launcher_activity_exit</item>
+        <item name="android:activityCloseEnterAnimation">@anim/launcher_activity_pop_enter</item>
+        <item name="android:activityCloseExitAnimation">@anim/launcher_activity_pop_exit</item>
+    </style>
+
+    <style name="LauncherDialogAnimation">
+        <item name="android:windowEnterAnimation">@anim/launcher_dialog_enter</item>
+        <item name="android:windowExitAnimation">@anim/launcher_dialog_exit</item>
+    </style>
+
+    <style name="Theme.YukiHub.Splash" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowBackground">@drawable/launcher_splash_screen</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowFullscreen">false</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+    </style>
+
+    <style name="Theme.YukiHub.Launcher" parent="AppTheme">
+        <item name="android:windowAnimationStyle">@style/LauncherActivityAnimation</item>
+        <item name="android:alertDialogTheme">@style/Theme.YukiHub.Launcher.Dialog</item>
+        <item name="alertDialogTheme">@style/Theme.YukiHub.Launcher.Dialog</item>
+    </style>
+
+    <style name="Theme.YukiHub.Launcher.Dialog" parent="Theme.AppCompat.Dialog.Alert">
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowAnimationStyle">@style/LauncherDialogAnimation</item>
+        <item name="windowNoTitle">true</item>
+        <item name="windowActionBar">false</item>
+    </style>
+</resources>

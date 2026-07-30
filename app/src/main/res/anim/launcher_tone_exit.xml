@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 旧窗口保持完全不透明，让新窗口在其上方淡入，避免交叉淡入淡出时黑底穿透 -->
+<alpha xmlns:android="http://schemas.android.com/apk/res/android"
+    android:duration="520"
+    android:fromAlpha="1"
+    android:interpolator="@android:interpolator/accelerate_quad"
+    android:toAlpha="1" />

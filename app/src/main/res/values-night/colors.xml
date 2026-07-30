@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="launcher_bg_color">#141515</color>
+    <color name="launcher_card_color">#1E1F1F</color>
+    <color name="launcher_card_alt_color">#262727</color>
+    <color name="launcher_text_color">#F0F0F0</color>
+    <color name="launcher_text_muted_color">#9A9A9A</color>
+    <color name="launcher_primary_color">#22D88E</color>
+    <color name="launcher_on_primary_color">#06120D</color>
+    <color name="launcher_line_color">#2E2E2E</color>
+    <color name="launcher_bottom_bar_color">#1A1A1A</color>
+    <color name="launcher_input_hint_color">#787878</color>
+    <color name="launcher_nav_muted_color">#9A9A9A</color>
+    <color name="launcher_surface_subtle_color">#222323</color>
+    <color name="launcher_surface_header_color">#222323</color>
+    <color name="launcher_avatar_gradient_start">#146849</color>
+    <color name="launcher_avatar_gradient_end">#2FA36F</color>
+    <color name="launcher_cover_gradient_start">#244C3A</color>
+    <color name="launcher_cover_gradient_end">#305A47</color>
+    <color name="launcher_balance_start_color">#168A61</color>
+    <color name="launcher_balance_end_color">#0D4F3C</color>
+    <color name="launcher_home_stats_scrim_start">#E622D88E</color>
+    <color name="launcher_home_stats_scrim_mid">#B322D88E</color>
+    <color name="launcher_home_stats_scrim_end">#0022D88E</color>
+    <color name="launcher_danger_color">#F06B6B</color>
+    <color name="launcher_on_danger_color">#06120D</color>
+    <color name="launcher_accent_blue_soft_color">#7CCBFF</color>
+    <color name="launcher_accent_orange_color">#F4B36A</color>
+    <color name="launcher_accent_pink_color">#FF7BA5</color>
+    <color name="launcher_accent_purple_color">#D8A9C9</color>
+    <color name="launcher_rank_gold_color">#FFD45C</color>
+    <color name="launcher_rank_silver_color">#C4CDD4</color>
+    <color name="launcher_rank_bronze_color">#E39A67</color>
+    <color name="launcher_game_text_overlay_color">#D91A1A1A</color>
+</resources>

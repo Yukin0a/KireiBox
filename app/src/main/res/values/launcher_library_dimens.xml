@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 手机竖屏：完全保持原尺寸 -->
+    <dimen name="launcher_library_content_horizontal_padding">20dp</dimen>
+    <dimen name="launcher_library_content_top_padding">25dp</dimen>
+    <dimen name="launcher_library_content_bottom_padding">0dp</dimen>
+
+    <dimen name="launcher_library_toolbar_height">40dp</dimen>
+    <dimen name="launcher_library_title_text_size">22sp</dimen>
+    <dimen name="launcher_library_toolbar_button_width">49dp</dimen>
+    <dimen name="launcher_library_toolbar_button_height">31dp</dimen>
+    <dimen name="launcher_library_toolbar_button_text_size">12sp</dimen>
+    <dimen name="launcher_library_sync_button_margin_end">5dp</dimen>
+    <dimen name="launcher_library_collapse_button_margin_end">7dp</dimen>
+
+    <dimen name="launcher_library_search_height">38dp</dimen>
+    <dimen name="launcher_library_search_margin_top">7dp</dimen>
+    <dimen name="launcher_library_search_horizontal_padding">14dp</dimen>
+    <dimen name="launcher_library_search_text_size">13sp</dimen>
+
+    <dimen name="launcher_library_category_scroll_height">38dp</dimen>
+    <dimen name="launcher_library_category_margin_top">9dp</dimen>
+    <dimen name="launcher_library_category_chip_height">29dp</dimen>
+    <dimen name="launcher_library_category_horizontal_padding">13dp</dimen>
+    <dimen name="launcher_library_category_chip_margin_end">7dp</dimen>
+    <dimen name="launcher_library_category_text_size">12sp</dimen>
+
+    <dimen name="launcher_library_list_margin_top">7dp</dimen>
+    <dimen name="launcher_library_recycler_bottom_padding">31dp</dimen>
+    <dimen name="launcher_library_empty_height">86dp</dimen>
+    <dimen name="launcher_library_empty_text_size">14sp</dimen>
+    <dimen name="launcher_library_footer_height">29dp</dimen>
+    <dimen name="launcher_library_footer_text_size">12sp</dimen>
+    <dimen name="launcher_bottom_nav_height">85dp</dimen>
+
+    <!-- 固定卡片高度仅在平板竖屏开启；基础值兼容横屏共享逻辑 -->
+    <dimen name="launcher_library_card_text_overlay_height">41dp</dimen>
+</resources>

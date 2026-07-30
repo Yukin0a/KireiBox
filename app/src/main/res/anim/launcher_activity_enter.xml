@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<set xmlns:android="http://schemas.android.com/apk/res/android"
+    android:interpolator="@android:interpolator/decelerate_quad">
+    <alpha
+        android:duration="330"
+        android:fromAlpha="0"
+        android:toAlpha="1" />
+    <translate
+        android:duration="330"
+        android:fromYDelta="4%"
+        android:toYDelta="0%" />
+</set>

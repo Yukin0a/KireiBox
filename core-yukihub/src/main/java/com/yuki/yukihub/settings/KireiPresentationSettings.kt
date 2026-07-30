@@ -1,0 +1,600 @@
+package com.yuki.yukihub.settings
+
+import org.json.JSONArray
+import org.json.JSONObject
+import java.util.UUID
+import kotlin.math.abs
+
+enum class MotionMode {
+    AUTO, POLISHED, REDUCED;
+
+    companion object {
+        fun fromStored(value: String?): MotionMode = entries.firstOrNull {
+            it.name.equals(value, ignoreCase = true)
+        } ?: AUTO
+    }
+}
+
+data class MotionDecisionInputs(
+    val animatorsEnabled: Boolean,
+    val lowRamDevice: Boolean,
+    val memoryClassMb: Int,
+    val powerSaveMode: Boolean
+)
+
+object MotionModePolicy {
+    fun resolve(requested: MotionMode, inputs: MotionDecisionInputs): MotionMode {
+        if (!inputs.animatorsEnabled) return MotionMode.REDUCED
+        if (requested != MotionMode.AUTO) return requested
+        return if (inputs.lowRamDevice || inputs.memoryClassMb <= 192 || inputs.powerSaveMode) {
+            MotionMode.REDUCED
+        } else {
+            MotionMode.POLISHED
+        }
+    }
+}
+
+enum class DashboardProfile(val columns: Int) { COMPACT(2), WIDE(4) }
+
+enum class DashboardWidgetType(val unique: Boolean) {
+    GAME_SPOTLIGHT(false),
+    LIBRARY_OVERVIEW(true),
+    RECENT_GAMES(true),
+    FAVORITES(true),
+    LIBRARY_SHORTCUT(true),
+    PLAY_TREND(true)
+}
+
+enum class SpotlightSource { FIXED, RECENT, FAVORITES, ALL }
+enum class SpotlightStrategy { FIRST, RANDOM_EACH_LAUNCH, DAILY_RANDOM }
+
+data class DashboardWidgetSize(val columns: Int, val rows: Int)
+
+data class DashboardWidgetSpec(
+    val instanceId: String,
+    val type: DashboardWidgetType,
+    val size: DashboardWidgetSize,
+    val gameId: Long? = null,
+    val spotlightSource: SpotlightSource = SpotlightSource.RECENT,
+    val spotlightStrategy: SpotlightStrategy = SpotlightStrategy.FIRST,
+    val styleKey: String = "",
+    val column: Int = UNPLACED,
+    val row: Int = UNPLACED,
+    /** Height is stored independently from the horizontal span in 8dp steps. */
+    val heightSteps: Int = UNSPECIFIED_HEIGHT
+) {
+    companion object {
+        const val UNPLACED = -1
+        const val UNSPECIFIED_HEIGHT = 0
+    }
+}
+
+data class DashboardLayout(
+    val version: Int = DashboardLayouts.VERSION,
+    val widgets: List<DashboardWidgetSpec>,
+    val autoFill: Boolean = true
+)
+
+data class DashboardPlacement(
+    val spec: DashboardWidgetSpec,
+    val index: Int,
+    val column: Int,
+    val row: Int
+)
+
+/** Type-specific styles. Unknown values are normalized without discarding the layout. */
+object DashboardStyles {
+    const val SPOTLIGHT_IMMERSIVE = "spotlight_immersive"
+    const val SPOTLIGHT_POSTER = "spotlight_poster"
+    const val SPOTLIGHT_HORIZONTAL = "spotlight_horizontal"
+    const val OVERVIEW_MINIMAL = "overview_minimal"
+    const val OVERVIEW_SPLIT = "overview_split"
+    const val OVERVIEW_RING = "overview_ring"
+    const val OVERVIEW_TILES = "overview_tiles"
+    const val OVERVIEW_FOCUS = "overview_focus"
+    const val RECENT_STRIP = "recent_strip"
+    const val RECENT_GLASS = "recent_glass"
+    const val RECENT_COVERS = "recent_covers"
+    const val FAVORITES_STACK = "favorites_stack"
+    const val FAVORITES_MOSAIC = "favorites_mosaic"
+    const val FAVORITES_FEATURED = "favorites_featured"
+    const val FAVORITES_COUNT = "favorites_count"
+    const val LIBRARY_ICON = "library_icon"
+    const val LIBRARY_PROGRESS = "library_progress"
+    const val TREND_7_DAY = "trend_7_day"
+    const val TREND_30_DAY = "trend_30_day"
+    const val TREND_LAUNCH_7_DAY = "trend_launch_7_day"
+    const val TREND_LAUNCH_30_DAY = "trend_launch_30_day"
+
+    fun allowed(type: DashboardWidgetType): List<String> = when (type) {
+        DashboardWidgetType.GAME_SPOTLIGHT -> listOf(SPOTLIGHT_IMMERSIVE, SPOTLIGHT_POSTER, SPOTLIGHT_HORIZONTAL)
+        DashboardWidgetType.LIBRARY_OVERVIEW -> listOf(
+            OVERVIEW_MINIMAL, OVERVIEW_SPLIT, OVERVIEW_RING, OVERVIEW_TILES, OVERVIEW_FOCUS
+        )
+        DashboardWidgetType.RECENT_GAMES -> listOf(RECENT_STRIP, RECENT_GLASS, RECENT_COVERS)
+        DashboardWidgetType.FAVORITES -> listOf(
+            FAVORITES_STACK, FAVORITES_MOSAIC, FAVORITES_FEATURED, FAVORITES_COUNT
+        )
+        DashboardWidgetType.LIBRARY_SHORTCUT -> listOf(LIBRARY_ICON, LIBRARY_PROGRESS)
+        DashboardWidgetType.PLAY_TREND -> listOf(
+            TREND_7_DAY, TREND_30_DAY, TREND_LAUNCH_7_DAY, TREND_LAUNCH_30_DAY
+        )
+    }
+
+    fun default(type: DashboardWidgetType): String = allowed(type).first()
+    fun normalize(type: DashboardWidgetType, raw: String?): String =
+        raw?.takeIf { it in allowed(type) } ?: default(type)
+}
+
+object DashboardLayouts {
+    const val VERSION = 4
+    const val MAX_WIDGETS = 12
+    const val HEIGHT_STEP_DP = 8
+    const val GAP_STEPS = 1
+    const val MAX_VERTICAL_STEPS = 256
+    /** Compatibility alias for older tests and callers. */
+    const val MAX_ROWS = MAX_VERTICAL_STEPS
+
+    private val oneByOne = DashboardWidgetSize(1, 1)
+
+    fun default(profile: DashboardProfile): DashboardLayout = when (profile) {
+        DashboardProfile.COMPACT -> DashboardLayout(
+            widgets = listOf(
+                DashboardWidgetSpec(
+                    "default-game-compact", DashboardWidgetType.GAME_SPOTLIGHT,
+                    DashboardWidgetSize(2, 2), heightSteps = defaultHeightSteps(DashboardWidgetType.GAME_SPOTLIGHT)
+                ),
+                DashboardWidgetSpec(
+                    "default-overview-compact", DashboardWidgetType.LIBRARY_OVERVIEW,
+                    DashboardWidgetSize(2, 1), styleKey = DashboardStyles.OVERVIEW_SPLIT,
+                    heightSteps = defaultHeightSteps(DashboardWidgetType.LIBRARY_OVERVIEW)
+                ),
+                DashboardWidgetSpec(
+                    "default-recent-compact", DashboardWidgetType.RECENT_GAMES,
+                    DashboardWidgetSize(2, 1), heightSteps = defaultHeightSteps(DashboardWidgetType.RECENT_GAMES)
+                )
+            )
+        )
+        DashboardProfile.WIDE -> DashboardLayout(
+            widgets = listOf(
+                DashboardWidgetSpec(
+                    "default-game-wide", DashboardWidgetType.GAME_SPOTLIGHT,
+                    DashboardWidgetSize(2, 2), heightSteps = defaultHeightSteps(DashboardWidgetType.GAME_SPOTLIGHT)
+                ),
+                DashboardWidgetSpec(
+                    "default-overview-wide", DashboardWidgetType.LIBRARY_OVERVIEW,
+                    DashboardWidgetSize(2, 1), styleKey = DashboardStyles.OVERVIEW_SPLIT,
+                    heightSteps = defaultHeightSteps(DashboardWidgetType.LIBRARY_OVERVIEW)
+                ),
+                DashboardWidgetSpec(
+                    "default-recent-wide", DashboardWidgetType.RECENT_GAMES,
+                    DashboardWidgetSize(2, 1), heightSteps = defaultHeightSteps(DashboardWidgetType.RECENT_GAMES)
+                )
+            )
+        )
+    }
+
+    fun heightRange(type: DashboardWidgetType): IntRange = when (type) {
+        DashboardWidgetType.GAME_SPOTLIGHT -> 17..52
+        DashboardWidgetType.LIBRARY_OVERVIEW -> 13..28
+        DashboardWidgetType.RECENT_GAMES -> 14..28
+        DashboardWidgetType.FAVORITES -> 13..28
+        DashboardWidgetType.LIBRARY_SHORTCUT -> 12..24
+        DashboardWidgetType.PLAY_TREND -> 15..30
+    }
+
+    fun defaultHeightSteps(type: DashboardWidgetType): Int = when (type) {
+        DashboardWidgetType.GAME_SPOTLIGHT -> 34
+        DashboardWidgetType.LIBRARY_OVERVIEW -> 17
+        DashboardWidgetType.RECENT_GAMES -> 17
+        DashboardWidgetType.FAVORITES -> 17
+        DashboardWidgetType.LIBRARY_SHORTCUT -> 15
+        DashboardWidgetType.PLAY_TREND -> 17
+    }
+
+    fun heightDp(spec: DashboardWidgetSpec): Int =
+        normalizeHeight(spec.type, spec.heightSteps) * HEIGHT_STEP_DP
+
+    fun allowedWidths(type: DashboardWidgetType, profile: DashboardProfile): List<Int> =
+        allowedSizes(type, profile).map { it.columns }.distinct()
+
+    fun allowedSizes(type: DashboardWidgetType, profile: DashboardProfile): List<DashboardWidgetSize> = when (type) {
+        DashboardWidgetType.GAME_SPOTLIGHT -> if (profile == DashboardProfile.COMPACT) {
+            listOf(DashboardWidgetSize(1, 2), DashboardWidgetSize(2, 1), DashboardWidgetSize(2, 2), DashboardWidgetSize(2, 3))
+        } else {
+            listOf(
+                DashboardWidgetSize(1, 2), DashboardWidgetSize(2, 1), DashboardWidgetSize(2, 2),
+                DashboardWidgetSize(3, 2), DashboardWidgetSize(4, 2), DashboardWidgetSize(4, 3)
+            )
+        }
+        DashboardWidgetType.LIBRARY_OVERVIEW,
+        DashboardWidgetType.FAVORITES -> listOf(oneByOne, DashboardWidgetSize(2, 1))
+        DashboardWidgetType.RECENT_GAMES -> if (profile == DashboardProfile.COMPACT) {
+            listOf(oneByOne, DashboardWidgetSize(2, 1))
+        } else {
+            listOf(DashboardWidgetSize(2, 1), DashboardWidgetSize(4, 1))
+        }
+        DashboardWidgetType.LIBRARY_SHORTCUT -> listOf(oneByOne)
+        DashboardWidgetType.PLAY_TREND -> if (profile == DashboardProfile.COMPACT) {
+            listOf(DashboardWidgetSize(2, 1))
+        } else {
+            listOf(DashboardWidgetSize(2, 1), DashboardWidgetSize(4, 1))
+        }
+    }
+
+    fun normalize(layout: DashboardLayout, profile: DashboardProfile): DashboardLayout {
+        val base = normalizeBase(layout, profile)
+        return if (base.autoFill) base else resolveManual(base, profile)
+    }
+
+    fun nextSize(spec: DashboardWidgetSpec, profile: DashboardProfile): DashboardWidgetSize {
+        val allowed = allowedSizes(spec.type, profile)
+        val index = allowed.indexOf(spec.size)
+        return allowed[(if (index < 0) 0 else index + 1) % allowed.size]
+    }
+
+    fun resize(layout: DashboardLayout, profile: DashboardProfile, instanceId: String, size: DashboardWidgetSize): DashboardLayout {
+        val updated = normalizeBase(
+            layout.copy(widgets = layout.widgets.map {
+                if (it.instanceId == instanceId) {
+                    it.copy(size = size, heightSteps = legacyHeightSteps(size.rows))
+                } else it
+            }),
+            profile
+        )
+        return if (updated.autoFill) updated else resolveManual(updated, profile, instanceId)
+    }
+
+    fun resizeWidth(layout: DashboardLayout, profile: DashboardProfile, instanceId: String, columns: Int): DashboardLayout {
+        val updated = normalizeBase(
+            layout.copy(widgets = layout.widgets.map {
+                if (it.instanceId == instanceId) it.copy(size = it.size.copy(columns = columns)) else it
+            }),
+            profile
+        )
+        return if (updated.autoFill) updated else resolveManual(updated, profile, instanceId)
+    }
+
+    fun resizeHeight(layout: DashboardLayout, profile: DashboardProfile, instanceId: String, heightSteps: Int): DashboardLayout {
+        val updated = normalizeBase(
+            layout.copy(widgets = layout.widgets.map {
+                if (it.instanceId == instanceId) {
+                    it.copy(heightSteps = heightSteps.coerceIn(heightRange(it.type)))
+                } else it
+            }),
+            profile
+        )
+        return if (updated.autoFill) updated else resolveManual(updated, profile, instanceId)
+    }
+
+    fun setStyle(layout: DashboardLayout, profile: DashboardProfile, instanceId: String, styleKey: String): DashboardLayout =
+        normalize(layout.copy(widgets = layout.widgets.map {
+            if (it.instanceId == instanceId) it.copy(styleKey = DashboardStyles.normalize(it.type, styleKey)) else it
+        }), profile)
+
+    fun setSpotlight(
+        layout: DashboardLayout,
+        profile: DashboardProfile,
+        instanceId: String,
+        source: SpotlightSource,
+        strategy: SpotlightStrategy,
+        gameId: Long? = null,
+    ): DashboardLayout = normalize(
+        layout.copy(widgets = layout.widgets.map { spec ->
+            if (spec.instanceId != instanceId || spec.type != DashboardWidgetType.GAME_SPOTLIGHT) spec
+            else spec.copy(
+                gameId = if (source == SpotlightSource.FIXED) gameId ?: spec.gameId else null,
+                spotlightSource = if (source == SpotlightSource.FIXED && gameId == null && spec.gameId == null) {
+                    SpotlightSource.RECENT
+                } else source,
+                spotlightStrategy = strategy,
+            )
+        }),
+        profile,
+    )
+
+    fun move(layout: DashboardLayout, profile: DashboardProfile, instanceId: String, targetIndex: Int): DashboardLayout {
+        if (!layout.autoFill) return normalize(layout, profile)
+        val mutable = layout.widgets.toMutableList()
+        val from = mutable.indexOfFirst { it.instanceId == instanceId }
+        if (from < 0) return normalize(layout, profile)
+        val item = mutable.removeAt(from)
+        mutable.add(targetIndex.coerceIn(0, mutable.size), item)
+        return normalize(layout.copy(widgets = mutable), profile)
+    }
+
+    /** Manual placement gives the dragged widget priority and relocates collisions to the nearest free cells. */
+    fun placeAt(
+        layout: DashboardLayout,
+        profile: DashboardProfile,
+        instanceId: String,
+        column: Int,
+        row: Int
+    ): DashboardLayout {
+        val frozen = freezePositions(layout, profile)
+        val manual = frozen.copy(
+            widgets = frozen.widgets.map {
+                if (it.instanceId == instanceId) it.copy(column = column, row = row) else it
+            },
+            autoFill = false
+        )
+        return resolveManual(normalizeBase(manual, profile), profile, instanceId)
+    }
+
+    fun setAutoFill(layout: DashboardLayout, profile: DashboardProfile, enabled: Boolean): DashboardLayout {
+        if (enabled) return normalizeBase(layout.copy(autoFill = true), profile)
+        return freezePositions(layout, profile).copy(autoFill = false)
+    }
+
+    fun remove(layout: DashboardLayout, profile: DashboardProfile, instanceId: String): DashboardLayout =
+        normalize(layout.copy(widgets = layout.widgets.filterNot { it.instanceId == instanceId }), profile)
+
+    fun add(layout: DashboardLayout, profile: DashboardProfile, type: DashboardWidgetType, gameId: Long? = null): DashboardLayout {
+        val spec = DashboardWidgetSpec(
+            instanceId = "${type.name.lowercase()}-${UUID.randomUUID()}",
+            type = type,
+            size = allowedSizes(type, profile).first(),
+            gameId = gameId,
+            spotlightSource = if (gameId == null) SpotlightSource.RECENT else SpotlightSource.FIXED,
+            styleKey = DashboardStyles.default(type),
+            heightSteps = defaultHeightSteps(type)
+        )
+        return normalize(layout.copy(widgets = layout.widgets + spec), profile)
+    }
+
+    fun encode(layout: DashboardLayout, profile: DashboardProfile): String {
+        val clean = normalize(layout, profile)
+        val root = JSONObject().put("version", VERSION).put("autoFill", clean.autoFill)
+        val widgets = JSONArray()
+        clean.widgets.forEach { spec ->
+            widgets.put(
+                JSONObject()
+                    .put("id", spec.instanceId)
+                    .put("type", spec.type.name)
+                    .put("columns", spec.size.columns)
+                    .put("rows", spec.size.rows)
+                    .put("heightSteps", spec.heightSteps)
+                    .put("style", spec.styleKey)
+                    .put("spotlightSource", spec.spotlightSource.name)
+                    .put("spotlightStrategy", spec.spotlightStrategy.name)
+                    .put("column", spec.column)
+                    .put("row", spec.row)
+                    .apply { spec.gameId?.let { put("gameId", it) } }
+            )
+        }
+        return root.put("widgets", widgets).toString()
+    }
+
+    fun decode(raw: String?, profile: DashboardProfile): DashboardLayout {
+        if (raw.isNullOrBlank()) return default(profile)
+        return runCatching {
+            val root = JSONObject(raw)
+            val storedVersion = root.optInt("version", 1)
+            if (storedVersion > VERSION) return@runCatching default(profile)
+            val array = root.optJSONArray("widgets") ?: return@runCatching default(profile)
+            val widgets = ArrayList<DashboardWidgetSpec>()
+            for (index in 0 until array.length()) {
+                val item = array.optJSONObject(index) ?: continue
+                val type = DashboardWidgetType.entries.firstOrNull {
+                    it.name.equals(item.optString("type"), ignoreCase = true)
+                } ?: continue
+                val gameId = item.optLong("gameId").takeIf { item.has("gameId") && it > 0L }
+                widgets += DashboardWidgetSpec(
+                    instanceId = item.optString("id"),
+                    type = type,
+                    size = DashboardWidgetSize(item.optInt("columns", 1), item.optInt("rows", 1)),
+                    gameId = gameId,
+                    spotlightSource = if (storedVersion >= 4) {
+                        SpotlightSource.entries.firstOrNull {
+                            it.name.equals(item.optString("spotlightSource"), ignoreCase = true)
+                        } ?: if (gameId == null) SpotlightSource.RECENT else SpotlightSource.FIXED
+                    } else if (gameId == null) {
+                        SpotlightSource.RECENT
+                    } else {
+                        SpotlightSource.FIXED
+                    },
+                    spotlightStrategy = if (storedVersion >= 4) {
+                        SpotlightStrategy.entries.firstOrNull {
+                            it.name.equals(item.optString("spotlightStrategy"), ignoreCase = true)
+                        } ?: SpotlightStrategy.FIRST
+                    } else {
+                        SpotlightStrategy.FIRST
+                    },
+                    styleKey = if (storedVersion >= 2) item.optString("style") else DashboardStyles.default(type),
+                    column = if (storedVersion >= 2) item.optInt("column", DashboardWidgetSpec.UNPLACED) else DashboardWidgetSpec.UNPLACED,
+                    row = if (storedVersion >= 3) {
+                        item.optInt("row", DashboardWidgetSpec.UNPLACED)
+                    } else if (storedVersion >= 2) {
+                        item.optInt("row", DashboardWidgetSpec.UNPLACED)
+                            .takeIf { it >= 0 }?.times(18) ?: DashboardWidgetSpec.UNPLACED
+                    } else {
+                        DashboardWidgetSpec.UNPLACED
+                    },
+                    heightSteps = if (storedVersion >= 3) {
+                        item.optInt("heightSteps", defaultHeightSteps(type))
+                    } else {
+                        legacyHeightSteps(item.optInt("rows", 1))
+                    }
+                )
+            }
+            normalize(
+                DashboardLayout(
+                    version = VERSION,
+                    widgets = widgets,
+                    autoFill = if (storedVersion >= 2) root.optBoolean("autoFill", true) else true
+                ),
+                profile
+            )
+        }.getOrElse { default(profile) }
+    }
+
+    fun pack(layout: DashboardLayout, profile: DashboardProfile): List<DashboardPlacement> {
+        val clean = normalize(layout, profile)
+        if (!clean.autoFill) return clean.widgets.mapIndexed { index, spec ->
+            DashboardPlacement(spec, index, spec.column, spec.row)
+        }
+        return firstFit(clean.widgets, profile)
+    }
+
+    private fun normalizeBase(layout: DashboardLayout, profile: DashboardProfile): DashboardLayout {
+        val seenIds = HashSet<String>()
+        val seenUnique = HashSet<DashboardWidgetType>()
+        val seenGames = HashSet<Long>()
+        var automaticGameSeen = false
+        val normalized = ArrayList<DashboardWidgetSpec>()
+        layout.widgets.take(MAX_WIDGETS * 2).forEachIndexed { index, raw ->
+            if (normalized.size >= MAX_WIDGETS) return@forEachIndexed
+            if (raw.type.unique && !seenUnique.add(raw.type)) return@forEachIndexed
+            if (raw.type == DashboardWidgetType.GAME_SPOTLIGHT) {
+                val gameId = raw.gameId
+                if (gameId == null) {
+                    if (automaticGameSeen) return@forEachIndexed
+                    automaticGameSeen = true
+                } else if (!seenGames.add(gameId)) return@forEachIndexed
+            }
+            val id = raw.instanceId.takeIf { it.isNotBlank() && seenIds.add(it) }
+                ?: "${raw.type.name.lowercase()}-$index-${UUID.randomUUID()}"
+            seenIds.add(id)
+            val allowed = allowedSizes(raw.type, profile)
+            val columns = allowedWidths(raw.type, profile)
+                .minByOrNull { abs(it - raw.size.columns) } ?: 1
+            val heightSteps = normalizeHeight(
+                raw.type,
+                if (raw.heightSteps > 0) raw.heightSteps else legacyHeightSteps(raw.size.rows)
+            )
+            val size = nearestAllowed(raw.size.copy(columns = columns), allowed)
+            val spotlightSource = when {
+                raw.type != DashboardWidgetType.GAME_SPOTLIGHT -> raw.spotlightSource
+                raw.gameId != null -> SpotlightSource.FIXED
+                raw.spotlightSource == SpotlightSource.FIXED -> SpotlightSource.RECENT
+                else -> raw.spotlightSource
+            }
+            normalized += raw.copy(
+                instanceId = id,
+                size = size,
+                gameId = raw.gameId.takeIf {
+                    raw.type != DashboardWidgetType.GAME_SPOTLIGHT ||
+                        spotlightSource == SpotlightSource.FIXED
+                },
+                spotlightSource = spotlightSource,
+                heightSteps = heightSteps,
+                styleKey = DashboardStyles.normalize(raw.type, raw.styleKey),
+                column = raw.column.coerceIn(DashboardWidgetSpec.UNPLACED, profile.columns - size.columns),
+                row = raw.row.coerceIn(DashboardWidgetSpec.UNPLACED, MAX_VERTICAL_STEPS - occupiedHeight(raw.copy(heightSteps = heightSteps)))
+            )
+        }
+        return DashboardLayout(VERSION, normalized, layout.autoFill)
+    }
+
+    private fun freezePositions(layout: DashboardLayout, profile: DashboardProfile): DashboardLayout {
+        val base = normalizeBase(layout, profile)
+        val placements = if (base.autoFill) firstFit(base.widgets, profile) else pack(base, profile)
+        val byId = placements.associateBy { it.spec.instanceId }
+        return base.copy(
+            autoFill = false,
+            widgets = base.widgets.map { spec ->
+                val placement = byId[spec.instanceId]
+                spec.copy(column = placement?.column ?: 0, row = placement?.row ?: 0)
+            }
+        )
+    }
+
+    private fun resolveManual(
+        layout: DashboardLayout,
+        profile: DashboardProfile,
+        priorityId: String? = null
+    ): DashboardLayout {
+        val occupied = Array(MAX_ROWS) { BooleanArray(profile.columns) }
+        val placed = HashMap<String, Pair<Int, Int>>()
+        val ordered = layout.widgets.sortedBy { if (it.instanceId == priorityId) 0 else 1 }
+        ordered.forEach { spec ->
+            val preferredColumn = spec.column.coerceAtLeast(0).coerceAtMost(profile.columns - spec.size.columns)
+            val preferredRow = spec.row.coerceAtLeast(0).coerceAtMost(MAX_VERTICAL_STEPS - occupiedHeight(spec))
+            val occupiedSize = DashboardWidgetSize(spec.size.columns, occupiedHeight(spec))
+            val destination = nearestFree(occupied, occupiedSize, preferredColumn, preferredRow, profile.columns)
+                ?: return@forEach
+            mark(occupied, destination.first, destination.second, occupiedSize)
+            placed[spec.instanceId] = destination
+        }
+        return layout.copy(
+            version = VERSION,
+            autoFill = false,
+            widgets = layout.widgets.mapNotNull { spec ->
+                placed[spec.instanceId]?.let { (column, row) -> spec.copy(column = column, row = row) }
+            }
+        )
+    }
+
+    private fun nearestFree(
+        occupied: Array<BooleanArray>,
+        size: DashboardWidgetSize,
+        preferredColumn: Int,
+        preferredRow: Int,
+        columns: Int
+    ): Pair<Int, Int>? {
+        val candidates = ArrayList<Pair<Int, Int>>()
+        for (row in 0..(MAX_VERTICAL_STEPS - size.rows)) {
+            for (column in 0..(columns - size.columns)) candidates += column to row
+        }
+        return candidates.sortedWith(
+            compareBy<Pair<Int, Int>> { abs(it.first - preferredColumn) + abs(it.second - preferredRow) }
+                .thenBy { it.second }.thenBy { it.first }
+        ).firstOrNull { (column, row) -> isFree(occupied, column, row, size) }
+    }
+
+    private fun firstFit(widgets: List<DashboardWidgetSpec>, profile: DashboardProfile): List<DashboardPlacement> {
+        val occupied = ArrayList<BooleanArray>()
+        fun ensureRows(count: Int) { while (occupied.size < count) occupied += BooleanArray(profile.columns) }
+        val placements = ArrayList<DashboardPlacement>()
+        widgets.forEachIndexed { index, spec ->
+            val width = spec.size.columns.coerceIn(1, profile.columns)
+            val height = occupiedHeight(spec)
+            var row = 0
+            var placed = false
+            while (!placed && row < MAX_VERTICAL_STEPS) {
+                ensureRows(row + height)
+                for (column in 0..(profile.columns - width)) {
+                    var free = true
+                    loop@ for (y in row until row + height) for (x in column until column + width) {
+                        if (occupied[y][x]) { free = false; break@loop }
+                    }
+                    if (free) {
+                        for (y in row until row + height) for (x in column until column + width) occupied[y][x] = true
+                        placements += DashboardPlacement(spec, index, column, row)
+                        placed = true
+                        break
+                    }
+                }
+                if (!placed) row++
+            }
+        }
+        return placements
+    }
+
+    private fun isFree(occupied: Array<BooleanArray>, column: Int, row: Int, size: DashboardWidgetSize): Boolean {
+        for (y in row until row + size.rows) for (x in column until column + size.columns) {
+            if (y !in occupied.indices || x !in occupied[y].indices || occupied[y][x]) return false
+        }
+        return true
+    }
+
+    private fun mark(occupied: Array<BooleanArray>, column: Int, row: Int, size: DashboardWidgetSize) {
+        for (y in row until row + size.rows) for (x in column until column + size.columns) occupied[y][x] = true
+    }
+
+    private fun nearestAllowed(size: DashboardWidgetSize, allowed: List<DashboardWidgetSize>): DashboardWidgetSize =
+        allowed.minByOrNull { abs(it.columns - size.columns) + abs(it.rows - size.rows) } ?: oneByOne
+
+    private fun normalizeHeight(type: DashboardWidgetType, raw: Int): Int =
+        raw.coerceIn(heightRange(type).first, heightRange(type).last)
+
+    private fun occupiedHeight(spec: DashboardWidgetSpec): Int =
+        normalizeHeight(spec.type, spec.heightSteps) + GAP_STEPS
+
+    private fun legacyHeightSteps(rows: Int): Int = when (rows.coerceAtLeast(1)) {
+        1 -> 17
+        2 -> 34
+        3 -> 52
+        else -> ((132 * rows + 10 * (rows - 1)) / HEIGHT_STEP_DP.toFloat()).toInt().coerceAtLeast(1)
+    }
+}
