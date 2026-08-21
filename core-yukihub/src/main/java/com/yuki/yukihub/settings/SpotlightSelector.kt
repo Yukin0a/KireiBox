@@ -9,7 +9,26 @@ object SpotlightSelector {
         games: List<Game>,
         sessionSeed: Long,
         epochDay: Long,
-    ): Game? {
+    ): Game? = selectPages(spec, games, sessionSeed, epochDay).firstOrNull()
+
+    /**
+     * Selects the carousel pages without changing the persisted dashboard schema.
+     * Covered games are preferred in automatic sources, but an all-default-cover source
+     * remains usable. Manual mode preserves the saved explicit order and never silently
+     * substitutes another game when every saved id is missing.
+     */
+    fun selectPages(
+        spec: DashboardWidgetSpec,
+        games: List<Game>,
+        sessionSeed: Long,
+        epochDay: Long,
+    ): List<Game> {
+        if (spec.spotlightSelectionMode == SpotlightSelectionMode.MANUAL) {
+            val byId = games.associateBy { it.id }
+            return spec.spotlightGameIds
+                .mapNotNull(byId::get)
+                .take(spec.spotlightMaxPages.coerceIn(1, MAX_PAGES))
+        }
         val ordered = games.sortedWith(
             compareByDescending<Game> { it.lastPlayedAt }
                 .thenBy { it.title.orEmpty() }
@@ -17,20 +36,29 @@ object SpotlightSelector {
         )
         val sourcePool = when (spec.spotlightSource) {
             SpotlightSource.FIXED -> ordered.filter { it.id == spec.gameId }
-            SpotlightSource.RECENT -> ordered.filter { it.lastPlayedAt > 0L }.ifEmpty { ordered }
+            // RECENT is intentionally empty until a real play session exists. ALL is the
+            // only source allowed to expose the whole library.
+            SpotlightSource.RECENT -> ordered.filter { it.lastPlayedAt > 0L }
             SpotlightSource.FAVORITES -> ordered.filter { it.favorite }
             SpotlightSource.ALL -> ordered
         }
-        if (sourcePool.isEmpty()) return null
+        if (sourcePool.isEmpty()) return emptyList()
         val pool = sourcePool.filter { !it.coverUri.isNullOrBlank() }.ifEmpty { sourcePool }
-        val salt = when (spec.spotlightStrategy) {
-            SpotlightStrategy.FIRST -> return pool.firstOrNull()
-            SpotlightStrategy.RANDOM_EACH_LAUNCH -> sessionSeed
-            SpotlightStrategy.DAILY_RANDOM -> epochDay
+        val pages: List<Game> = when (spec.spotlightStrategy) {
+            SpotlightStrategy.FIRST -> pool
+            SpotlightStrategy.RANDOM_EACH_LAUNCH -> randomized(pool, spec.instanceId, sessionSeed)
+            SpotlightStrategy.DAILY_RANDOM -> randomized(pool, spec.instanceId, epochDay)
         }
-        val mixed = mix64(salt xor spec.instanceId.hashCode().toLong())
-        return pool[Math.floorMod(mixed, pool.size.toLong()).toInt()]
+        return pages.take(spec.spotlightMaxPages.coerceIn(1, MAX_PAGES))
     }
+
+    private const val MAX_PAGES = 5
+
+    private fun randomized(pool: List<Game>, instanceId: String, salt: Long): List<Game> =
+        pool.sortedWith(
+            compareBy<Game> { game -> mix64(salt xor instanceId.hashCode().toLong() xor game.id) }
+                .thenBy { it.id },
+        )
 
     private fun mix64(input: Long): Long {
         var value = input

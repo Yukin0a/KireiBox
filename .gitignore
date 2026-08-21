@@ -99,3 +99,6 @@ log/
 # Imported residues excluded from every public build
 /app/src/main/assets/rtp/sf.sf2
 /engine/src/main/jniLibs/arm64-v8a/libBugly.so
+
+# SDD ledgers and task artifacts (local-only plan tracking)
+/.superpowers/

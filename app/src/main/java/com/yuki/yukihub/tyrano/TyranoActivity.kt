@@ -13,6 +13,7 @@ import android.os.Looper
 import android.util.Log
 import android.view.View
 import android.view.ViewGroup
+import android.view.Gravity
 import android.view.WindowManager
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
@@ -22,11 +23,14 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
+import android.widget.LinearLayout
+import android.widget.TextView
 import android.widget.Toast
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
+import com.yuki.yukihub.engine.EngineStorageProbe
 import org.tvp.kirikiri2.EnginePlaySessionJournal
 
 /** Tyrano WebView 宿主；资源服务与存档沙箱分别由独立组件负责。 */
@@ -61,8 +65,10 @@ class TyranoActivity : Activity() {
         gameRootFile = gameRoot
         val saves = resolveSaveDirectory(intent, gameRoot)
         saveDirectory = saves
-        if (!ensureWritableSaveDirectory(saves)) {
-            failLaunch("Tyrano 启动失败：存档目录不可写")
+        val probe = EngineStorageProbe.probeDirectory(saves)
+        if (!probe.ok) {
+            Log.e(TAG, "save probe failed: ${probe.logMessage()}")
+            failLaunch("Tyrano 启动失败：${probe.userMessage()}")
             return
         }
         Log.i(TAG, "save directory=${saves!!.absolutePath} scoped=${intent.getBooleanExtra(EXTRA_SCOPED_SAVE_DIR, false)}")
@@ -131,8 +137,38 @@ class TyranoActivity : Activity() {
     }
 
     private fun failLaunch(message: String) {
-        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
-        finish()
+        Log.e(TAG, message)
+        if (isFinishing || isDestroyed) return
+        val density = resources.displayMetrics.density
+        val root = FrameLayout(this).apply {
+            setBackgroundColor(Color.BLACK)
+            layoutParams = ViewGroup.LayoutParams(-1, -1)
+        }
+        val messageText = TextView(this).apply {
+            setText(message)
+            setTextColor(Color.WHITE)
+            textSize = 14f
+            setLineSpacing(0f, 1.15f)
+            setPadding(
+                (24 * density).toInt(), (24 * density).toInt(),
+                (24 * density).toInt(), (12 * density).toInt(),
+            )
+        }
+        val close = TextView(this).apply {
+            text = "返回"
+            setTextColor(Color.rgb(120, 170, 255))
+            textSize = 16f
+            gravity = Gravity.CENTER
+            setPadding(0, (12 * density).toInt(), 0, (24 * density).toInt())
+            setOnClickListener { finish() }
+        }
+        val column = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(messageText)
+            addView(close)
+        }
+        root.addView(column)
+        setContentView(root)
     }
 
     private fun configureWebView(browser: WebView) {
@@ -455,14 +491,7 @@ class TyranoActivity : Activity() {
         private const val EXTRA_SCOPED_SAVE_ROOT = "scopedSaveRoot"
         private const val PROCESS_EXIT_DELAY_MS = 500L
 
-        private fun ensureWritableSaveDirectory(directory: File?): Boolean = try {
-            directory != null &&
-                (directory.exists() || directory.mkdirs()) &&
-                directory.isDirectory &&
-                directory.canWrite()
-        } catch (_: Throwable) {
-            false
-        }
+
 
         @JvmStatic
         @Throws(Exception::class)

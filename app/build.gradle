@@ -6,6 +6,13 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+def releaseSigningFile = rootProject.file("keystore.properties")
+def releaseSigningProperties = new Properties()
+def releaseSigningConfigured = releaseSigningFile.isFile()
+if (releaseSigningConfigured) {
+    releaseSigningProperties.load(new FileInputStream(releaseSigningFile))
+}
+
 android {
     // Keep the source namespace stable for JNI/reflection and imported engine bridges.
     // The installable identity is the independent com.kireibox.app applicationId above.
@@ -15,9 +22,13 @@ android {
     defaultConfig {
         applicationId "com.kireibox.app"
         minSdk 26
-        targetSdk 33
-        versionCode 7
-        versionName "0.5.0-alpha.1"
+        // Android 10 (API 29) needs legacy external storage so the KRKR native
+        // engine can write <game>/savedata. requestLegacyExternalStorage only
+        // takes effect when targetSdk <= 29; Android 11+ still enforces scoped
+        // storage and keeps using MANAGE_EXTERNAL_STORAGE instead.
+        targetSdk 29
+        versionCode 19
+        versionName "0.5.0-alpha.13"
 
         ndk {
             abiFilters 'arm64-v8a'
@@ -30,24 +41,27 @@ android {
 
     signingConfigs {
         release {
-            def ks = rootProject.file("keystore.properties")
-            if (ks.exists()) {
-                def props = new Properties()
-                props.load(new FileInputStream(ks))
-                storeFile file(props['releaseStoreFile'])
-                storePassword props['releaseStorePassword']
-                keyAlias props['releaseKeyAlias']
-                keyPassword props['releaseKeyPassword']
-            } else {
-                storeFile file(System.getProperty("user.home") + '/.android/debug.keystore')
-                storePassword 'android'
-                keyAlias 'androiddebugkey'
-                keyPassword 'android'
+            if (releaseSigningConfigured) {
+                storeFile file(releaseSigningProperties['releaseStoreFile'])
+                storePassword releaseSigningProperties['releaseStorePassword']
+                keyAlias releaseSigningProperties['releaseKeyAlias']
+                keyPassword releaseSigningProperties['releaseKeyPassword']
             }
         }
     }
 
     buildTypes {
+        demo {
+            initWith release
+            // Demo packages stay upgrade-compatible with the Huawei-tested debug line.
+            // R8/resource shrinking keeps the distributable small while the normal
+            // debug variant remains untouched for development diagnostics.
+            signingConfig signingConfigs.debug
+            matchingFallbacks = ['release']
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
         release {
             signingConfig signingConfigs.release
             minifyEnabled true
@@ -65,6 +79,7 @@ android {
         // The KireiBox shell is Compose-only.
         viewBinding false
         compose true
+        buildConfig true
     }
 
     sourceSets {
@@ -84,9 +99,129 @@ android {
     packaging {
         pickFirst 'lib/arm64-v8a/libSDL2.so'
         jniLibs {
+            // Keep release native libraries compressed in the APK; Android extracts them once
+            // at install time, reducing the Alpha distributable without dropping engine files.
             useLegacyPackaging true
         }
+        resources {
+            excludes += [
+                'META-INF/DEPENDENCIES',
+                'META-INF/INDEX.LIST',
+                '**/._*',
+                '**/.DS_Store',
+            ]
+        }
     }
+}
+
+tasks.register("verifyReleaseSigning") {
+    doLast {
+        def requiredKeys = [
+            'releaseStoreFile',
+            'releaseStorePassword',
+            'releaseKeyAlias',
+            'releaseKeyPassword',
+        ]
+        if (!releaseSigningConfigured || requiredKeys.any { releaseSigningProperties[it]?.trim().isEmpty() != false }) {
+            throw new GradleException("Release signing requires ignored local keystore.properties; debug signing fallback is forbidden.")
+        }
+        def signingStore = file(releaseSigningProperties['releaseStoreFile'])
+        if (!signingStore.isFile()) {
+            throw new GradleException("Release signing keystore is missing: ${signingStore}")
+        }
+    }
+}
+
+tasks.configureEach { task ->
+    if (task.name == "packageRelease") {
+        task.dependsOn("verifyReleaseSigning")
+    }
+}
+
+androidComponents {
+    onVariants(selector().withBuildType("demo")) { variant ->
+        variant.outputs.each { output ->
+            output.versionCode.set(12)
+            output.versionName.set("demo.1")
+        }
+    }
+}
+
+def demoApk = layout.buildDirectory.file("outputs/apk/demo/app-demo.apk")
+def demoDeliverable = rootProject.layout.buildDirectory.file("deliverables/KireiBox-demo.1-arm64-v8a.apk")
+
+tasks.register("verifyDemoApk") {
+    dependsOn("assembleDemo")
+    inputs.file(demoApk)
+    doLast {
+        def apk = demoApk.get().asFile
+        if (!apk.isFile()) throw new GradleException("Missing demo APK: ${apk}")
+        def maxBytes = 60L * 1024L * 1024L
+        if (apk.length() > maxBytes) {
+            throw new GradleException("Demo APK exceeds 60 MiB: ${apk.length()} bytes")
+        }
+
+        def requiredEntries = [
+            "lib/arm64-v8a/libgame.so",
+            "lib/arm64-v8a/libgame134.so",
+            "lib/arm64-v8a/libgame126.so",
+            "lib/arm64-v8a/libffmpeg.so",
+            "lib/arm64-v8a/libkrkr_bridge.so",
+            "lib/arm64-v8a/libartemis.so",
+            "lib/arm64-v8a/libartemis-compatible.so",
+            "lib/arm64-v8a/libartemis-compatible-v2.so",
+            "lib/arm64-v8a/libONSPatch.so",
+            "assets/libs/Yuri_0.7.6/libonsyuri.so",
+            "lib/arm64-v8a/libijkffmpeg.so",
+            "lib/arm64-v8a/libijksdl.so",
+            "lib/arm64-v8a/libijkplayer.so",
+        ] as Set
+        def forbiddenText = [
+            "chatgpt", "openai", "codex", "claude", "gemini",
+            "聊天记录", "聊天内容", "对话记录", "对话内容",
+        ]
+
+        def zip = new java.util.zip.ZipFile(apk)
+        try {
+            def entryNames = zip.entries().collect { it.name } as Set
+            def missing = requiredEntries - entryNames
+            if (!missing.isEmpty()) {
+                throw new GradleException("Demo APK is missing compatibility files: ${missing.join(', ')}")
+            }
+            def unexpectedAbis = entryNames.findAll {
+                it.startsWith("lib/") && !it.startsWith("lib/arm64-v8a/")
+            }
+            if (!unexpectedAbis.isEmpty()) {
+                throw new GradleException("Demo APK contains unexpected ABIs: ${unexpectedAbis.join(', ')}")
+            }
+
+            def privacyMatches = []
+            zip.entries().each { entry ->
+                if (entry.directory) return
+                def inspect = entry.name ==~ /classes.*\.dex/ ||
+                    entry.name == "resources.arsc" || entry.name.startsWith("assets/")
+                if (!inspect || entry.size > 64L * 1024L * 1024L) return
+                def text = new String(zip.getInputStream(entry).bytes, java.nio.charset.StandardCharsets.UTF_8)
+                    .toLowerCase(java.util.Locale.ROOT)
+                forbiddenText.each { term ->
+                    if (text.contains(term)) privacyMatches << "${term}@${entry.name}"
+                }
+            }
+            if (!privacyMatches.isEmpty()) {
+                throw new GradleException("Demo APK contains chat/development text: ${privacyMatches.unique().join(', ')}")
+            }
+        } finally {
+            zip.close()
+        }
+        println("Verified demo APK: ${apk.length()} bytes; arm64-v8a; compatibility files complete; privacy scan clean")
+    }
+}
+
+tasks.register("stageDemoApk", Copy) {
+    dependsOn("verifyDemoApk")
+    from(demoApk)
+    into(rootProject.layout.buildDirectory.dir("deliverables"))
+    rename { demoDeliverable.get().asFile.name }
 }
 
 tasks.register("verifyLegacySqliteSyntax") {
@@ -140,6 +275,7 @@ dependencies {
     debugImplementation libs.compose.ui.tooling
 
     testImplementation libs.junit
+    testImplementation libs.coroutines.test
     testImplementation 'com.squareup.okhttp3:mockwebserver:5.4.0'
     // JVM unit tests exercise the same org.json parsing used on Android.
     testImplementation 'org.json:json:20240303'

@@ -26,7 +26,7 @@ public abstract class Cocos2dxActivity extends Activity implements Cocos2dxHelpe
     private Cocos2dxGLSurfaceView mGLSurfaceView = null;
     public int[] mGLContextAttrs = null;
     private Cocos2dxHandler mHandler = null;
-    private boolean hasFocus = false;
+    private final EngineForegroundState foregroundState = new EngineForegroundState();
     public ResizeLayout mFrameLayout = null;
 
     public static Context getContext() {
@@ -45,12 +45,25 @@ public abstract class Cocos2dxActivity extends Activity implements Cocos2dxHelpe
         return emulator;
     }
 
-    private void resumeIfHasFocus() {
-        if (this.hasFocus) {
+    private void applyForegroundTransition(EngineForegroundState.Transition transition) {
+        if (transition == EngineForegroundState.Transition.NONE) return;
+        if (transition == EngineForegroundState.Transition.ENTER_BACKGROUND) {
+            Log.i(TAG, "engine foreground transition=BACKGROUND");
+            onEngineForegroundChanged(false);
+            Cocos2dxHelper.onPause();
+            try { Cocos2dxHelper.onEnterBackground(); } catch (Throwable ignored) { }
+            if (this.mGLSurfaceView != null) this.mGLSurfaceView.onPause();
+        } else {
+            Log.i(TAG, "engine foreground transition=FOREGROUND");
+            onEngineForegroundChanged(true);
             Cocos2dxHelper.onResume();
+            try { Cocos2dxHelper.onEnterForeground(); } catch (Throwable ignored) { }
             if (this.mGLSurfaceView != null) this.mGLSurfaceView.onResume();
         }
     }
+
+    /** Allows an engine implementation to synchronize non-Cocos resources with the lifecycle gate. */
+    protected void onEngineForegroundChanged(boolean foreground) { }
 
     public Cocos2dxGLSurfaceView getGLSurfaceView() {
         return this.mGLSurfaceView;
@@ -149,23 +162,21 @@ public abstract class Cocos2dxActivity extends Activity implements Cocos2dxHelpe
     public void onPause() {
         Log.d(TAG, "onPause()");
         super.onPause();
-        Cocos2dxHelper.onPause();
-        if (this.mGLSurfaceView != null) this.mGLSurfaceView.onPause();
+        applyForegroundTransition(foregroundState.onActivityResumed(false));
     }
 
     @Override
     public void onResume() {
         Log.d(TAG, "onResume()");
         super.onResume();
-        resumeIfHasFocus();
+        applyForegroundTransition(foregroundState.onActivityResumed(true));
     }
 
     @Override
     public void onWindowFocusChanged(boolean hasFocus) {
         Log.d(TAG, "onWindowFocusChanged() hasFocus=" + hasFocus);
         super.onWindowFocusChanged(hasFocus);
-        this.hasFocus = hasFocus;
-        resumeIfHasFocus();
+        applyForegroundTransition(foregroundState.onWindowFocusChanged(hasFocus));
     }
 
     @Override

@@ -54,6 +54,8 @@ public final class NativeBridge {
 
     private NativeBridge() { }
 
+    /** Installs the dedicated-process AAudio stream capture before engine libraries are loaded. */
+    public static native boolean prepareAudioCapture();
     public static native boolean initialize(String so);
     /** True when the selected KR native library accepted the TVPConsoleLog hook. */
     public static native boolean isConsoleLogHookInstalled();
@@ -63,6 +65,8 @@ public final class NativeBridge {
     public static native void interceptor(String prefix);
     public static native void relocate();
     public static native boolean write(String path, byte[] data);
+    /** Pauses/resumes the captured KRKR AAudio stream. Must be called on the engine GL thread. */
+    public static native boolean setAudioForeground(boolean foreground);
 
     /** Called by the native TVPMainScene update hook after doStartup has returned. */
     private static void onKrkrGameReady() {

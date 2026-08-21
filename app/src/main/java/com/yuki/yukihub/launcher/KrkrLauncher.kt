@@ -11,6 +11,7 @@ import com.akira.tyranoemu.remote.Kirikiroid126
 import com.akira.tyranoemu.remote.Kirikiroid134
 import com.akira.tyranoemu.remote.Kirikiroid139
 import com.apps.LauncherActivity
+import com.yuki.yukihub.launch.Xp3EntrySelector
 import com.yuki.yukihub.launcherbridge.LauncherKrkrBridge
 import org.tvp.kirikiri2.KR2Activity
 import java.io.File
@@ -99,7 +100,6 @@ internal object KrkrLauncher {
             putExtra("launchStartedElapsed", SystemClock.elapsedRealtime())
             putExtra("krStartupDialogPolicy", LauncherKrkrBridge.getStartupDialogPolicy(context))
             putExtra("originMode", originMode)
-            putExtra("focus", "true")
             putExtra("krEngineVersion", when { use126 -> "1.2.6"; use134 -> "1.3.4"; else -> "1.3.9" })
             putExtra("orientation", 6)
             putExtra("launchMode", if (originMode) "internal.krkr.origin" else "internal.krkr")
@@ -146,9 +146,12 @@ internal object KrkrLauncher {
             return rootPath
         }
         if (target.equals("XP3_FIRST", ignoreCase = true)) {
-            return findFirstChildBySuffix(rootPath, ".xp3")
-                ?: findPreferredEntryFromTree(context, rootUri, rootPath)
-                ?: rootPath
+            val selected = selectXp3Entry(rootPath)
+            if (selected != null) return selected
+            // Directory accessible but no reliable entry (e.g. only asset packs):
+            // launch in directory mode so the engine resolves startup.tjs itself.
+            if (File(rootPath).isDirectory) return rootPath
+            return findPreferredEntryFromTree(context, rootUri, rootPath) ?: rootPath
         }
         if (target.startsWith('/')) {
             val file = File(target)
@@ -190,6 +193,19 @@ internal object KrkrLauncher {
         }
     }
 
+    private fun selectXp3Entry(rootPath: String): String? {
+        val root = File(rootPath)
+        if (!root.isDirectory) return null
+        val files = root.listFiles() ?: return null
+        val entries = files.asSequence()
+            .filter { it.isFile && it.name.endsWith(".xp3", ignoreCase = true) }
+            .map { Xp3EntrySelector.Entry(it.name, it.length()) }
+            .toList()
+        if (entries.isEmpty()) return null
+        val picked = Xp3EntrySelector.select(entries, root.name, null) ?: return null
+        return File(root, picked).absolutePath
+    }
+
     private fun findPreferredEntryFromTree(context: Context?, rootUri: String?, rootPath: String): String? {
         arrayOf("data.xp3", "startup.tjs", "patch.xp3").forEach { name ->
             findTargetFromTree(context, rootUri, rootPath, name)?.let { return it }
@@ -229,17 +245,6 @@ internal object KrkrLauncher {
         }
     }
 
-    private fun findFirstChildBySuffix(rootPath: String?, suffix: String?): String? {
-        if (rootPath.isNullOrBlank() || suffix.isNullOrBlank()) return null
-        return try {
-            val normalizedSuffix = suffix.lowercase(Locale.ROOT)
-            File(rootPath).listFiles()?.firstOrNull { child ->
-                child?.isFile == true && child.name?.lowercase(Locale.ROOT)?.endsWith(normalizedSuffix) == true
-            }?.absolutePath
-        } catch (_: Throwable) {
-            null
-        }
-    }
 
     @JvmStatic
     fun prepareGameSaveDirectory(

@@ -36,17 +36,105 @@ object MotionModePolicy {
 
 enum class DashboardProfile(val columns: Int) { COMPACT(2), WIDE(4) }
 
+enum class LandscapeHomeStyle(val storedValue: String, val label: String) {
+    /** D: default 16:9 arc Cover Flow for compact landscape phones. */
+    IMMERSIVE_COVER("immersive_cover", "16:9 弧线画廊（D）"),
+    /** C: optional stacked-focus 9:16 portrait layout with side cards tucked behind center. */
+    FOCUS_POSTER("focus_poster", "9:16 专注海报（C）");
+
+    companion object {
+        fun fromStored(value: String?): LandscapeHomeStyle = entries.firstOrNull {
+            val normalized = value?.trim()
+            it.storedValue.equals(normalized, ignoreCase = true) ||
+                it.name.equals(normalized, ignoreCase = true)
+        } ?: IMMERSIVE_COVER
+    }
+}
+
 enum class DashboardWidgetType(val unique: Boolean) {
     GAME_SPOTLIGHT(false),
     LIBRARY_OVERVIEW(true),
     RECENT_GAMES(true),
     FAVORITES(true),
     LIBRARY_SHORTCUT(true),
-    PLAY_TREND(true)
+    PLAY_TREND(false)
 }
 
 enum class SpotlightSource { FIXED, RECENT, FAVORITES, ALL }
 enum class SpotlightStrategy { FIRST, RANDOM_EACH_LAUNCH, DAILY_RANDOM }
+
+/**
+ * Dashboard v6 spotlight selection contract. MANUAL keeps an explicit ordered 1-5 game id
+ * list; AUTOMATIC keeps the legacy source/strategy pair (recent/favorites/all plus a
+ * deterministic ordering). Legacy v5 FIXED+gameId widgets migrate to MANUAL.
+ */
+enum class SpotlightSelectionMode { MANUAL, AUTOMATIC }
+
+/**
+ * Immersive gallery settings are kept separate from dashboard drafts. The type aliases keep
+ * the first-wave API compatible with the existing spotlight names used by the dashboard editor.
+ */
+typealias ImmersiveGallerySource = SpotlightSource
+typealias ImmersiveGalleryStrategy = SpotlightStrategy
+typealias ImmersiveGallerySelectionMode = SpotlightSelectionMode
+
+data class ImmersiveGallerySettings(
+    val selectionMode: ImmersiveGallerySelectionMode = SpotlightSelectionMode.AUTOMATIC,
+    val manualIds: List<Long> = emptyList(),
+    val source: ImmersiveGallerySource = SpotlightSource.RECENT,
+    val strategy: ImmersiveGalleryStrategy = SpotlightStrategy.FIRST,
+    val count: Int = DEFAULT_COUNT,
+) {
+    val orderedManualIds: List<Long> get() = manualIds
+    val manualGameIds: List<Long> get() = manualIds
+    val maxItems: Int get() = count
+
+    fun normalized(validGameIds: Set<Long>? = null): ImmersiveGallerySettings =
+        ImmersiveGallerySettingsPolicy.normalize(this, validGameIds)
+
+    companion object {
+        const val MIN_COUNT = 1
+        const val MAX_COUNT = 5
+        const val DEFAULT_COUNT = MAX_COUNT
+    }
+}
+
+enum class TrendMetric {
+    PLAY_TIME,
+    GAME_OPENS;
+
+    companion object {
+        fun fromStored(value: String?): TrendMetric = entries.firstOrNull {
+            it.name.equals(value, ignoreCase = true)
+        } ?: PLAY_TIME
+    }
+}
+
+enum class TrendRange(val storedValue: String, val days: Int) {
+    DAYS_7("7d", 7),
+    DAYS_30("30d", 30);
+
+    /** Aliases make the persisted contract explicit for callers without coupling them to enum names. */
+    val persistedValue: String get() = storedValue
+    val storageValue: String get() = storedValue
+
+    companion object {
+        fun fromStored(value: String?): TrendRange = entries.firstOrNull {
+            it.name.equals(value, ignoreCase = true) || it.storedValue.equals(value, ignoreCase = true)
+        } ?: DAYS_7
+    }
+}
+
+enum class TrendVisualStyle {
+    LINE,
+    AREA;
+
+    companion object {
+        fun fromStored(value: String?): TrendVisualStyle = entries.firstOrNull {
+            it.name.equals(value, ignoreCase = true)
+        } ?: LINE
+    }
+}
 
 data class DashboardWidgetSize(val columns: Int, val rows: Int)
 
@@ -57,15 +145,22 @@ data class DashboardWidgetSpec(
     val gameId: Long? = null,
     val spotlightSource: SpotlightSource = SpotlightSource.RECENT,
     val spotlightStrategy: SpotlightStrategy = SpotlightStrategy.FIRST,
+    val spotlightSelectionMode: SpotlightSelectionMode = SpotlightSelectionMode.AUTOMATIC,
+    val spotlightGameIds: List<Long> = emptyList(),
+    val spotlightMaxPages: Int = DEFAULT_SPOTLIGHT_MAX_PAGES,
     val styleKey: String = "",
     val column: Int = UNPLACED,
     val row: Int = UNPLACED,
     /** Height is stored independently from the horizontal span in 8dp steps. */
-    val heightSteps: Int = UNSPECIFIED_HEIGHT
+    val heightSteps: Int = UNSPECIFIED_HEIGHT,
+    val trendMetric: TrendMetric = TrendMetric.PLAY_TIME,
+    val trendRange: TrendRange = TrendRange.DAYS_7,
+    val trendVisualStyle: TrendVisualStyle = TrendVisualStyle.LINE,
 ) {
     companion object {
         const val UNPLACED = -1
         const val UNSPECIFIED_HEIGHT = 0
+        const val DEFAULT_SPOTLIGHT_MAX_PAGES = 5
     }
 }
 
@@ -127,8 +222,9 @@ object DashboardStyles {
 }
 
 object DashboardLayouts {
-    const val VERSION = 4
+    const val VERSION = 6
     const val MAX_WIDGETS = 12
+    const val MAX_SPOTLIGHT_PAGES = 5
     const val HEIGHT_STEP_DP = 8
     const val GAP_STEPS = 1
     const val MAX_VERTICAL_STEPS = 256
@@ -180,7 +276,7 @@ object DashboardLayouts {
         DashboardWidgetType.RECENT_GAMES -> 14..28
         DashboardWidgetType.FAVORITES -> 13..28
         DashboardWidgetType.LIBRARY_SHORTCUT -> 12..24
-        DashboardWidgetType.PLAY_TREND -> 15..30
+        DashboardWidgetType.PLAY_TREND -> 15..36
     }
 
     fun defaultHeightSteps(type: DashboardWidgetType): Int = when (type) {
@@ -216,9 +312,12 @@ object DashboardLayouts {
         }
         DashboardWidgetType.LIBRARY_SHORTCUT -> listOf(oneByOne)
         DashboardWidgetType.PLAY_TREND -> if (profile == DashboardProfile.COMPACT) {
-            listOf(DashboardWidgetSize(2, 1))
+            listOf(DashboardWidgetSize(1, 1), DashboardWidgetSize(2, 1))
         } else {
-            listOf(DashboardWidgetSize(2, 1), DashboardWidgetSize(4, 1))
+            listOf(
+                DashboardWidgetSize(1, 1), DashboardWidgetSize(2, 1),
+                DashboardWidgetSize(3, 1), DashboardWidgetSize(4, 1)
+            )
         }
     }
 
@@ -272,22 +371,68 @@ object DashboardLayouts {
             if (it.instanceId == instanceId) it.copy(styleKey = DashboardStyles.normalize(it.type, styleKey)) else it
         }), profile)
 
-    fun setSpotlight(
+    /**
+     * Switches a spotlight widget to automatic selection with the given source, ordering
+     * strategy and page count. Manual id lists are cleared so AUTOMATIC stays canonical.
+     */
+    fun setSpotlightAutomatic(
         layout: DashboardLayout,
         profile: DashboardProfile,
         instanceId: String,
         source: SpotlightSource,
         strategy: SpotlightStrategy,
-        gameId: Long? = null,
+        maxPages: Int = MAX_SPOTLIGHT_PAGES,
     ): DashboardLayout = normalize(
         layout.copy(widgets = layout.widgets.map { spec ->
             if (spec.instanceId != instanceId || spec.type != DashboardWidgetType.GAME_SPOTLIGHT) spec
             else spec.copy(
-                gameId = if (source == SpotlightSource.FIXED) gameId ?: spec.gameId else null,
-                spotlightSource = if (source == SpotlightSource.FIXED && gameId == null && spec.gameId == null) {
-                    SpotlightSource.RECENT
-                } else source,
+                gameId = null,
+                spotlightSource = source,
                 spotlightStrategy = strategy,
+                spotlightSelectionMode = SpotlightSelectionMode.AUTOMATIC,
+                spotlightGameIds = emptyList(),
+                spotlightMaxPages = maxPages.coerceIn(1, MAX_SPOTLIGHT_PAGES),
+            )
+        }),
+        profile,
+    )
+
+    /** Replaces the spotlight with an explicit ordered manual list (1-5 games). */
+    fun setSpotlightManual(
+        layout: DashboardLayout,
+        profile: DashboardProfile,
+        instanceId: String,
+        gameIds: List<Long>,
+        maxPages: Int = MAX_SPOTLIGHT_PAGES,
+    ): DashboardLayout = normalize(
+        layout.copy(widgets = layout.widgets.map { spec ->
+            if (spec.instanceId != instanceId || spec.type != DashboardWidgetType.GAME_SPOTLIGHT) spec
+            else spec.copy(
+                gameId = null,
+                spotlightSource = SpotlightSource.FIXED,
+                spotlightStrategy = SpotlightStrategy.FIRST,
+                spotlightSelectionMode = SpotlightSelectionMode.MANUAL,
+                spotlightGameIds = gameIds,
+                spotlightMaxPages = maxPages.coerceIn(1, MAX_SPOTLIGHT_PAGES),
+            )
+        }),
+        profile,
+    )
+
+    fun setTrendConfig(
+        layout: DashboardLayout,
+        profile: DashboardProfile,
+        instanceId: String,
+        metric: TrendMetric,
+        range: TrendRange,
+        visualStyle: TrendVisualStyle,
+    ): DashboardLayout = normalize(
+        layout.copy(widgets = layout.widgets.map { spec ->
+            if (spec.instanceId != instanceId || spec.type != DashboardWidgetType.PLAY_TREND) spec
+            else spec.copy(
+                trendMetric = metric,
+                trendRange = range,
+                trendVisualStyle = visualStyle,
             )
         }),
         profile,
@@ -336,6 +481,12 @@ object DashboardLayouts {
             size = allowedSizes(type, profile).first(),
             gameId = gameId,
             spotlightSource = if (gameId == null) SpotlightSource.RECENT else SpotlightSource.FIXED,
+            spotlightSelectionMode = if (gameId == null) {
+                SpotlightSelectionMode.AUTOMATIC
+            } else {
+                SpotlightSelectionMode.MANUAL
+            },
+            spotlightGameIds = if (gameId == null) emptyList() else listOfNotNull(gameId),
             styleKey = DashboardStyles.default(type),
             heightSteps = defaultHeightSteps(type)
         )
@@ -357,8 +508,22 @@ object DashboardLayouts {
                     .put("style", spec.styleKey)
                     .put("spotlightSource", spec.spotlightSource.name)
                     .put("spotlightStrategy", spec.spotlightStrategy.name)
+                    .put("spotlightSelectionMode", spec.spotlightSelectionMode.name)
+                    .put("spotlightMaxPages", spec.spotlightMaxPages)
                     .put("column", spec.column)
                     .put("row", spec.row)
+                    .apply {
+                        if (spec.type == DashboardWidgetType.GAME_SPOTLIGHT &&
+                            spec.spotlightSelectionMode == SpotlightSelectionMode.MANUAL
+                        ) {
+                            put("spotlightGameIds", JSONArray(spec.spotlightGameIds))
+                        }
+                        if (spec.type == DashboardWidgetType.PLAY_TREND) {
+                            put("trendMetric", spec.trendMetric.name)
+                            put("trendRange", spec.trendRange.storedValue)
+                            put("trendVisualStyle", spec.trendVisualStyle.name)
+                        }
+                    }
                     .apply { spec.gameId?.let { put("gameId", it) } }
             )
         }
@@ -379,19 +544,30 @@ object DashboardLayouts {
                     it.name.equals(item.optString("type"), ignoreCase = true)
                 } ?: continue
                 val gameId = item.optLong("gameId").takeIf { item.has("gameId") && it > 0L }
+                val legacyTrend = legacyTrendConfig(item.optString("style"))
+                val legacyFixed = gameId != null
+                val selectionMode = if (storedVersion >= 6) {
+                    SpotlightSelectionMode.entries.firstOrNull {
+                        it.name.equals(item.optString("spotlightSelectionMode"), ignoreCase = true)
+                    } ?: SpotlightSelectionMode.AUTOMATIC
+                } else if (legacyFixed) {
+                    SpotlightSelectionMode.MANUAL
+                } else {
+                    SpotlightSelectionMode.AUTOMATIC
+                }
                 widgets += DashboardWidgetSpec(
                     instanceId = item.optString("id"),
                     type = type,
                     size = DashboardWidgetSize(item.optInt("columns", 1), item.optInt("rows", 1)),
                     gameId = gameId,
-                    spotlightSource = if (storedVersion >= 4) {
+                    spotlightSource = if (legacyFixed) {
+                        SpotlightSource.FIXED
+                    } else if (storedVersion >= 4) {
                         SpotlightSource.entries.firstOrNull {
                             it.name.equals(item.optString("spotlightSource"), ignoreCase = true)
-                        } ?: if (gameId == null) SpotlightSource.RECENT else SpotlightSource.FIXED
-                    } else if (gameId == null) {
-                        SpotlightSource.RECENT
+                        } ?: SpotlightSource.RECENT
                     } else {
-                        SpotlightSource.FIXED
+                        SpotlightSource.RECENT
                     },
                     spotlightStrategy = if (storedVersion >= 4) {
                         SpotlightStrategy.entries.firstOrNull {
@@ -399,6 +575,19 @@ object DashboardLayouts {
                         } ?: SpotlightStrategy.FIRST
                     } else {
                         SpotlightStrategy.FIRST
+                    },
+                    spotlightSelectionMode = selectionMode,
+                    spotlightGameIds = if (storedVersion >= 6) {
+                        readSpotlightGameIds(item)
+                    } else if (legacyFixed) {
+                        listOf(gameId)
+                    } else {
+                        emptyList()
+                    },
+                    spotlightMaxPages = if (storedVersion >= 6) {
+                        item.optInt("spotlightMaxPages", MAX_SPOTLIGHT_PAGES).coerceIn(1, MAX_SPOTLIGHT_PAGES)
+                    } else {
+                        MAX_SPOTLIGHT_PAGES
                     },
                     styleKey = if (storedVersion >= 2) item.optString("style") else DashboardStyles.default(type),
                     column = if (storedVersion >= 2) item.optInt("column", DashboardWidgetSpec.UNPLACED) else DashboardWidgetSpec.UNPLACED,
@@ -414,7 +603,28 @@ object DashboardLayouts {
                         item.optInt("heightSteps", defaultHeightSteps(type))
                     } else {
                         legacyHeightSteps(item.optInt("rows", 1))
-                    }
+                    },
+                    trendMetric = if (type != DashboardWidgetType.PLAY_TREND) {
+                        TrendMetric.PLAY_TIME
+                    } else if (storedVersion >= 5) {
+                        TrendMetric.fromStored(item.optString("trendMetric"))
+                    } else {
+                        legacyTrend.metric
+                    },
+                    trendRange = if (type != DashboardWidgetType.PLAY_TREND) {
+                        TrendRange.DAYS_7
+                    } else if (storedVersion >= 5) {
+                        TrendRange.fromStored(item.optString("trendRange"))
+                    } else {
+                        legacyTrend.range
+                    },
+                    trendVisualStyle = if (type != DashboardWidgetType.PLAY_TREND) {
+                        TrendVisualStyle.LINE
+                    } else if (storedVersion >= 5) {
+                        TrendVisualStyle.fromStored(item.optString("trendVisualStyle"))
+                    } else {
+                        legacyTrend.visualStyle
+                    },
                 )
             }
             normalize(
@@ -445,12 +655,19 @@ object DashboardLayouts {
         layout.widgets.take(MAX_WIDGETS * 2).forEachIndexed { index, raw ->
             if (normalized.size >= MAX_WIDGETS) return@forEachIndexed
             if (raw.type.unique && !seenUnique.add(raw.type)) return@forEachIndexed
+            val selectionMode = when {
+                raw.type != DashboardWidgetType.GAME_SPOTLIGHT -> SpotlightSelectionMode.AUTOMATIC
+                raw.spotlightSelectionMode == SpotlightSelectionMode.MANUAL -> SpotlightSelectionMode.MANUAL
+                raw.gameId != null -> SpotlightSelectionMode.MANUAL
+                else -> SpotlightSelectionMode.AUTOMATIC
+            }
             if (raw.type == DashboardWidgetType.GAME_SPOTLIGHT) {
-                val gameId = raw.gameId
-                if (gameId == null) {
+                if (raw.gameId != null) {
+                    if (!seenGames.add(raw.gameId)) return@forEachIndexed
+                } else if (raw.spotlightSelectionMode != SpotlightSelectionMode.MANUAL) {
                     if (automaticGameSeen) return@forEachIndexed
                     automaticGameSeen = true
-                } else if (!seenGames.add(gameId)) return@forEachIndexed
+                }
             }
             val id = raw.instanceId.takeIf { it.isNotBlank() && seenIds.add(it) }
                 ?: "${raw.type.name.lowercase()}-$index-${UUID.randomUUID()}"
@@ -465,7 +682,7 @@ object DashboardLayouts {
             val size = nearestAllowed(raw.size.copy(columns = columns), allowed)
             val spotlightSource = when {
                 raw.type != DashboardWidgetType.GAME_SPOTLIGHT -> raw.spotlightSource
-                raw.gameId != null -> SpotlightSource.FIXED
+                selectionMode == SpotlightSelectionMode.MANUAL -> SpotlightSource.FIXED
                 raw.spotlightSource == SpotlightSource.FIXED -> SpotlightSource.RECENT
                 else -> raw.spotlightSource
             }
@@ -473,10 +690,19 @@ object DashboardLayouts {
                 instanceId = id,
                 size = size,
                 gameId = raw.gameId.takeIf {
-                    raw.type != DashboardWidgetType.GAME_SPOTLIGHT ||
-                        spotlightSource == SpotlightSource.FIXED
+                    raw.type != DashboardWidgetType.GAME_SPOTLIGHT || selectionMode != SpotlightSelectionMode.MANUAL
                 },
                 spotlightSource = spotlightSource,
+                spotlightSelectionMode = selectionMode,
+                spotlightGameIds = if (raw.type == DashboardWidgetType.GAME_SPOTLIGHT &&
+                    selectionMode == SpotlightSelectionMode.MANUAL
+                ) {
+                    val seed = raw.spotlightGameIds.ifEmpty { listOfNotNull(raw.gameId) }
+                    seed.filter { it > 0L }.distinct().take(MAX_SPOTLIGHT_PAGES)
+                } else {
+                    emptyList()
+                },
+                spotlightMaxPages = raw.spotlightMaxPages.coerceIn(1, MAX_SPOTLIGHT_PAGES),
                 heightSteps = heightSteps,
                 styleKey = DashboardStyles.normalize(raw.type, raw.styleKey),
                 column = raw.column.coerceIn(DashboardWidgetSpec.UNPLACED, profile.columns - size.columns),
@@ -591,10 +817,36 @@ object DashboardLayouts {
     private fun occupiedHeight(spec: DashboardWidgetSpec): Int =
         normalizeHeight(spec.type, spec.heightSteps) + GAP_STEPS
 
+    private data class TrendConfig(
+        val metric: TrendMetric,
+        val range: TrendRange,
+        val visualStyle: TrendVisualStyle,
+    )
+
+    private fun legacyTrendConfig(style: String): TrendConfig = when (style) {
+        DashboardStyles.TREND_30_DAY -> TrendConfig(TrendMetric.PLAY_TIME, TrendRange.DAYS_30, TrendVisualStyle.AREA)
+        DashboardStyles.TREND_LAUNCH_7_DAY -> TrendConfig(TrendMetric.GAME_OPENS, TrendRange.DAYS_7, TrendVisualStyle.LINE)
+        DashboardStyles.TREND_LAUNCH_30_DAY -> TrendConfig(TrendMetric.GAME_OPENS, TrendRange.DAYS_30, TrendVisualStyle.AREA)
+        else -> TrendConfig(TrendMetric.PLAY_TIME, TrendRange.DAYS_7, TrendVisualStyle.LINE)
+    }
+
     private fun legacyHeightSteps(rows: Int): Int = when (rows.coerceAtLeast(1)) {
         1 -> 17
         2 -> 34
         3 -> 52
         else -> ((132 * rows + 10 * (rows - 1)) / HEIGHT_STEP_DP.toFloat()).toInt().coerceAtLeast(1)
+    }
+
+    private fun readSpotlightGameIds(item: JSONObject): List<Long> {
+        val array = item.optJSONArray("spotlightGameIds") ?: return emptyList()
+        val result = ArrayList<Long>()
+        for (index in 0 until array.length()) {
+            val id = array.optLong(index)
+            if (id > 0L && id !in result) {
+                result += id
+                if (result.size >= MAX_SPOTLIGHT_PAGES) break
+            }
+        }
+        return result
     }
 }

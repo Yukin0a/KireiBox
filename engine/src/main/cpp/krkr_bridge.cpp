@@ -1,4 +1,5 @@
 #include <android/log.h>
+#include <aaudio/AAudio.h>
 #include <dlfcn.h>
 #include <fcntl.h>
 #include <jni.h>
@@ -74,6 +75,8 @@ using Update = void (*)(void*, float);
 using UiFormCount = int (*)(void*);
 using OpenFn = int (*)(const char*, int, ...);
 using ConsoleLogUtf16 = void (*)(const char16_t*);
+using AAudioOpenStream = aaudio_result_t (*)(AAudioStreamBuilder*, AAudioStream**);
+using AAudioStreamCommand = aaudio_result_t (*)(AAudioStream*);
 
 struct GameApi {
     std::string library;
@@ -99,8 +102,17 @@ void** gSceneUpdateSlot = nullptr;
 std::atomic<int> gLeakedCowStringCount{0};
 std::atomic<bool> gGameReadyReported{false};
 std::atomic<int> gLastLaunchReadiness{-1};
+std::mutex gAudioMutex;
+AAudioOpenStream gOriginalAAudioOpenStream = nullptr;
+AAudioStreamCommand gOriginalAAudioClose = nullptr;
+AAudioStreamCommand gOriginalAAudioStart = nullptr;
+AAudioStream* gAAudioStream = nullptr;
+bool gAAudioPaused = false;
+bool gAudioForegroundRequested = true;
 int64_t gFirstSceneUpdateNs = 0;
 constexpr int64_t kMenuShrinkWaitNs = 1200LL * 1000LL * 1000LL;
+
+bool setWritablePointer(void** slot, void* value);
 
 bool supportedGameLibrary(const char* library) {
     return library != nullptr
@@ -168,6 +180,123 @@ bool installConsoleLogHook() {
     return installed;
 }
 
+bool installArm64BranchHook(void* target, void* replacement, void** original) {
+#if defined(__aarch64__)
+    if (target == nullptr || replacement == nullptr || original == nullptr) return false;
+    const uint32_t instruction = *static_cast<const uint32_t*>(target);
+    if ((instruction & 0xFC000000u) != 0x14000000u) {
+        __android_log_print(ANDROID_LOG_ERROR, kTag,
+                            "native branch hook rejected instruction=%08x", instruction);
+        return false;
+    }
+    int64_t originalImmediate = static_cast<int64_t>(instruction & 0x03FFFFFFu);
+    if ((originalImmediate & (1LL << 25)) != 0) originalImmediate |= ~((1LL << 26) - 1LL);
+    const uintptr_t targetAddress = reinterpret_cast<uintptr_t>(target);
+    const uintptr_t originalAddress = static_cast<uintptr_t>(
+            static_cast<int64_t>(targetAddress) + (originalImmediate << 2));
+    const int64_t replacementDelta = static_cast<int64_t>(reinterpret_cast<uintptr_t>(replacement))
+            - static_cast<int64_t>(targetAddress);
+    if ((replacementDelta & 0x3LL) != 0
+            || replacementDelta < -(1LL << 27)
+            || replacementDelta >= (1LL << 27)) {
+        __android_log_print(ANDROID_LOG_ERROR, kTag,
+                            "native branch hook rejected delta=%lld",
+                            static_cast<long long>(replacementDelta));
+        return false;
+    }
+    const uint32_t redirect = 0x14000000u
+            | (static_cast<uint32_t>(replacementDelta >> 2) & 0x03FFFFFFu);
+    const long pageSize = sysconf(_SC_PAGESIZE);
+    if (pageSize <= 0) return false;
+    const uintptr_t page = targetAddress & ~static_cast<uintptr_t>(pageSize - 1);
+    if (mprotect(reinterpret_cast<void*>(page), static_cast<size_t>(pageSize),
+                 PROT_READ | PROT_WRITE | PROT_EXEC) != 0) return false;
+    std::memcpy(target, &redirect, sizeof(redirect));
+    __builtin___clear_cache(reinterpret_cast<char*>(target),
+                            reinterpret_cast<char*>(target) + sizeof(redirect));
+    if (mprotect(reinterpret_cast<void*>(page), static_cast<size_t>(pageSize),
+                 PROT_READ | PROT_EXEC) != 0) {
+        __android_log_print(ANDROID_LOG_WARN, kTag, "native branch text protection restore failed");
+    }
+    *original = reinterpret_cast<void*>(originalAddress);
+    return true;
+#else
+    (void) target;
+    (void) replacement;
+    (void) original;
+    return false;
+#endif
+}
+
+aaudio_result_t hookedAAudioOpenStream(AAudioStreamBuilder* builder, AAudioStream** stream) {
+    if (gOriginalAAudioOpenStream == nullptr) return AAUDIO_ERROR_INTERNAL;
+    const aaudio_result_t result = gOriginalAAudioOpenStream(builder, stream);
+    AAudioStream* opened = result == AAUDIO_OK && stream != nullptr ? *stream : nullptr;
+    {
+        std::lock_guard<std::mutex> lock(gAudioMutex);
+        gAAudioStream = opened;
+        gAAudioPaused = opened != nullptr && !gAudioForegroundRequested;
+    }
+    __android_log_print(opened != nullptr ? ANDROID_LOG_INFO : ANDROID_LOG_WARN, kTag,
+                        "captured KRKR AAudio stream=%p result=%d", opened, result);
+    return result;
+}
+
+aaudio_result_t hookedAAudioStart(AAudioStream* stream) {
+    {
+        std::lock_guard<std::mutex> lock(gAudioMutex);
+        if (gAAudioStream == stream && !gAudioForegroundRequested) {
+            gAAudioPaused = true;
+            __android_log_print(ANDROID_LOG_INFO, kTag,
+                                "suppressed KRKR AAudio start while background stream=%p", stream);
+            return AAUDIO_OK;
+        }
+    }
+    if (gOriginalAAudioStart == nullptr) return AAUDIO_ERROR_INTERNAL;
+    const aaudio_result_t result = gOriginalAAudioStart(stream);
+    {
+        std::lock_guard<std::mutex> lock(gAudioMutex);
+        if (gAAudioStream != stream) return result;
+        gAAudioPaused = result != AAUDIO_OK;
+    }
+    return result;
+}
+
+aaudio_result_t hookedAAudioClose(AAudioStream* stream) {
+    {
+        std::lock_guard<std::mutex> lock(gAudioMutex);
+        if (gAAudioStream == stream) {
+            gAAudioStream = nullptr;
+            gAAudioPaused = false;
+        }
+    }
+    return gOriginalAAudioClose == nullptr ? AAUDIO_ERROR_INTERNAL : gOriginalAAudioClose(stream);
+}
+
+bool prepareAAudioCapture() {
+    if (gOriginalAAudioOpenStream != nullptr) return true;
+    void* aaudioHandle = dlopen("libaaudio.so", RTLD_NOW | RTLD_LOCAL);
+    void* openTarget = aaudioHandle == nullptr
+            ? nullptr : dlsym(aaudioHandle, "AAudioStreamBuilder_openStream");
+    void* closeTarget = aaudioHandle == nullptr
+            ? nullptr : dlsym(aaudioHandle, "AAudioStream_close");
+    void* startTarget = aaudioHandle == nullptr
+            ? nullptr : dlsym(aaudioHandle, "AAudioStream_requestStart");
+    const bool openInstalled = installArm64BranchHook(
+            openTarget, reinterpret_cast<void*>(hookedAAudioOpenStream),
+            reinterpret_cast<void**>(&gOriginalAAudioOpenStream));
+    const bool closeInstalled = installArm64BranchHook(
+            closeTarget, reinterpret_cast<void*>(hookedAAudioClose),
+            reinterpret_cast<void**>(&gOriginalAAudioClose));
+    const bool startInstalled = installArm64BranchHook(
+            startTarget, reinterpret_cast<void*>(hookedAAudioStart),
+            reinterpret_cast<void**>(&gOriginalAAudioStart));
+    __android_log_print(openInstalled ? ANDROID_LOG_INFO : ANDROID_LOG_ERROR, kTag,
+                        "KRKR pre-load AAudio capture open=%d close=%d start=%d target=%p",
+                        openInstalled, closeInstalled, startInstalled, openTarget);
+    return openInstalled && startInstalled;
+}
+
 std::string takeString(JNIEnv* env, jstring value) {
     if (value == nullptr) return {};
     const char* chars = env->GetStringUTFChars(value, nullptr);
@@ -215,6 +344,34 @@ bool resolveGameLocked(const char* library) {
                         reinterpret_cast<void*>(getScene), reinterpret_cast<void*>(startupFrom),
                         reinterpret_cast<void*>(update));
     return true;
+}
+
+bool setAudioForegroundLocked(bool foreground) {
+    std::lock_guard<std::mutex> audioLock(gAudioMutex);
+    gAudioForegroundRequested = foreground;
+    if (foreground && !gAAudioPaused) return true;
+    if (gAAudioStream == nullptr) {
+        return true;
+    }
+    void* aaudioHandle = dlopen("libaaudio.so", RTLD_NOW | RTLD_LOCAL);
+    auto requestPause = reinterpret_cast<AAudioStreamCommand>(
+            aaudioHandle == nullptr ? nullptr : dlsym(aaudioHandle, "AAudioStream_requestPause"));
+    if (requestPause == nullptr || gOriginalAAudioStart == nullptr) return false;
+
+    if (!foreground) {
+        if (gAAudioPaused) return true;
+        const aaudio_result_t result = requestPause(gAAudioStream);
+        gAAudioPaused = result == AAUDIO_OK;
+        __android_log_print(gAAudioPaused ? ANDROID_LOG_INFO : ANDROID_LOG_WARN, kTag,
+                            "KRKR AAudio pause stream=%p result=%d", gAAudioStream, result);
+        return gAAudioPaused;
+    }
+
+    const aaudio_result_t result = gOriginalAAudioStart(gAAudioStream);
+    gAAudioPaused = result != AAUDIO_OK;
+    __android_log_print(!gAAudioPaused ? ANDROID_LOG_INFO : ANDROID_LOG_WARN, kTag,
+                        "KRKR AAudio resume stream=%p result=%d", gAAudioStream, result);
+    return !gAAudioPaused;
 }
 
 bool setWritablePointer(void** slot, void* value) {
@@ -398,8 +555,15 @@ Java_bridge_NativeBridge_initialize(JNIEnv* env, jclass, jstring gameLibrary) {
         std::lock_guard<std::mutex> lock(gMutex);
         resolved = resolveGameLocked(library.c_str());
     }
-    if (resolved) installConsoleLogHook();
+    if (resolved) {
+        installConsoleLogHook();
+    }
     return resolved ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_bridge_NativeBridge_prepareAudioCapture(JNIEnv*, jclass) {
+    return prepareAAudioCapture() ? JNI_TRUE : JNI_FALSE;
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
@@ -504,6 +668,12 @@ Java_bridge_NativeBridge_write(JNIEnv* env, jclass, jstring path, jbyteArray byt
     return (written == static_cast<size_t>(length) && closeResult == 0) ? JNI_TRUE : JNI_FALSE;
 }
 
+extern "C" JNIEXPORT jboolean JNICALL
+Java_bridge_NativeBridge_setAudioForeground(JNIEnv*, jclass, jboolean foreground) {
+    std::lock_guard<std::mutex> lock(gMutex);
+    return setAudioForegroundLocked(foreground == JNI_TRUE) ? JNI_TRUE : JNI_FALSE;
+}
+
 // JNI_OnLoad is invoked when libkrkr_bridge.so is loaded via System.loadLibrary("krkr_bridge")
 // in Kirikiroid134/139 (KirikiroidLauncherBaseActivity.onLoadNativeLibraries). This must only
 // happen in the :kirikiri2 process, where the engine module's classes are visible to the
@@ -542,6 +712,8 @@ extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
         return JNI_ERR;
     }
     JNINativeMethod methods[] = {
+            {const_cast<char*>("prepareAudioCapture"), const_cast<char*>("()Z"),
+             reinterpret_cast<void*>(Java_bridge_NativeBridge_prepareAudioCapture)},
             {const_cast<char*>("initialize"), const_cast<char*>("(Ljava/lang/String;)Z"),
              reinterpret_cast<void*>(Java_bridge_NativeBridge_initialize)},
             {const_cast<char*>("isConsoleLogHookInstalled"), const_cast<char*>("()Z"),
@@ -556,6 +728,8 @@ extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
              reinterpret_cast<void*>(Java_bridge_NativeBridge_relocate)},
             {const_cast<char*>("write"), const_cast<char*>("(Ljava/lang/String;[B)Z"),
              reinterpret_cast<void*>(Java_bridge_NativeBridge_write)},
+            {const_cast<char*>("setAudioForeground"), const_cast<char*>("(Z)Z"),
+             reinterpret_cast<void*>(Java_bridge_NativeBridge_setAudioForeground)},
     };
     if (env->RegisterNatives(bridge, methods, sizeof(methods) / sizeof(methods[0])) != JNI_OK) {
         env->ExceptionClear();

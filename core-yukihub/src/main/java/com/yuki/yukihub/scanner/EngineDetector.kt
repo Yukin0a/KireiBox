@@ -2,6 +2,7 @@ package com.yuki.yukihub.scanner
 
 import android.util.Log
 import androidx.documentfile.provider.DocumentFile
+import com.yuki.yukihub.launch.Xp3EntrySelector
 import com.yuki.yukihub.model.EngineType
 import com.yuki.yukihub.storage.StorageNode
 import com.yuki.yukihub.storage.StorageNodes
@@ -43,13 +44,7 @@ object EngineDetector {
         if (features.empty) return result
 
         features.xp3Files.sortWith(String.CASE_INSENSITIVE_ORDER)
-        features.gameNamedXp3Files.sortWith(String.CASE_INSENSITIVE_ORDER)
-        val firstXp3 = when {
-            features.gameNamedXp3Files.size == 1 -> features.gameNamedXp3Files.single()
-            features.dataXp3 != null -> features.dataXp3
-            features.xp3Files.isNotEmpty() -> features.xp3Files.first()
-            else -> null
-        }
+        val firstXp3 = selectFirstXp3(features, dir.name)
 
         val tyranoRuntime = features.hasTyranoDir || features.hasDataDir ||
             "tyrano.css" in features.names || "tyrano.base.js" in features.names ||
@@ -72,9 +67,7 @@ object EngineDetector {
             )
             firstXp3 != null || features.hasStartupTjs || features.hasConfigTjs -> {
                 score(result, EngineType.KIRIKIRI, if (firstXp3 != null) 95 else 80, firstXp3 ?: "[游戏目录]")
-                if (features.gameNamedXp3Files.size > 1 ||
-                    (features.gameNamedXp3Files.isEmpty() && features.dataXp3 == null && features.xp3Files.size > 1)
-                ) {
+                if (features.dataXp3 == null && features.xp3Files.size > 1) {
                     result.xp3Candidates.addAll(features.xp3Files)
                 }
             }
@@ -93,7 +86,7 @@ object EngineDetector {
         val names = HashSet<String>()
         val relativeNames = HashSet<String>()
         val xp3Files = ArrayList<String>()
-        val gameNamedXp3Files = ArrayList<String>()
+        val xp3Sizes = HashMap<String, Long>()
         var dataXp3: String? = null
         var hasIndex = false
         var hasTyranoDir = false
@@ -163,10 +156,21 @@ object EngineDetector {
             if (lower.startsWith("chrome_") && lower.endsWith(".pak")) state.hasElectronPak = true
             if (lower.endsWith(".xp3")) {
                 state.xp3Files += originalRelative
-                if (lower.contains("游戏")) state.gameNamedXp3Files += originalRelative
+                state.xp3Sizes[originalRelative] = runCatching { file.size }.getOrDefault(0L)
                 if (lower == "data.xp3" && state.dataXp3 == null) state.dataXp3 = originalRelative
             }
         }
+    }
+
+    private fun selectFirstXp3(features: FeatureState, folderName: String?): String? {
+        val entries = features.xp3Files.map { relative ->
+            Xp3EntrySelector.Entry(
+                name = relative.substringAfterLast('/'),
+                size = features.xp3Sizes[relative] ?: 0L,
+            )
+        }
+        val picked = Xp3EntrySelector.select(entries, folderName, null) ?: return null
+        return features.xp3Files.firstOrNull { it.substringAfterLast('/').equals(picked, ignoreCase = true) }
     }
 
     private fun safeName(file: StorageNode?): String = runCatching { file?.name.orEmpty() }.getOrDefault("")

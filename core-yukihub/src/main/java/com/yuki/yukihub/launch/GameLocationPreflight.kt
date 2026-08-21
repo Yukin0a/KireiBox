@@ -21,6 +21,9 @@ object GameLocationPreflight {
             ?: return Result(null, false, "无法读取游戏目录，请重新授权")
         val target = source.launchTarget?.trim().orEmpty()
         if (target.isBlank() || target.startsWith("[")) return Result(source, false, "directory entry")
+        if (source.engine == EngineType.KIRIKIRI && Xp3EntrySelector.isAssetTarget(target)) {
+            return repairAssetXp3Target(repository, source, root)
+        }
         if (resolve(root, target) != null) return Result(source, false, "verified")
 
         val candidates = ArrayList<StorageNode>()
@@ -44,6 +47,30 @@ object GameLocationPreflight {
         )
         repository.update(repaired)
         return Result(repository.findById(source.id) ?: repaired, true, "已修复游戏目录：${selected.name.orEmpty()}")
+    }
+
+    private fun repairAssetXp3Target(
+        repository: GameRepository,
+        source: Game,
+        root: StorageNode,
+    ): Result {
+        val children = runCatching { root.children() }.getOrDefault(emptyList())
+        val entries = children.asSequence()
+            .filter { it.isFile && it.name.endsWith(".xp3", ignoreCase = true) }
+            .map { Xp3EntrySelector.Entry(it.name, it.size) }
+            .toList()
+        val selected = Xp3EntrySelector.select(entries, root.name, source.title)
+        val newTarget = selected ?: "[游戏目录]"
+        val repaired = source.copy(
+            launchTarget = newTarget,
+            updatedAt = System.currentTimeMillis(),
+        )
+        repository.update(repaired)
+        return Result(
+            repository.findById(source.id) ?: repaired,
+            true,
+            if (selected != null) "已修正 XP3 启动文件：$selected" else "已改为目录模式启动",
+        )
     }
 
     private fun collectDirectoriesContaining(

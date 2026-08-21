@@ -1,6 +1,7 @@
 package com.yuki.yukihub.util
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.util.Log
 import java.io.BufferedReader
 import java.io.File
@@ -24,15 +25,28 @@ object DevLogger {
     private var captureThread: Thread? = null
     @Volatile
     private var captureGeneration = 0L
+    private val fileAppendLock = Any()
 
     @JvmStatic
     fun init(ctx: Context?) {
         if (ctx == null) return
-        enabled = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY, false)
         val dir = File(ctx.getExternalFilesDir(null) ?: ctx.filesDir, "logs")
-        if (!dir.exists()) dir.mkdirs()
-        logcatFile = File(dir, "logcat.txt")
-        if (enabled) startCapture()
+        initializeCapture(
+            preferences = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE),
+            logDirectory = dir,
+        )
+    }
+
+    /** Shared production path for app initialization and deterministic JVM verification. */
+    internal fun initializeCapture(
+        preferences: SharedPreferences,
+        logDirectory: File,
+        processFactory: () -> Process = { Runtime.getRuntime().exec("logcat -v threadtime") },
+    ) {
+        enabled = preferences.getBoolean(KEY, false)
+        if (!logDirectory.exists()) logDirectory.mkdirs()
+        logcatFile = File(logDirectory, "logcat.txt")
+        if (enabled) startCapture(processFactory) else stopCapture()
     }
 
     @JvmStatic
@@ -46,7 +60,9 @@ object DevLogger {
         if (on) startCapture() else stopCapture()
     }
 
-    private fun startCapture() {
+    private fun startCapture(
+        processFactory: () -> Process = { Runtime.getRuntime().exec("logcat -v threadtime") },
+    ) {
         val previous: Thread?
         val next: Thread
         synchronized(DevLogger::class.java) {
@@ -58,7 +74,7 @@ object DevLogger {
                 var reader: BufferedReader? = null
                 var writer: FileWriter? = null
                 try {
-                    localProcess = Runtime.getRuntime().exec("logcat -v threadtime")
+                    localProcess = processFactory()
                     synchronized(DevLogger::class.java) {
                         if (!enabled || generation != captureGeneration) {
                             localProcess.destroy()
@@ -92,7 +108,9 @@ object DevLogger {
                         line = reader.readLine()
                     }
                 } catch (e: Exception) {
-                    if (enabled && generation == captureGeneration) Log.e(TAG, "Capture failed", e)
+                    if (enabled && generation == captureGeneration) {
+                        runCatching { Log.e(TAG, "Capture failed", e) }
+                    }
                 } finally {
                     reader?.let { runCatching { it.close() } }
                     writer?.let { runCatching { it.close() } }
@@ -110,7 +128,7 @@ object DevLogger {
             if (captureThread !== next || !enabled) return
             next.start()
         }
-        Log.i(TAG, "Logcat capture started")
+        runCatching { Log.i(TAG, "Logcat capture started") }
     }
 
     private fun stopCapture() {
@@ -162,6 +180,24 @@ object DevLogger {
             true
         } catch (e: Exception) {
             false
+        }
+    }
+
+    /**
+     * Records an app-level event directly into the log file. Streaming logcat
+     * can be unavailable on some OEM builds (Huawei/HarmonyOS), so key launch
+     * steps are written straight to disk to keep diagnostics useful.
+     */
+    @JvmStatic
+    fun event(message: String) {
+        if (!enabled) return
+        val target = logcatFile ?: return
+        val line = "[app] ${android.os.SystemClock.elapsedRealtime()}ms $message\n"
+        synchronized(fileAppendLock) {
+            runCatching {
+                FileWriter(target, true).use { it.write(line) }
+                if (target.length() > MAX_LOG_SIZE) FileWriter(target, false).use { }
+            }
         }
     }
 

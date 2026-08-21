@@ -4,6 +4,13 @@ import android.os.Bundle;
 import android.os.SystemClock;
 import android.util.Log;
 import android.content.Intent;
+import com.yuki.yukihub.engine.EngineStorageProbe;
+import android.graphics.Color;
+import android.view.Gravity;
+import android.widget.FrameLayout;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+import java.io.File;
 import org.tvp.kirikiri2.EnginePlaySessionJournal;
 
 public abstract class ArtemisLauncherBaseActivity extends com.ies_net.artemis.ArtemisActivity {
@@ -13,6 +20,7 @@ public abstract class ArtemisLauncherBaseActivity extends com.ies_net.artemis.Ar
     private long createdAtElapsed;
     private boolean userRequestedFinish;
     private EnginePlaySessionJournal playSessionJournal;
+    private volatile boolean storageError = false;
     /** Loads the revision-specific Artemis native library (e.g. libartemis.so). Called once from onCreate. */
     public abstract void loadEngineLibrary();
 
@@ -36,6 +44,22 @@ public abstract class ArtemisLauncherBaseActivity extends com.ies_net.artemis.Ar
         super.onCreate(bundle);
         createdAtElapsed = SystemClock.elapsedRealtime();
         Log.i("YukiArtemis", "onCreate path=" + (getIntent() == null ? null : getIntent().getStringExtra("path")) + " scoped=" + (getIntent() != null && getIntent().getBooleanExtra("scopedSaveDir", false)) + " saveName=" + (getIntent() == null ? null : getIntent().getStringExtra("scopedSaveName")));
+        Intent source = getIntent();
+        boolean scoped = source != null && source.getBooleanExtra("scopedSaveDir", false);
+        String saveName = source == null ? null : source.getStringExtra("scopedSaveName");
+        if (scoped && saveName != null && !saveName.trim().isEmpty()) {
+            File base = getApplicationContext().getExternalFilesDir(null);
+            if (base != null) {
+                EngineStorageProbe.Result probe = EngineStorageProbe.probeDirectory(
+                        new File(new File(base, "save"), saveName));
+                if (!probe.ok) {
+                    storageError = true;
+                    Log.e("YukiArtemis", "storage probe failed: " + probe.logMessage());
+                    showStorageError(probe.userMessage());
+                    return;
+                }
+            }
+        }
         loadEngineLibrary();
     }
 
@@ -60,6 +84,15 @@ public abstract class ArtemisLauncherBaseActivity extends com.ies_net.artemis.Ar
 
     @Override
     protected void onDestroy() {
+        if (storageError) {
+            if (playSessionJournal != null) {
+                playSessionJournal.finish();
+                playSessionJournal = null;
+            }
+            Log.i("YukiArtemis", "terminate dedicated Artemis process after storage failure");
+            android.os.Process.killProcess(android.os.Process.myPid());
+            return;
+        }
         boolean retried = maybeRetryWithCompatibleArtemis();
         if (playSessionJournal != null) {
             if (retried) playSessionJournal.pause();
@@ -67,6 +100,36 @@ public abstract class ArtemisLauncherBaseActivity extends com.ies_net.artemis.Ar
             playSessionJournal = null;
         }
         super.onDestroy();
+    }
+
+    private void showStorageError(String message) {
+        Log.e("YukiArtemis", "storage failure page: " + message);
+        FrameLayout root = new FrameLayout(this);
+        root.setBackgroundColor(Color.BLACK);
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        int padding = dp(24);
+        panel.setPadding(padding, padding, padding, padding);
+        TextView text = new TextView(this);
+        text.setText(message);
+        text.setTextColor(Color.WHITE);
+        text.setTextSize(14f);
+        text.setLineSpacing(0f, 1.15f);
+        TextView close = new TextView(this);
+        close.setText("返回");
+        close.setTextColor(Color.rgb(120, 170, 255));
+        close.setTextSize(16f);
+        close.setGravity(Gravity.CENTER);
+        close.setPadding(0, dp(12), 0, dp(24));
+        close.setOnClickListener(v -> finish());
+        panel.addView(text);
+        panel.addView(close);
+        root.addView(panel);
+        setContentView(root);
+    }
+
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
     }
 
     /**
@@ -77,7 +140,7 @@ public abstract class ArtemisLauncherBaseActivity extends com.ies_net.artemis.Ar
      */
     private boolean maybeRetryWithCompatibleArtemis() {
         Intent source = getIntent();
-        if (source == null || userRequestedFinish
+        if (storageError || source == null || userRequestedFinish
                 || !source.getBooleanExtra("artemisAutoFallback", false)
                 || SystemClock.elapsedRealtime() - createdAtElapsed > EARLY_EXIT_WINDOW_MS) return false;
         int stage = source.getIntExtra("artemisFallbackStage", 0);

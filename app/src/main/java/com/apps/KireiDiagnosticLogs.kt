@@ -35,6 +35,9 @@ object KireiDiagnosticLogs {
                 appendLine()
                 appendLogFile("previous", old)
                 appendLogFile("current", active)
+                appendEngineLaunchLogs(app)
+                appendCommandSection("crash buffer", "logcat", "-d", "-b", "crash", "-v", "threadtime", "-t", "200")
+                appendCommandSection("logcat dump", "logcat", "-d", "-v", "threadtime", "-t", "1500")
             },
         )
     }
@@ -62,6 +65,55 @@ object KireiDiagnosticLogs {
             return
         }
         appendLine(readTail(file, MAX_FILE_TAIL_BYTES))
+    }
+
+    private fun StringBuilder.appendEngineLaunchLogs(context: Context) {
+        appendLine("=== engine launch logs (kr) ===")
+        val directory = File(context.applicationContext.filesDir, "launch_logs/kr")
+        val files = runCatching {
+            directory.listFiles { file -> file.isFile && file.name.endsWith(".log") }
+                ?.sortedByDescending(File::lastModified)
+                ?.take(2)
+                .orEmpty()
+        }.getOrDefault(emptyList())
+        if (files.isEmpty()) {
+            appendLine("(not available)")
+            return
+        }
+        files.forEach { file ->
+            appendLine("--- ${file.name} ---")
+            appendLine(readTail(file, MAX_FILE_TAIL_BYTES))
+        }
+    }
+
+    private fun StringBuilder.appendCommandSection(label: String, vararg command: String) {
+        appendLine("=== $label ===")
+        val output = runCommandTimeout(command.toList())
+        if (output.isNullOrBlank()) appendLine("(not available)") else appendLine(output)
+    }
+
+    private fun runCommandTimeout(command: List<String>): String? {
+        return try {
+            val process = ProcessBuilder(command).redirectErrorStream(true).start()
+            val output = StringBuilder()
+            val readerThread = Thread({
+                try {
+                    process.inputStream.bufferedReader().useLines { lines ->
+                        for (line in lines) {
+                            if (output.length >= 1_500_000) break
+                            output.append(line).append('\n')
+                        }
+                    }
+                } catch (_: Throwable) { }
+            }, "diag-log-reader")
+            readerThread.isDaemon = true
+            readerThread.start()
+            readerThread.join(2500L)
+            process.destroy()
+            output.toString().takeIf { it.isNotBlank() }
+        } catch (_: Throwable) {
+            null
+        }
     }
 
     private fun readTail(file: File, maxBytes: Int): String = runCatching {

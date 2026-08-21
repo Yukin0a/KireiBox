@@ -299,6 +299,19 @@ public class KR2Activity extends Cocos2dxActivity {
         if (sPlaySessionJournal != null) sPlaySessionJournal.pause();
         super.onPause();
     }
+    @Override protected void onEngineForegroundChanged(final boolean foreground) {
+        runOnGLThread(new Runnable() {
+            @Override public void run() {
+                boolean applied = false;
+                try {
+                    applied = NativeBridge.setAudioForeground(foreground);
+                } catch (Throwable error) {
+                    android.util.Log.w("KR2Activity", "KRKR audio lifecycle bridge failed foreground=" + foreground, error);
+                }
+                android.util.Log.i("KR2Activity", "KRKR audio foreground=" + foreground + " applied=" + applied);
+            }
+        });
+    }
     @Override public void onDestroy() {
         try {
             if (sPlaySessionJournal != null) sPlaySessionJournal.finish();
@@ -415,9 +428,27 @@ public class KR2Activity extends Cocos2dxActivity {
             int colon = docId.indexOf(':');
             String volume = colon >= 0 ? docId.substring(0, colon) : docId;
             String rel = colon >= 0 ? docId.substring(colon + 1) : "";
-            if ("primary".equalsIgnoreCase(volume)) return rel.isEmpty() ? "/storage/emulated/0" : "/storage/emulated/0/" + rel;
+            if (isInternalVolume(volume)) {
+                String base = externalStorageBase();
+                return rel.isEmpty() ? base : base + "/" + rel;
+            }
             if (volume != null && !volume.isEmpty()) return rel.isEmpty() ? "/storage/" + volume : "/storage/" + volume + "/" + rel;
         } catch (Throwable ignored) { }
         return value;
+    }
+
+    /** Internal-storage volume aliases found in SAF document IDs (OEM/HarmonyOS). */
+    private static boolean isInternalVolume(String volume) {
+        if (volume == null || volume.isEmpty()) return false;
+        String v = volume.toLowerCase(Locale.ROOT);
+        return "primary".equals(v) || "internal".equals(v) || "emulated".equals(v) || "0".equals(v);
+    }
+
+    private static String externalStorageBase() {
+        try {
+            String base = Environment.getExternalStorageDirectory().getAbsolutePath();
+            if (base != null && !base.isEmpty()) return base;
+        } catch (Throwable ignored) { }
+        return "/storage/emulated/0";
     }
 }

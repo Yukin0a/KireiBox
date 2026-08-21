@@ -3,6 +3,7 @@ package com.yuki.yukihub.launcher
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Environment
 import android.provider.DocumentsContract
 import android.util.Log
 import com.apps.LauncherActivity
@@ -311,17 +312,43 @@ internal object ScriptEngineLaunchers {
                     val colon = documentId.indexOf(':')
                     val volume = if (colon >= 0) documentId.substring(0, colon) else documentId
                     val relative = if (colon >= 0) documentId.substring(colon + 1) else ""
-                    if (volume.equals("primary", ignoreCase = true)) {
-                        return if (relative.isEmpty()) "/storage/emulated/0" else "/storage/emulated/0/$relative"
+                    val candidate = if (isInternalVolume(volume)) {
+                        val base = internalStorageBase()
+                        if (relative.isEmpty()) base else "$base/$relative"
+                    } else if (volume.isNotEmpty()) {
+                        if (relative.isEmpty()) "/storage/$volume" else "/storage/$volume/$relative"
+                    } else {
+                        null
                     }
-                    if (volume.isNotEmpty()) {
-                        return if (relative.isEmpty()) "/storage/$volume" else "/storage/$volume/$relative"
+                    if (candidate != null) {
+                        if (File(candidate).exists()) return candidate
+                        val base = internalStorageBase()
+                        val fallback = if (relative.isEmpty()) base else "$base/$relative"
+                        if (fallback != candidate && File(fallback).exists()) return fallback
+                        return candidate
                     }
                 }
             }
             uriText
         } catch (_: Throwable) {
             uriText
+        }
+    }
+
+    private fun internalStorageBase(): String =
+        runCatching { Environment.getExternalStorageDirectory().absolutePath }
+            .getOrDefault("/storage/emulated/0")
+
+    /**
+     * Internal-storage volume aliases found in SAF document IDs. Besides the
+     * standard "primary", some OEM/HarmonyOS providers report "internal",
+     * "emulated" or the user id "0" for the same internal storage.
+     */
+    private fun isInternalVolume(volume: String?): Boolean {
+        if (volume.isNullOrEmpty()) return false
+        return when (volume.lowercase(Locale.ROOT)) {
+            "primary", "internal", "emulated", "0" -> true
+            else -> false
         }
     }
 }

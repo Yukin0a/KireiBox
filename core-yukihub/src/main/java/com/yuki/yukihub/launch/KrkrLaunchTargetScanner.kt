@@ -12,7 +12,7 @@ import java.util.Locale
  * the stored launch target relative to the game root.
  */
 object KrkrLaunchTargetScanner {
-    private const val DEFAULT_MAX_DEPTH = 4
+    private const val DEFAULT_MAX_DEPTH = 1
     private const val MAX_VISITED_NODES = 10_000
     private const val MAX_RESULTS = 512
 

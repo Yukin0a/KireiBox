@@ -12,6 +12,7 @@ import com.yuki.yukihub.model.Game
 import com.yuki.yukihub.model.SupportedEngines
 import com.yuki.yukihub.launch.GameLocationPreflight
 import com.yuki.yukihub.util.AppExecutors
+import com.yuki.yukihub.util.DevLogger
 import com.yuki.yukihub.util.RxMainScheduler
 import java.util.Locale
 import org.tvp.kirikiri2.EnginePlaySessionJournal
@@ -60,24 +61,34 @@ object LauncherGameLaunchBridge {
         val appContext = context.applicationContext
         val repository = GameRepository(appContext)
         val prepared = GameLocationPreflight.verify(appContext, repository, game)
-        val launchGame = prepared.game ?: return LaunchResult.failure(prepared.message)
+        val launchGame = prepared.game ?: run {
+            DevLogger.event("launch blocked by preflight: ${prepared.message}")
+            return LaunchResult.failure(prepared.message)
+        }
+        DevLogger.event("launch start engine=${launchGame.engine} root=${launchGame.rootUri} target=${launchGame.launchTarget}")
         val emulatorPackage = resolveEmulatorPackage(launchGame)
         val launchTarget = resolveLaunchTarget(launchGame)
         val validationError = validate(launchGame, emulatorPackage)
-        if (validationError != null) return LaunchResult.failure(validationError)
+        if (validationError != null) {
+            DevLogger.event("launch validation failed: $validationError")
+            return LaunchResult.failure(validationError)
+        }
 
         val startedAt = System.currentTimeMillis()
         val sessionId = repository.startPlaySession(launchGame.id, startedAt, resolveLaunchType(emulatorPackage))
         if (sessionId <= 0L) return LaunchResult.failure("无法记录本次游玩启动")
-        if (startGameActivity(
-                context, launchGame, emulatorPackage, launchTarget, krSafCompatibility,
-                sessionId
-            )) {
+        val launchError = startGameActivity(
+            context, launchGame, emulatorPackage, launchTarget, krSafCompatibility,
+            sessionId
+        )
+        if (launchError == null) {
+            DevLogger.event("launch started session=$sessionId engine=$emulatorPackage")
             repository.markPlaySessionLaunched(sessionId, System.currentTimeMillis())
             return LaunchResult.success(sessionId)
         }
         repository.cancelPlaySession(sessionId)
-        return LaunchResult.failure("启动失败：未找到该模拟器，或该模拟器不接受当前启动目标")
+        DevLogger.event("launch failed: $launchError")
+        return LaunchResult.failure(launchError)
     }
 
     @JvmStatic
@@ -193,9 +204,9 @@ object LauncherGameLaunchBridge {
         launchTarget: String?,
         krSafCompatibility: Boolean,
         sessionId: Long
-    ): Boolean {
+    ): String? {
         val pkg = emulatorPackage.trim()
-        try {
+        return try {
             if (pkg.startsWith("internal.krkr") || pkg == "org.tvp.kirikiri2.internal") {
                 val prefs: SharedPreferences =
                     context.applicationContext.getSharedPreferences(APP_PREFS, Context.MODE_PRIVATE)
@@ -221,24 +232,29 @@ object LauncherGameLaunchBridge {
                 return startActivitySafely(context, intent)
             }
             if (game.engine == EngineType.ANDROID_APP) {
-                return EmulatorLauncher.launchAndroidApp(context, pkg, launchTarget)
+                return if (EmulatorLauncher.launchAndroidApp(context, pkg, launchTarget)) {
+                    null
+                } else {
+                    "无法启动 Android 应用：包名或 Activity 无效"
+                }
             }
-            return false
-        } catch (_: Throwable) {
-            return false
+            "没有可用的内置引擎启动方式"
+        } catch (error: Throwable) {
+            error.message?.takeIf(String::isNotBlank) ?: "启动引擎时发生未知错误"
         }
     }
 
-    private fun startActivitySafely(context: Context?, intent: Intent?): Boolean {
-        if (context == null || intent == null) return false
+    private fun startActivitySafely(context: Context?, intent: Intent?): String? {
+        if (context == null) return "应用上下文不可用"
+        if (intent == null) return "无法构建引擎启动意图"
         return try {
             if (context !is Activity) {
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             context.startActivity(intent)
-            true
-        } catch (_: Throwable) {
-            false
+            null
+        } catch (error: Throwable) {
+            error.message?.takeIf(String::isNotBlank) ?: "无法启动引擎界面"
         }
     }
 

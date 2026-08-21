@@ -26,11 +26,60 @@ class SearchRevealMathTest {
 
     @Test
     fun thresholdAndVelocityChooseStableTarget() {
-        assertFalse(SearchRevealMath.shouldShow(43f, 44f, 0f, false))
-        assertTrue(SearchRevealMath.shouldShow(44f, 44f, 0f, false))
-        assertTrue(SearchRevealMath.shouldShow(1f, 44f, 901f, false))
-        assertFalse(SearchRevealMath.shouldShow(71f, 44f, -901f, false))
+        assertEquals(36f, SearchRevealMath.settleThreshold(72f), 0f)
+        assertFalse(SearchRevealMath.shouldShow(35.9f, 36f, 0f, false))
+        assertTrue(SearchRevealMath.shouldShow(36f, 36f, 0f, false))
+        assertTrue(SearchRevealMath.shouldShow(1f, 36f, 800f, false))
+        assertFalse(SearchRevealMath.shouldShow(71f, 36f, -800f, false))
         assertTrue(SearchRevealMath.shouldShow(0f, 44f, -2000f, true))
+    }
+
+    @Test
+    fun midListDownwardDragDoesNotReveal() {
+        val move = SearchRevealMath.move(
+            offsetPx = 0f,
+            maxOffsetPx = 72f,
+            deltaPx = 24f,
+            atListStart = false,
+        )
+
+        assertEquals(0f, move.offsetPx, 0f)
+        assertEquals(0f, move.consumedPx, 0f)
+    }
+
+    @Test
+    fun listStartDownwardDragRevealsOneToOne() {
+        val move = SearchRevealMath.move(
+            offsetPx = 8f,
+            maxOffsetPx = 72f,
+            deltaPx = 24f,
+            atListStart = true,
+        )
+
+        assertEquals(32f, move.offsetPx, 0f)
+        assertEquals(24f, move.consumedPx, 0f)
+    }
+
+    @Test
+    fun upwardDragConsumesRevealBeforeLeavingResidualDistance() {
+        val delta = -48f
+        val move = SearchRevealMath.move(18f, 72f, delta, atListStart = false)
+
+        assertEquals(0f, move.offsetPx, 0f)
+        assertEquals(-18f, move.consumedPx, 0f)
+        assertEquals(-30f, delta - move.consumedPx, 0f)
+    }
+
+    @Test
+    fun nonFiniteInputsNeverPublishNaNOrEscapeBounds() {
+        val nan = SearchRevealMath.move(Float.NaN, Float.NaN, Float.NaN)
+        val positive = SearchRevealMath.move(10f, 72f, Float.POSITIVE_INFINITY)
+        val negative = SearchRevealMath.move(10f, 72f, Float.NEGATIVE_INFINITY)
+
+        assertEquals(0f, nan.offsetPx, 0f)
+        assertEquals(72f, positive.offsetPx, 0f)
+        assertEquals(0f, negative.offsetPx, 0f)
+        assertFalse(nan.offsetPx.isNaN())
     }
 
     @Test

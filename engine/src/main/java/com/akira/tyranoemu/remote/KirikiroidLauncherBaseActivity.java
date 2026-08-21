@@ -26,6 +26,7 @@ import java.io.File;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
 import bridge.NativeBridge;
+import com.yuki.yukihub.engine.EngineStorageProbe;
 import org.tvp.kirikiri2.KR2Activity;
 
 /**
@@ -236,6 +237,14 @@ public abstract class KirikiroidLauncherBaseActivity extends KR2Activity {
         });
         String path = getIntent().getStringExtra("path");
         if (path != null && path.length() != 0) {
+            EngineStorageProbe.Result probe = EngineStorageProbe.probeKrkrGameSaveDirectory(path);
+            if (!probe.ok) {
+                KrLaunchLogger.error(
+                        KrLaunchLogger.Stage.STORAGE,
+                        "savedata write probe failed: " + probe.logMessage());
+                showLaunchFailure("启动失败：" + probe.userMessage());
+                return;
+            }
             requestGameLaunch(path, false);
         } else {
             finish();
@@ -671,10 +680,8 @@ public abstract class KirikiroidLauncherBaseActivity extends KR2Activity {
 
     @Override
     public void onWindowFocusChanged(boolean hasFocus) {
-        String focus = getIntent().getStringExtra("focus");
-        boolean forceFocus = focus != null && Boolean.parseBoolean(focus);
-        super.onWindowFocusChanged(hasFocus || forceFocus);
-        if (hasFocus || forceFocus) doSetSystemUiVisibility();
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) doSetSystemUiVisibility();
     }
 
     @Override

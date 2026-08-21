@@ -1,6 +1,8 @@
 package com.apps
 
+import android.Manifest
 import android.content.ClipData
+import android.content.pm.PackageManager
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
@@ -20,6 +22,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.documentfile.provider.DocumentFile
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.ViewModelProvider
@@ -28,9 +32,14 @@ import com.kireibox.ui.BuiltinFileBrowserMode
 import com.kireibox.ui.BuiltinFileBrowserRequest
 import com.kireibox.ui.KireiBoxApp
 import com.kireibox.ui.KireiPrompt
+import com.kireibox.ui.KireiPublicCopy
 import com.kireibox.ui.KireiViewModel
+import com.kireibox.ui.SystemBarVisibilityPolicy
+import com.kireibox.update.UpdateInstaller
 import com.yuki.yukihub.R
 import com.yuki.yukihub.data.GameRepository
+import com.yuki.yukihub.engine.EngineStorageProbe
+import com.yuki.yukihub.util.DevLogger
 import com.yuki.yukihub.launcher.EmulatorLauncher
 import com.yuki.yukihub.launcherbridge.LauncherGameLaunchBridge
 import com.yuki.yukihub.model.EngineType
@@ -38,6 +47,7 @@ import com.yuki.yukihub.model.Game
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 
 /** KireiBox Compose shell. YukiHub repositories are the only runtime data source. */
 class LauncherActivity : AppCompatActivity() {
@@ -52,11 +62,29 @@ class LauncherActivity : AppCompatActivity() {
     private val launcherPrompt = androidx.compose.runtime.mutableStateOf<KireiPrompt?>(null)
     private val fileBrowserRequest = androidx.compose.runtime.mutableStateOf<BuiltinFileBrowserRequest?>(null)
     private var pendingBrowserMode: BuiltinFileBrowserMode? = null
+    private var pendingUpdateApkPath: String? = null
+    private val updateInstaller by lazy { UpdateInstaller(this) }
+
+    private val krkrStoragePermission =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
+            if (grants[Manifest.permission.WRITE_EXTERNAL_STORAGE] != true) {
+                // Denied: guide the user to the system details page. Granting
+                // resumes the pending launch from onResume.
+                showNativeFileAccessDialog()
+            }
+        }
 
     private val folderPicker = registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri == null) return@registerForActivityResult
         if (persist(uri)) viewModel.addScanRoot(uri)
     }
+
+    private val updateInstallLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode != android.app.Activity.RESULT_OK && !isFinishing && !isDestroyed) {
+                showMessage("安装未完成", "系统安装器未完成覆盖安装；更新文件仍已校验，可稍后再次安装。")
+            }
+        }
 
     private val launchFilePicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri == null) return@registerForActivityResult
@@ -100,6 +128,7 @@ class LauncherActivity : AppCompatActivity() {
                     chooseLaunchFile = { chooseStorage(BuiltinFileBrowserMode.LAUNCH_FILE) },
                     chooseAndroidApp = viewModel::openAndroidAppPicker,
                     launchGame = ::launchGame,
+                    selectedGame = viewModel::selectedGame,
                     launchKrkrNative = ::launchKrkrNative,
                     checkPermissions = ::checkPermissions,
                     repairPermission = ::repairPermission,
@@ -109,7 +138,8 @@ class LauncherActivity : AppCompatActivity() {
                         viewModel.setDarkMode(dark)
                         applySystemBarTone(dark)
                     },
-                    showAbout = ::showAbout
+                    showAbout = ::showAbout,
+                    installUpdate = ::installUpdate,
                 ),
                 prompt = launcherPrompt.value,
                 onPromptDismiss = { launcherPrompt.value = null },
@@ -128,13 +158,16 @@ class LauncherActivity : AppCompatActivity() {
                         BuiltinFileBrowserMode.LAUNCH_FILE -> viewModel.importPhysicalLaunchFile(uri)
                         null -> Unit
                     }
-                }
+                },
+                onSystemBarIconsLight = ::applyStatusBarTone
             )
         }
+        applySystemBars()
     }
 
     override fun onResume() {
         super.onResume()
+        applySystemBars()
         if (engineWasOpened && runningSessionId > 0) {
             val sessionId = runningSessionId
             val journaled = runningSessionJournaled
@@ -165,6 +198,21 @@ class LauncherActivity : AppCompatActivity() {
             pendingBrowserMode = null
             window.decorView.post { openBuiltinBrowser(browserMode) }
         }
+        val updatePath = pendingUpdateApkPath
+        if (updatePath != null && updateInstaller.canRequestPackageInstalls()) {
+            pendingUpdateApkPath = null
+            window.decorView.post { installUpdate(updatePath) }
+        }
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) applySystemBars()
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        applySystemBars()
     }
 
     private fun chooseStorage(mode: BuiltinFileBrowserMode) {
@@ -204,15 +252,25 @@ class LauncherActivity : AppCompatActivity() {
         showPrompt(
             KireiPrompt(
                 title = "允许 KireiBox 浏览文件",
-                message = "Android 11 及以上需要“所有文件访问权限”才能使用内置浏览器。授权后会自动继续刚才的操作；KireiBox 本版本只浏览和选择，不会复制、移动、重命名或删除文件。",
+                message = buildString {
+                    append("Android 11 及以上需要“所有文件访问权限”才能使用内置浏览器。授权后会自动继续刚才的操作；KireiBox 本版本只浏览和选择，不会复制、移动、重命名或删除文件。")
+                    if (EngineStorageProbe.isHuaweiFamily()) {
+                        append("\n\n华为/HarmonyOS 路径：设置 → 应用 → KireiBox → 权限管理 → 存储 → 允许；HarmonyOS 3 及以上还需开启“所有文件访问”。")
+                    }
+                },
                 confirmLabel = "前往授权",
                 dismissLabel = "使用系统 SAF",
                 onConfirm = {
-                    val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                    val manageApp = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
                         data = Uri.parse("package:$packageName")
                     }
-                    runCatching { startActivity(intent) }
+                    runCatching { startActivity(manageApp) }
                         .recoverCatching { startActivity(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)) }
+                        .recoverCatching {
+                            startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                data = Uri.parse("package:$packageName")
+                            })
+                        }
                 },
                 onDismiss = {
                     pendingBrowserMode = null
@@ -224,8 +282,9 @@ class LauncherActivity : AppCompatActivity() {
 
     private fun launchGame(game: Game) {
         if (game.engine == EngineType.KIRIKIRI && !hasNativeFileAccess()) {
+            DevLogger.event("krkr launch gate: native file access missing -> prompt")
             pendingNativeLaunch = game
-            showNativeFileAccessDialog()
+            requestNativeFileAccess()
             return
         }
         launchPreparedGame(game)
@@ -239,7 +298,13 @@ class LauncherActivity : AppCompatActivity() {
                     engineWasOpened = true
                     runningSessionJournaled = game.engine != EngineType.ANDROID_APP
                     viewModel.reload()
-                } else showMessage("无法启动", result.message)
+                } else if (!hasNativeFileAccess() && isPermissionLaunchFailure(result.message)) {
+                    DevLogger.event("launch permission failure routed to grant dialog: ${result.message}")
+                    pendingNativeLaunch = game
+                    showNativeFileAccessDialog(hint = result.message)
+                } else {
+                    showMessage("无法启动", result.message)
+                }
             }
         })
     }
@@ -247,7 +312,7 @@ class LauncherActivity : AppCompatActivity() {
     private fun launchKrkrNative() {
         if (!hasNativeFileAccess()) {
             pendingNativeShell = true
-            showNativeFileAccessDialog()
+            requestNativeFileAccess()
             return
         }
         openKrkrNativeShell()
@@ -316,23 +381,98 @@ class LauncherActivity : AppCompatActivity() {
         }
     }
 
-    private fun hasNativeFileAccess(): Boolean =
-        Build.VERSION.SDK_INT < Build.VERSION_CODES.R || Environment.isExternalStorageManager()
+    /** Permission guide text; Huawei/HarmonyOS gets its own path (权限管理 → 存储). */
+    private fun storagePermissionGuide(android11Plus: Boolean): String =
+        if (EngineStorageProbe.isHuaweiFamily()) {
+            buildString {
+                append("华为/HarmonyOS 路径：设置 → 应用 → KireiBox → 权限管理 → 存储 → 允许。")
+                if (android11Plus) append("HarmonyOS 3 及以上还需开启“所有文件访问”。")
+                append("已开启仍无法写入，请把游戏目录移到 Download 等常规位置后重试。")
+            }
+        } else if (android11Plus) {
+            "Android 11 及以上需要“所有文件访问权限”：设置 → 应用 → KireiBox → 权限 → 所有文件访问 → 允许。授权后返回会自动继续；仍无法写入请把游戏目录移到内部存储常规位置后重试。"
+        } else {
+            "Android 10 及以下请授予 KireiBox“存储”权限：设置 → 应用 → KireiBox → 权限 → 存储 → 允许。已开启仍无法写入，请把游戏目录移到 Download 等常规位置后重试。"
+        }
 
-    private fun showNativeFileAccessDialog() {
+    private fun isPermissionLaunchFailure(message: String?): Boolean {
+        if (message.isNullOrBlank()) return false
+        return message.contains("EACCES", ignoreCase = true) ||
+            message.contains("Permission denied", ignoreCase = true) ||
+            message.contains("所有文件访问", ignoreCase = true) ||
+            message.contains("无法创建 savedata", ignoreCase = true) ||
+            message.contains("savedata 无法写入", ignoreCase = true) ||
+            message.contains("只读目录", ignoreCase = true) ||
+            message.contains("写入检查失败", ignoreCase = true)
+    }
+
+    /**
+     * Android 11+ requires MANAGE_EXTERNAL_STORAGE (all-files access) because
+     * scoped storage is mandatory. Android 6-10 use the legacy
+     * WRITE_EXTERNAL_STORAGE runtime permission: with targetSdk 29 and
+     * requestLegacyExternalStorage it grants full physical access, which is
+     * what the KRKR native engine needs to write <game>/savedata.
+     */
+    private fun hasNativeFileAccess(): Boolean =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            Environment.isExternalStorageManager()
+        } else {
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.WRITE_EXTERNAL_STORAGE,
+            ) == PackageManager.PERMISSION_GRANTED
+        }
+
+    /** Requests the permission model matching this Android version; onResume continues the pending action. */
+    private fun requestNativeFileAccess() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            showNativeFileAccessDialog()
+        } else {
+            krkrStoragePermission.launch(
+                arrayOf(
+                    Manifest.permission.READ_EXTERNAL_STORAGE,
+                    Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                ),
+            )
+        }
+    }
+
+    private fun showNativeFileAccessDialog(hint: String? = null) {
         if (isFinishing || isDestroyed) return
+        val android11Plus = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
+        val permissionName = if (android11Plus) "所有文件访问" else "存储"
         showPrompt(
             KireiPrompt(
                 title = "允许 KRKR 读取游戏",
-                message = "目录授权用于扫描和管理；KRKR 原生内核还需要“所有文件访问权限”才能直接读取 XP3，并在游戏目录的 savedata 中保存进度。KireiBox 不会修改 XP3。",
+                message = buildString {
+                    append("目录授权用于扫描和管理；KRKR 原生内核还需要“")
+                    append(permissionName)
+                    append("”权限才能直接读取 XP3，并在游戏目录的 savedata 中保存进度。KireiBox 不会修改 XP3。")
+                    if (!hint.isNullOrBlank()) {
+                        append("\n\n上次失败原因：")
+                        append(hint)
+                    }
+                    append("\n\n")
+                    append(storagePermissionGuide(android11Plus))
+                },
                 confirmLabel = "前往授权",
                 dismissLabel = "稍后",
                 onConfirm = {
-                val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
-                    data = Uri.parse("package:$packageName")
-                }
-                runCatching { startActivity(intent) }
-                    .recoverCatching { startActivity(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)) }
+                    val details = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                        data = Uri.parse("package:$packageName")
+                    }
+                    if (android11Plus) {
+                        val manageApp = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                            data = Uri.parse("package:$packageName")
+                        }
+                        runCatching { startActivity(manageApp) }
+                            .recoverCatching { startActivity(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)) }
+                            .recoverCatching { startActivity(details) }
+                            .onFailure { showMessage("无法打开设置", "请在系统设置中手动允许 KireiBox 的“所有文件访问”后再试。") }
+                    } else {
+                        runCatching { startActivity(details) }
+                            .onFailure { showMessage("无法打开设置", "请在系统设置中手动允许 KireiBox 的“存储”权限后再试。") }
+                    }
                 }
             )
         )
@@ -363,7 +503,8 @@ class LauncherActivity : AppCompatActivity() {
                 append(if (grant?.isWritePermission == true && doc?.canWrite() == true) " / 可写入" else " / 只读")
                 append('\n')
             }
-            append("\nSAF 负责扫描、封面与目录管理；KRKR 原生内核使用物理文件路径，因此需要单独的所有文件访问权限。")
+            append("\nSAF 负责扫描、封面与目录管理；KRKR 原生内核使用物理文件路径。\n")
+            append(storagePermissionGuide(Build.VERSION.SDK_INT >= Build.VERSION_CODES.R))
         }
         showMessage("权限检查", details)
     }
@@ -374,16 +515,31 @@ class LauncherActivity : AppCompatActivity() {
     }
 
     private fun showAbout() {
-        val version = runCatching {
-            packageManager.getPackageInfo(packageName, 0).versionName
-        }.getOrNull().orEmpty().ifBlank { "unknown" }
         showMessage(
-            "KireiBox $version",
-            "YukiHub 单底层 + Jetpack Compose UI\n" +
-                "Kotlin 2.2.21 · Compose UI 1.7.6 · Haze 1.5.4\n" +
-                "数据库 v19 · 四引擎 arm64-v8a\n\n" +
-                "完整技术栈占比和优化建议见版本文档。"
+            "关于 KireiBox",
+            KireiPublicCopy.aboutText,
         )
+    }
+
+    private fun installUpdate(apkPath: String) {
+        val updateRoot = runCatching { File(cacheDir, "updates").canonicalFile }.getOrNull()
+        val apk = runCatching { File(apkPath).canonicalFile }.getOrNull()
+        if (updateRoot == null || apk == null || !apk.isFile || apk.parentFile != updateRoot) {
+            showMessage("无法安装更新", "更新文件位置无效，请重新下载。")
+            return
+        }
+        if (!updateInstaller.canRequestPackageInstalls()) {
+            pendingUpdateApkPath = apk.absolutePath
+            runCatching { startActivity(updateInstaller.unknownSourcesSettingsIntent()) }
+                .onFailure {
+                    pendingUpdateApkPath = null
+                    showMessage("无法打开授权页面", it.message ?: "请在系统设置中允许 KireiBox 安装未知应用。")
+                }
+            return
+        }
+        pendingUpdateApkPath = null
+        runCatching { updateInstallLauncher.launch(updateInstaller.installIntent(apk)) }
+            .onFailure { showMessage("无法启动安装器", it.message ?: "系统安装器不可用。") }
     }
 
     private fun showMessage(title: String, message: String) {
@@ -442,6 +598,35 @@ class LauncherActivity : AppCompatActivity() {
         applySystemBarTone(isLauncherDarkMode(this))
     }
 
+    /**
+     * Alpha 8 V3 system-bar contract: only non-Pad phone landscape hides the status bar.
+     * The transient top-swipe reveal never triggers a layout remeasure, and the navigation
+     * bar stays visible in every mode. Reapplied on resume and configuration changes so a
+     * rotation or split-screen resize restores the bar immediately.
+     */
+    private fun applySystemBars() {
+        val controller = WindowInsetsControllerCompat(window, window.decorView)
+        controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        val config = resources.configuration
+        val visibility = SystemBarVisibilityPolicy.visibilitySpec(
+            widthDp = config.screenWidthDp.toFloat(),
+            heightDp = config.screenHeightDp.toFloat(),
+            smallestScreenWidthDp = config.smallestScreenWidthDp,
+            screenLayoutSize = config.screenLayout and Configuration.SCREENLAYOUT_SIZE_MASK,
+            orientation = config.orientation,
+        )
+        if (visibility.hideStatusBar) {
+            controller.hide(WindowInsetsCompat.Type.statusBars())
+        } else {
+            controller.show(WindowInsetsCompat.Type.statusBars())
+        }
+        if (visibility.hideNavigationBar) {
+            controller.hide(WindowInsetsCompat.Type.navigationBars())
+        } else {
+            controller.show(WindowInsetsCompat.Type.navigationBars())
+        }
+    }
+
     private fun configureEdgeToEdge(dark: Boolean) {
         val style = if (dark) {
             SystemBarStyle.dark(Color.TRANSPARENT)
@@ -456,6 +641,27 @@ class LauncherActivity : AppCompatActivity() {
         androidx.core.view.WindowInsetsControllerCompat(window, window.decorView).apply {
             isAppearanceLightStatusBars = !dark
             isAppearanceLightNavigationBars = !dark
+        }
+    }
+
+    /**
+     * Applies the system-bar icon tone requested by the composed page. [lightIcons] is
+     * true when the page background is dark and icons must be white (light); it maps to
+     * [WindowInsetsControllerCompat.isAppearanceLightStatusBars] == false, never inverted.
+     * The immersive home always requests light icons because its backdrop is dark in both
+     * themes; the initial theme tone is applied before composition and this corrects it
+     * on the first frame, on theme changes and on configuration changes.
+     */
+    private fun applyStatusBarTone(lightIcons: Boolean) {
+        val style = if (lightIcons) {
+            SystemBarStyle.dark(Color.TRANSPARENT)
+        } else {
+            SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
+        }
+        enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
+        androidx.core.view.WindowInsetsControllerCompat(window, window.decorView).apply {
+            isAppearanceLightStatusBars = !lightIcons
+            isAppearanceLightNavigationBars = !lightIcons
         }
     }
 

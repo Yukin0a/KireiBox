@@ -19,8 +19,11 @@ class KrkrLaunchTargetScannerTest {
         root.resolve("savedata").mkdirs()
         root.resolve("savedata/ignored.xp3").writeBytes(byteArrayOf(1))
 
+        // Default depth is 1: launch archives live at the game root, and a deep
+        // walk slows down the picker on large folders. Subdirectory archives
+        // are intentionally not listed.
         assertEquals(
-            listOf("bgi_data.xp3", "data/patch.xp3", "恋爱，我接走了了.xp3"),
+            listOf("bgi_data.xp3", "恋爱，我接走了了.xp3"),
             KrkrLaunchTargetScanner.list(StorageNodes.fromFile(root)),
         )
     }

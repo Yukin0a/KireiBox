@@ -5,53 +5,87 @@
 <h1 align="center">KireiBox</h1>
 
 <p align="center">
-  简洁、美观、专注本地的 Android 视觉小说管理与启动工具
+  一款整合 KRKR、ONScripter、Tyrano 与 Artemis 等多种视觉小说引擎，兼顾美观界面与本地游戏管理的 Android 启动器
 </p>
 
 <p align="center">
-  <a href="../../releases">
+  统一整理、展示和启动不同引擎的本地游戏，让视觉小说管理更加简单直观
+</p>
+
+<p align="center">
+  KireiBox 是基于 YukiHub 的 RinneMobile 分支开发。
+</p>
+
+<p align="center">
+  <a href="https://github.com/Yukin0a/KireiBox/releases">
     <img src="https://img.shields.io/badge/Download-Releases-8B5CF6?logo=github&logoColor=white" alt="Download" />
   </a>
-  <a href="../../releases">
-    <img src="https://img.shields.io/badge/Status-Alpha-F59E0B" alt="Alpha" />
-  </a>
-  <a href="#系统要求">
-    <img src="https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white" alt="Android 8.0+" />
-  </a>
+  <img src="https://img.shields.io/badge/Version-0.5.0--alpha.13-F59E0B" alt="Version" />
+  <img src="https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white" alt="Android 8.0+" />
   <a href="./LICENSE">
     <img src="https://img.shields.io/badge/License-GPL--3.0-E11D48" alt="GPL-3.0" />
   </a>
 </p>
 
 <p align="center">
-  <a href="#主要功能">主要功能</a> ·
-  <a href="#项目结构">项目结构</a> ·
-  <a href="#交流群">加入交流群</a>
+  好看美观 · 简洁易用 · 本地优先 · 多引擎支持 · 横竖屏适配
 </p>
-
-这是一个基于 [YukiHub](https://gitcode.com/xm486/YukiHub) 重构与二次开发的分支版本。
 
 ***
 
 ## 当前状态
 
-**⚠️ KireiBox 目前处于较早期的测试阶段。**
+> KireiBox 目前处于 Alpha 测试阶段。
 
-部分功能、界面和引擎兼容性仍在持续打磨中。使用过程中如遇到问题，欢迎通过 QQ 群反馈。
+部分功能、界面细节和游戏兼容性仍在持续完善。不同游戏、Android 系统和设备之间可能存在兼容性差异。
+
+如遇到问题，欢迎通过 GitHub Issues 或 QQ 交流群反馈。
 
 ***
 
-## 项目简介
+## 主要功能
 
-KireiBox 是一款面向 Android 的视觉小说管理与启动工具。
+- 扫描、添加和管理本地视觉小说
+- 自动识别游戏引擎及启动入口
+- 沉浸式封面首页与多种展示样式
+- 游戏搜索、收藏和资料编辑
+- 游戏启动记录与游玩时长统计
+- 支持竖屏、横屏和大屏布局
+- 支持深色、浅色和减少动态效果
+- 支持 VNDB、Bangumi、月幕 Gal、Hikarinagi 等封面来源
+- 提供封面下载进度、取消和失败重试
+- 支持通过包名和 Activity 添加 Android 应用
+- 支持应用内检查、下载和验证新版本
 
-项目延续了 YukiHub 的游戏数据、目录扫描、封面元数据、设置管理、游玩记录与引擎启动底层，并在此基础上重新设计应用界面与交互。
+除封面搜索、元数据获取和版本检查等主动使用的功能外，KireiBox 主要围绕本地游戏库运行。
 
-KireiBox 使用 Kotlin、Jetpack Compose、Coroutines / Flow 与 MVVM 架构构建更加现代化的 Android 应用层。目前项目正在进行第三次重构，并持续将遗留实现向 Kotlin 迁移。
+***
 
-项目注重简单操作与清晰美观的界面，希望让用户可以方便地整理、搜索和启动本地视觉小说。
+## 支持的启动方式
 
-除用户主动使用的封面搜索与下载外，KireiBox 不依赖账号、云同步、社交或其他在线服务。
+| 类型 | 自动识别特征 | 启动方式 |
+| --- | --- | --- |
+| Kirikiri / KRKR | `.xp3`、`startup.tjs`、`config.tjs` | 使用内置 KRKR 引擎启动，可手动选择 XP3 入口 |
+| ONScripter | `0.txt`、`nscript.dat`、`onscript.nt*`、`.nsa`、`.sar` | 使用内置 ONScripter 引擎启动 |
+| Tyrano | `index.html` 及 Tyrano / Electron 目录特征 | 使用内置 Tyrano 引擎启动 |
+| Artemis | `system.ini`、`system/first.iet`、`.pfs` | 使用内置 Artemis 引擎启动 |
+| Android 应用 | 应用包名与 Activity | 通过手动添加的应用条目启动 |
+
+Android 应用目前不参与游戏目录自动扫描，需要通过应用内入口手动添加。
+
+***
+
+## 下载与安装
+
+请前往 [GitHub Releases](https://github.com/Yukin0a/KireiBox/releases) 下载最新测试版本。
+
+### 系统要求
+
+- Android 8.0（API 26）及以上
+- 当前发布版本主要面向 `arm64-v8a` 设备
+- 扫描游戏目录需要授予相应的文件访问权限
+- KRKR 原生引擎在部分系统上可能需要“所有文件访问权限”
+- 不同游戏和设备的兼容情况可能有所差异
 
 ***
 
@@ -61,85 +95,48 @@ KireiBox 使用 Kotlin、Jetpack Compose、Coroutines / Flow 与 MVVM 架构构�
 KireiBox/
 ├── app/                  # Compose 界面、应用入口与启动桥接
 ├── core-yukihub/         # 游戏库、扫描、元数据、设置与游玩记录
-├── engine/               # KRKR、ONScripter、Tyrano、Artemis 内置引擎
+├── engine/               # KRKR、ONScripter、Tyrano、Artemis 引擎
 ├── doc/                  # 开发记录、版本说明与测试文档
 ├── gradle/               # Gradle Wrapper 与版本配置
 ├── build.gradle          # 根项目构建配置
 └── settings.gradle       # 模块声明
 ```
 
-KireiBox 使用 YukiHub 作为唯一的数据、扫描、元数据和设置底层；`app` 模块以 MVVM 组织 Compose 界面与交互，四个内置引擎集中在 `engine` 模块。
-
-***
-
-## 主要功能
-
-- 扫描并管理本地视觉小说
-- 自动识别游戏引擎和启动入口
-- 搜索、收藏和整理游戏
-- 获取并管理游戏封面
-- 记录游戏启动及游玩时长
-- 通过 Android 包名和 Activity 启动已安装应用
-
-***
-
-## 支持的启动方式
-
-| **类型** | **自动扫描特征** | **扫描导入后的状态** |
-| --- | --- | --- |
-| Kirikiri | `.xp3`、`startup.tjs`、`config.tjs` | 使用内置 KRKR 启动；可从游戏卡片手动选择任意 XP3 入口。 |
-| ONScripter | `0.txt`、`nscript.dat`、`onscript.nt*`、`.nsa`、`.sar` | 使用内置 ONScripter 启动。 |
-| Tyrano | `index.html` 与 Tyrano / Electron 目录特征 | 使用内置 Tyrano 启动。 |
-| Artemis | `system.ini`、`system/first.iet`、`.pfs` | 使用内置 Artemis 启动。 |
-
-Android 应用不参与目录自动扫描，可通过包名和 Activity 手动添加并启动。不同游戏、系统和设备之间可能存在兼容性差异。
-
-***
-
-## 下载
-
-测试版本请前往 [Releases](../../releases) 页面下载。
-
-***
-
-## 系统要求
-
-- Android 8.0（API 26）及以上
-- 部分游戏目录需要授予文件访问权限
-- KRKR 原生引擎可能需要“所有文件访问权限”
+KireiBox 使用 Kotlin、Jetpack Compose、Coroutines / Flow 与 MVVM 架构构建应用界面和交互。
 
 ***
 
 ## 构建信息
 
 - Application ID：`com.kireibox.app`
+- 当前版本：`0.5.0-alpha.13`
+- Version Code：`19`
 - Min SDK：`26`
-- Target SDK：`33`
+- Target SDK：`29`
 - Compile SDK：`36`
-- Version Code：`7`
-- 当前版本：`0.5.0-alpha.1`
+- 主要发布 ABI：`arm64-v8a`
+
+如需自行构建，请使用 Android Studio 打开项目，并准备 Java 17、Android SDK 和 Gradle 环境。
 
 ***
 
 ## 项目来源与致谢
 
-KireiBox 是 [YukiHub](https://gitcode.com/xm486/YukiHub) 的重构与二次开发分支。YukiHub 为项目提供核心数据、扫描、元数据、设置与引擎启动基础；KireiBox 在其上构建新的 Kotlin、Compose 与 MVVM 应用层。
+本项目参考、学习或使用了以下开源项目：
 
-[KAMiGAL](https://github.com/ruizhishenri-commits/KamiGAL)、[RinneMobile](https://github.com/Weiss-UltimateSavior/RinneMobile)、[LunaBox](https://github.com/Saramanda9988/LunaBox) 和 [ReinaManager](https://github.com/huoshen80/ReinaManager) 主要作为界面呈现、交互方式与游戏库体验的参考，不作为 KireiBox 的运行时底层。
-
-本项目参考或使用了以下开源项目：
-
+- [RinneMobile](https://github.com/Weiss-UltimateSavior/RinneMobile)
 - [YukiHub](https://gitcode.com/xm486/YukiHub)
 - [KAMiGAL](https://github.com/ruizhishenri-commits/KamiGAL)
-- [RinneMobile](https://github.com/Weiss-UltimateSavior/RinneMobile)
 - [LunaBox](https://github.com/Saramanda9988/LunaBox)
 - [ReinaManager](https://github.com/huoshen80/ReinaManager)
-- Kirikiroid2
-- ONScripter
+- Kirikiroid2 / Kirikiroid2Yuri
+- OnscripterYuri
 - Tyrano
 - Artemis
 
-感谢相关开源项目的作者、贡献者，以及所有参与测试和反馈的用户。
+感谢相关项目的作者、贡献者，以及所有参与测试和反馈的用户。
+
+第三方源码、组件和原生引擎仍遵循各自的开源协议与版权声明，详细信息请参阅 [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md)。
 
 ***
 
@@ -157,7 +154,7 @@ KireiBox 是 [YukiHub](https://gitcode.com/xm486/YukiHub) 的重构与二次开�
 
 ## 使用前说明
 
-请仅使用本项目管理和启动你**有权使用**的游戏、应用或资源。
+请仅使用本项目管理和启动你有权使用的游戏、应用或资源。
 
 本项目不提供：
 
@@ -168,8 +165,24 @@ KireiBox 是 [YukiHub](https://gitcode.com/xm486/YukiHub) 的重构与二次开�
 
 ***
 
+## 反馈与贡献
+
+遇到问题时，建议附上以下信息：
+
+- 设备型号
+- Android 版本
+- KireiBox 版本
+- 游戏引擎类型
+- 问题截图
+- 复现步骤
+- 相关日志
+
+欢迎通过 Issue 或 Pull Request 参与项目改进。
+
+***
+
 ## 开源协议
 
 KireiBox 采用 [GNU General Public License v3.0](./LICENSE) 开源。
 
-项目中使用的第三方组件和内置引擎仍遵循各自的开源协议与版权声明。
+项目中包含的第三方组件和内置引擎仍遵循各自的许可证及版权声明。

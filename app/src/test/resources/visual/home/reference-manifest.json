@@ -1,0 +1,28 @@
+{
+    "version": 2,
+    "createdUtc": "2026-08-13T03:50:00Z",
+    "policy": {
+        "statusBarHiddenPortrait": true,
+        "statusBarHiddenLandscape": true,
+        "navigationBarTransparentEdgeToEdge": true,
+        "navigationBarNeverHidden": true,
+        "dockAboveNavigationBar": true,
+        "cutoutShortEdges": true
+    },
+    "files": [
+        {
+            "targetRelativePath": "app/src/test/resources/visual/home/reference-portrait.png",
+            "sourceAbsolutePath": "/var/folders/95/dgy9_z2d5qz76g0yr16jnb740000gn/T/codex-clipboard-0b2320ec-26ba-498f-a94e-89e3890dd273.png",
+            "pixelWidth": 852,
+            "pixelHeight": 1846,
+            "sha256": "d7b5ff7ae3fca5af691b6e89074fc7bb5f8cd9eafedcc8bf397fa0fe3e5bd509"
+        },
+        {
+            "targetRelativePath": "app/src/test/resources/visual/home/reference-landscape.png",
+            "sourceAbsolutePath": "/var/folders/95/dgy9_z2d5qz76g0yr16jnb740000gn/T/codex-clipboard-82c56646-8552-464b-b5c4-68c3a004d091.png",
+            "pixelWidth": 1672,
+            "pixelHeight": 941,
+            "sha256": "b14067f13b0e1e0ede61d28f5b5b38e7b24f091cc1add97a94f0d847b82a00f8"
+        }
+    ]
+}

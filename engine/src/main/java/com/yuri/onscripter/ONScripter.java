@@ -30,6 +30,7 @@ import org.tvp.kirikiri2.EnginePlaySessionJournal;
 
 import com.yuki.yukihub.ons.OnsLibLoader;
 import com.yuki.yukihub.ons.OnsSettings;
+import com.yuki.yukihub.engine.EngineStorageProbe;
 import com.yuki.yukihub.ons.OnsVideoActivity;
 
 import java.io.File;
@@ -55,6 +56,7 @@ public class ONScripter extends SDLActivity {
     private boolean controlsVisible = true;
     private boolean autoMode = false;
     private EnginePlaySessionJournal playSessionJournal;
+    private volatile boolean storageError = false;
     private native int nativeInitJavaCallbacks();
     private native int nativeGetWidth();
     private native int nativeGetHeight();
@@ -87,6 +89,16 @@ public class ONScripter extends SDLActivity {
         onsArgs = getIntent().getStringArrayListExtra(OnsSettings.EXTRA_GAME_ARGS);
         OnsSettings settings = OnsSettings.load(this);
         if (onsArgs == null) onsArgs = settings.buildArgs(this, gameRoot);
+        String saveDirPath = argValue(onsArgs, "--save-dir");
+        if (saveDirPath != null && !saveDirPath.trim().isEmpty()) {
+            EngineStorageProbe.Result probe = EngineStorageProbe.probeDirectory(new File(saveDirPath));
+            if (!probe.ok) {
+                storageError = true;
+                Log.e(TAG, "storage probe failed: " + probe.logMessage());
+                showStorageError(probe.userMessage());
+                return;
+            }
+        }
         ignoreCutout = getIntent().getBooleanExtra(OnsSettings.EXTRA_IGNORE_CUTOUT, settings.ignoreCutout);
         // 提前加载/释放 assets：确保 libonsyuri 与内置 DroidSansFallback.ttf 在 SDLActivity 启动前可用。
         OnsLibLoader.load(this);
@@ -99,22 +111,32 @@ public class ONScripter extends SDLActivity {
     }
 
     @Override public void onResume() {
+        if (storageError) return;
         super.onResume();
         if (playSessionJournal != null) playSessionJournal.resume();
         fullscreen();
     }
 
     @Override public void onPause() {
+        if (storageError) return;
         if (playSessionJournal != null) playSessionJournal.pause();
         super.onPause();
     }
 
     @Override public void onWindowFocusChanged(boolean hasFocus) {
+        if (storageError) return;
         super.onWindowFocusChanged(hasFocus);
         if (hasFocus) fullscreen();
     }
 
     @Override public boolean dispatchKeyEvent(KeyEvent event) {
+        if (storageError) {
+            if (event != null && event.getKeyCode() == KeyEvent.KEYCODE_BACK
+                    && event.getAction() == KeyEvent.ACTION_UP) {
+                finish();
+            }
+            return true;
+        }
         if (event != null && event.getKeyCode() == KeyEvent.KEYCODE_BACK) {
             if (event.getAction() == KeyEvent.ACTION_UP) onBackPressed();
             return true;
@@ -492,6 +514,30 @@ public class ONScripter extends SDLActivity {
         setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
     }
 
+    private void showStorageError(String message) {
+        FrameLayout root = new FrameLayout(this);
+        root.setBackgroundColor(Color.BLACK);
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+        TextView text = new TextView(this);
+        text.setText(message);
+        text.setTextColor(Color.WHITE);
+        text.setTextSize(14f);
+        text.setLineSpacing(0f, 1.15f);
+        int padding = Math.round(24 * getResources().getDisplayMetrics().density);
+        text.setPadding(padding, padding, padding, padding);
+        root.addView(text, params);
+        setContentView(root);
+    }
+
+    private static String argValue(ArrayList<String> args, String key) {
+        if (args == null) return null;
+        for (int i = 0; i + 1 < args.size(); i++) {
+            if (key.equals(args.get(i))) return args.get(i + 1);
+        }
+        return null;
+    }
+
     private String normalizeRootPath(String value) {
         if (value == null) return null;
         String v = value.trim();
@@ -514,9 +560,26 @@ public class ONScripter extends SDLActivity {
         int colon = docId.indexOf(':');
         String volume = colon >= 0 ? docId.substring(0, colon) : docId;
         String rel = colon >= 0 ? docId.substring(colon + 1) : "";
-        if ("primary".equalsIgnoreCase(volume)) return "/storage/emulated/0" + (rel.isEmpty() ? "" : "/" + rel);
+        if (isInternalVolume(volume)) {
+            return externalStorageBase() + (rel.isEmpty() ? "" : "/" + rel);
+        }
         if (volume != null && !volume.isEmpty()) return "/storage/" + volume + (rel.isEmpty() ? "" : "/" + rel);
         return null;
+    }
+
+    /** Internal-storage volume aliases found in SAF document IDs (OEM/HarmonyOS). */
+    private boolean isInternalVolume(String volume) {
+        if (volume == null || volume.isEmpty()) return false;
+        String v = volume.toLowerCase(java.util.Locale.ROOT);
+        return "primary".equals(v) || "internal".equals(v) || "emulated".equals(v) || "0".equals(v);
+    }
+
+    private String externalStorageBase() {
+        try {
+            String base = Environment.getExternalStorageDirectory().getAbsolutePath();
+            if (base != null && !base.isEmpty()) return base;
+        } catch (Throwable ignored) { }
+        return "/storage/emulated/0";
     }
 
     private String firstNonEmpty(String... values) {
