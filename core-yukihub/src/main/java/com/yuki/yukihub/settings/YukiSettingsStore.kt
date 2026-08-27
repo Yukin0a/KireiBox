@@ -62,6 +62,8 @@ class YukiSettingsStore internal constructor(
         val ignoredUpdateVersionCode: Int = 0,
         val updateEtag: String = "",
         val lastUpdateCheckAt: Long = 0L,
+        /** Keeps user-removed cards hidden when a scan sees the same game again. */
+        val keepRemovedGamesHiddenOnRefresh: Boolean = true
     ) {
         val immersiveGallerySettings: ImmersiveGallerySettings
             get() = ImmersiveGallerySettings(
@@ -193,6 +195,10 @@ class YukiSettingsStore internal constructor(
             ignoredUpdateVersionCode = prefs.getInt(KEY_IGNORED_UPDATE_VERSION_CODE, 0).coerceAtLeast(0),
             updateEtag = prefs.getString(KEY_UPDATE_ETAG, "").orEmpty(),
             lastUpdateCheckAt = prefs.getLong(KEY_LAST_UPDATE_CHECK_AT, 0L).coerceAtLeast(0L),
+            keepRemovedGamesHiddenOnRefresh = prefs.getBoolean(
+                KEY_KEEP_REMOVED_GAMES_HIDDEN_ON_REFRESH,
+                true,
+            )
         )
     }
 
@@ -372,6 +378,7 @@ class YukiSettingsStore internal constructor(
         const val KEY_USE_BUILTIN_FILE_CHOOSER = "use_builtin_file_chooser"
         const val KEY_STARTUP_SCAN_DEPTH = "startup_scan_depth"
         const val KEY_AUTO_SCAN_ON_STARTUP = "auto_scan_on_startup"
+        const val KEY_KEEP_REMOVED_GAMES_HIDDEN_ON_REFRESH = "keep_removed_games_hidden_on_refresh"
         const val KEY_SORT_MODE = "sort_mode"
         const val KEY_ENGINE_LABEL_POSITION = "engine_label_position"
         const val KEY_METADATA_SOURCE = "metadata_source"
