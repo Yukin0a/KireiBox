@@ -122,10 +122,9 @@ class LibraryOverviewPolicyTest {
         assertTrue(card.contains("if (!compact)"))
     }
 
-    @Test fun shortLandscape2400x1080UsesNearSquareCoverAndPortraitKeepsRatio() {
+    @Test fun shortLandscape2400x1080UsesWidescreenCoverAndPortraitKeepsRatio() {
         assertTrue(LibraryCardLayoutPolicy.isShortLandscape(2400f, 1080f))
-        assertTrue(LibraryCardLayoutPolicy.coverAspectRatio(true) in .90f..1.0f)
-        assertEquals(.94f, LibraryCardLayoutPolicy.coverAspectRatio(true), .001f)
+        assertEquals(16f / 9f, LibraryCardLayoutPolicy.coverAspectRatio(true), .001f)
         assertEquals(.72f, LibraryCardLayoutPolicy.coverAspectRatio(false), .001f)
     }
 

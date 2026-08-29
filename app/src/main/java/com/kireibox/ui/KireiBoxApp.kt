@@ -4494,7 +4494,7 @@ internal fun resolveLibraryGridBottomContentPaddingDp(
  */
 internal object LibraryCardLayoutPolicy {
     const val PORTRAIT_COVER_ASPECT_RATIO = .72f
-    const val SHORT_LANDSCAPE_COVER_ASPECT_RATIO = .94f
+    const val SHORT_LANDSCAPE_COVER_ASPECT_RATIO = 16f / 9f
     const val SHORT_LANDSCAPE_MAX_HEIGHT_FRACTION = .60f
     const val MIN_HEADER_GAP_DP = 8f
     const val MIN_TITLE_GAP_DP = 6f
