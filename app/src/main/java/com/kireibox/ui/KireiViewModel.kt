@@ -26,7 +26,9 @@ import com.yuki.yukihub.data.GameSearchIndex
 import com.yuki.yukihub.data.GameRepository
 import com.yuki.yukihub.data.GameLibraryOrdering
 import com.yuki.yukihub.data.PlayTrendPoint
+import com.yuki.yukihub.data.ScanImportSummary
 import com.yuki.yukihub.data.YukiCoreFacade
+import com.yuki.yukihub.settings.YukiSettingsStore
 import com.yuki.yukihub.launch.GameLocationPreflight
 import com.yuki.yukihub.launch.KrkrLaunchTargetScanner
 import com.yuki.yukihub.metadata.CoverSourceMode
@@ -274,6 +276,7 @@ internal constructor(
     private var bindingRefreshJob: Job? = null
     private val immersiveReloadGate = LatestWinsGate()
     private val autoCoverGate = AutoCoverSchedulingGate()
+    private val foregroundRefreshGate = ForegroundRefreshGate()
     private var immersiveReloadJob: Job? = null
     private var updateDownloadJob: Job? = null
     private val _state = MutableStateFlow(KireiUiState())
@@ -839,7 +842,10 @@ internal constructor(
             _state.value = _state.value.copy(busy = true)
             core.settings.addScanRoot(uri.toString())
             val report = core.scan(uri)
-            val imported = core.importScan(report)
+            val imported = core.importScan(
+                report,
+                keepRemovedHidden = core.settings.snapshot().keepRemovedGamesHiddenOnRefresh,
+            )
             withContext(Dispatchers.Main) {
                 _state.value = _state.value.copy(busy = false, notice = "扫描完成：发现 ${imported.size} 个游戏")
             }
@@ -960,6 +966,39 @@ internal constructor(
     fun setUseBuiltinFileChooser(value: Boolean) {
         core.settings.putBoolean(com.yuki.yukihub.settings.YukiSettingsStore.KEY_USE_BUILTIN_FILE_CHOOSER, value)
         reload()
+    }
+    fun setAutoScanOnStartup(value: Boolean) {
+        core.settings.putBoolean(YukiSettingsStore.KEY_AUTO_SCAN_ON_STARTUP, value)
+        reload()
+    }
+    fun setKeepRemovedGamesHiddenOnRefresh(value: Boolean) {
+        core.settings.putBoolean(YukiSettingsStore.KEY_KEEP_REMOVED_GAMES_HIDDEN_ON_REFRESH, value)
+        reload()
+    }
+    fun onAppForeground() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val snapshot = core.settings.snapshot()
+            if (!snapshot.autoScanOnStartup) return@launch
+            if (!foregroundRefreshGate.tryStart(System.currentTimeMillis())) return@launch
+            try {
+                val roots = DirectoryAutoRefreshPolicy.enabledRoots(snapshot.scanRoots, snapshot.scanRootEnabled)
+                var failed = 0
+                var total = ScanImportSummary()
+                roots.forEach { root ->
+                    val parsed = runCatching { Uri.parse(root) }.getOrNull()
+                    if (parsed == null) { failed += 1; return@forEach }
+                    val report = runCatching { core.scan(parsed) }.getOrElse { failed += 1; return@forEach }
+                    total += core.importScan(report, snapshot.keepRemovedGamesHiddenOnRefresh)
+                }
+                val message = DirectoryAutoRefreshPolicy.notice(total, failed)
+                withContext(Dispatchers.Main) {
+                    if (message != null) _state.value = _state.value.copy(notice = message)
+                }
+                reloadInternal()
+            } finally {
+                foregroundRefreshGate.finish()
+            }
+        }
     }
     fun setKrEngineVersion(value: String) { core.settings.putString(com.yuki.yukihub.settings.YukiSettingsStore.KEY_KR_ENGINE_VERSION, value); reload() }
     fun setKrCompat(value: Boolean) { core.settings.putBoolean(com.yuki.yukihub.settings.YukiSettingsStore.KEY_KR_COMPAT_MODE, value); reload() }
@@ -1185,6 +1224,34 @@ internal constructor(
                     _state.value.copy(coverSearch = null, notice = "已使用 ${game.engine?.displayName ?: "引擎"} 默认封面")
                 } else {
                     _state.value.copy(coverSearch = search.copy(error = result.exceptionOrNull()?.message ?: "默认封面设置失败"))
+                }
+            }
+            if (result.isSuccess) reloadInternal()
+        }
+    }
+
+    fun importLocalCover(uri: Uri) {
+        val gameId = _state.value.coverSearch?.game?.id ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            withContext(Dispatchers.Main) {
+                _state.value = _state.value.copy(
+                    coverSearch = _state.value.coverSearch?.copy(saving = true, error = null),
+                )
+            }
+            val result = coverStore.importLocal(gameId, uri)
+            withContext(Dispatchers.Main) {
+                if (result.isSuccess) {
+                    _state.value = _state.value.copy(
+                        coverSearch = null,
+                        notice = "已使用本地封面",
+                    )
+                } else {
+                    _state.value = _state.value.copy(
+                        coverSearch = _state.value.coverSearch?.copy(
+                            saving = false,
+                            error = result.exceptionOrNull()?.message ?: "无法使用所选图片",
+                        ),
+                    )
                 }
             }
             if (result.isSuccess) reloadInternal()

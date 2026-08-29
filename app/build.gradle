@@ -27,8 +27,8 @@ android {
         // takes effect when targetSdk <= 29; Android 11+ still enforces scoped
         // storage and keeps using MANAGE_EXTERNAL_STORAGE instead.
         targetSdk 29
-        versionCode 19
-        versionName "0.5.0-alpha.13"
+        versionCode 23
+        versionName "0.5.0-alpha.15"
 
         ndk {
             abiFilters 'arm64-v8a'
@@ -51,6 +51,10 @@ android {
     }
 
     buildTypes {
+        debug {
+            applicationIdSuffix ".debug"
+            versionNameSuffix "-debug"
+        }
         demo {
             initWith release
             // Demo packages stay upgrade-compatible with the Huawei-tested debug line.

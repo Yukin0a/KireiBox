@@ -369,6 +369,8 @@ data class KireiActions(
     val chooseDirectory: () -> Unit,
     val chooseLaunchFile: () -> Unit,
     val chooseAndroidApp: () -> Unit,
+    val chooseCoverFromAlbum: () -> Unit,
+    val chooseCoverFromFiles: () -> Unit,
     val launchGame: (Game) -> Unit,
     val selectedGame: (Game) -> Unit,
     val launchKrkrNative: () -> Unit,
@@ -604,7 +606,8 @@ fun KireiBoxApp(
                         search = coverSearch,
                         colors = colors,
                         haze = haze,
-                        viewModel = viewModel
+                        viewModel = viewModel,
+                        actions = actions,
                     ) }
                     homeEditorProfile != null -> Box(Modifier.fillMaxSize()) {
                         DashboardEditorPage(
@@ -1396,6 +1399,7 @@ private fun BuiltinFileBrowserPage(
                     }
                 }.asReversed()
             }
+            if (!BuiltinFileBrowserCrumbPolicy.shouldHideRow(breadcrumbs.size)) {
             LazyRow(
                 Modifier.fillMaxWidth().padding(vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -1417,6 +1421,7 @@ private fun BuiltinFileBrowserPage(
                         )
                     }
                 }
+            }
             }
 
             GlassSurface(
@@ -6576,6 +6581,32 @@ private fun LibrarySettings(state: KireiUiState, colors: KireiColors, viewModel:
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
         )
     }
+    SettingsSection("扫描更新", colors) {
+        SwitchRow(
+            "目录自动更新",
+            state.settings?.autoScanOnStartup != false,
+            colors,
+            viewModel::setAutoScanOnStartup,
+        )
+        Text(
+            "回到 KireiBox 时自动扫描已开启的目录，只添加新游戏。",
+            color = colors.secondary,
+            style = AppleTypography.bodySmall,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        )
+        SwitchRow(
+            "已移除游戏更新目录不会再添加",
+            state.settings?.keepRemovedGamesHiddenOnRefresh != false,
+            colors,
+            viewModel::setKeepRemovedGamesHiddenOnRefresh,
+        )
+        Text(
+            "打开时，移出游戏库的记录扫目录也不会加回来。关掉才会重新出现。",
+            color = colors.secondary,
+            style = AppleTypography.bodySmall,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        )
+    }
     SettingsSection("扫描目录", colors) {
         state.settings?.scanRoots.orEmpty().forEachIndexed { index, root ->
             SettingsRow(Icons.Rounded.Folder, "目录 ${index + 1}", GameLocationLabel.format(context, root), colors) { actions.repairPermission(root) }
@@ -6608,7 +6639,7 @@ private fun PermissionSettings(state: KireiUiState, colors: KireiColors, actions
 }
 
 @Composable
-private fun CoverPickerPage(search: CoverSearchUi, colors: KireiColors, haze: HazeState?, viewModel: KireiViewModel) {
+private fun CoverPickerPage(search: CoverSearchUi, colors: KireiColors, haze: HazeState?, viewModel: KireiViewModel, actions: KireiActions) {
     BackHandler(onBack = viewModel::dismissCoverSearch)
     BoxWithConstraints(Modifier.fillMaxSize().background(colors.background), contentAlignment = Alignment.Center) {
         val wide = maxWidth >= 700.dp
@@ -6704,6 +6735,21 @@ private fun CoverPickerPage(search: CoverSearchUi, colors: KireiColors, haze: Ha
                         }
                     }
                 }
+            }
+            Row(
+                Modifier.fillMaxWidth().padding(top = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                TextButton(
+                    onClick = actions.chooseCoverFromAlbum,
+                    enabled = !search.saving && !search.loading,
+                    modifier = Modifier.weight(1f),
+                ) { Text("从相册选择", color = colors.accent, maxLines = 1) }
+                TextButton(
+                    onClick = actions.chooseCoverFromFiles,
+                    enabled = !search.saving && !search.loading,
+                    modifier = Modifier.weight(1f),
+                ) { Text("从手机文件选择", color = colors.accent, maxLines = 1) }
             }
             Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 TextButton(onClick = viewModel::useDefaultCover, enabled = !search.saving) {

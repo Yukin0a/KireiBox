@@ -18,6 +18,7 @@ import android.view.WindowManager
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -58,6 +59,12 @@ class LauncherActivity : AppCompatActivity() {
     private var engineWasOpened = false
     private var runningSessionJournaled = false
     private var pendingNativeLaunch: Game? = null
+    private val coverAlbumPicker = registerForActivityResult(
+        ActivityResultContracts.PickVisualMedia(),
+    ) { uri -> uri?.let(viewModel::importLocalCover) }
+    private val coverFilePicker = registerForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri -> uri?.let(viewModel::importLocalCover) }
     private var pendingNativeShell = false
     private val launcherPrompt = androidx.compose.runtime.mutableStateOf<KireiPrompt?>(null)
     private val fileBrowserRequest = androidx.compose.runtime.mutableStateOf<BuiltinFileBrowserRequest?>(null)
@@ -127,6 +134,12 @@ class LauncherActivity : AppCompatActivity() {
                     chooseDirectory = { chooseStorage(BuiltinFileBrowserMode.DIRECTORY) },
                     chooseLaunchFile = { chooseStorage(BuiltinFileBrowserMode.LAUNCH_FILE) },
                     chooseAndroidApp = viewModel::openAndroidAppPicker,
+                    chooseCoverFromAlbum = {
+                        coverAlbumPicker.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                        )
+                    },
+                    chooseCoverFromFiles = { coverFilePicker.launch(arrayOf("image/*")) },
                     launchGame = ::launchGame,
                     selectedGame = viewModel::selectedGame,
                     launchKrkrNative = ::launchKrkrNative,
@@ -203,6 +216,7 @@ class LauncherActivity : AppCompatActivity() {
             pendingUpdateApkPath = null
             window.decorView.post { installUpdate(updatePath) }
         }
+        viewModel.onAppForeground()
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {

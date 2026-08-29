@@ -97,6 +97,8 @@ class ImmersiveFixtureActivity : ComponentActivity() {
                         chooseDirectory = {},
                         chooseLaunchFile = {},
                         chooseAndroidApp = {},
+                        chooseCoverFromAlbum = {},
+                        chooseCoverFromFiles = {},
                         launchGame = {},
                         selectedGame = {},
                         launchKrkrNative = {},
