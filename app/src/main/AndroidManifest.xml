@@ -57,9 +57,10 @@
             android:launchMode="singleInstance"
             android:taskAffinity="com.yuki.yukihub.Kirikiroid2"
             android:screenOrientation="sensorLandscape"
+            android:resizeableActivity="true"
             android:theme="@style/Theme.YukiHub.Kirikiroid2"
             android:windowSoftInputMode="adjustPan"
-            android:configChanges="keyboardHidden|screenSize" />
+            android:configChanges="keyboardHidden|screenSize|screenLayout|smallestScreenSize|uiMode|density" />
 
         <activity
             android:name="com.akira.tyranoemu.remote.Kirikiroid139"
@@ -68,9 +69,10 @@
             android:launchMode="singleInstance"
             android:taskAffinity="com.yuki.yukihub.Kirikiroid2"
             android:screenOrientation="sensorLandscape"
+            android:resizeableActivity="true"
             android:theme="@style/Theme.YukiHub.Kirikiroid2"
             android:windowSoftInputMode="adjustPan"
-            android:configChanges="keyboardHidden|screenSize" />
+            android:configChanges="keyboardHidden|screenSize|screenLayout|smallestScreenSize|uiMode|density" />
 
         <activity
             android:name="com.akira.tyranoemu.remote.Kirikiroid134"
@@ -79,9 +81,10 @@
             android:launchMode="singleInstance"
             android:taskAffinity="com.yuki.yukihub.Kirikiroid2"
             android:screenOrientation="sensorLandscape"
+            android:resizeableActivity="true"
             android:theme="@style/Theme.YukiHub.Kirikiroid2Compatible"
             android:windowSoftInputMode="adjustPan"
-            android:configChanges="keyboardHidden|screenSize" />
+            android:configChanges="keyboardHidden|screenSize|screenLayout|smallestScreenSize|uiMode|density" />
 
         <activity
             android:name="com.akira.tyranoemu.remote.Kirikiroid126"
@@ -90,9 +93,10 @@
             android:launchMode="singleInstance"
             android:taskAffinity="com.yuki.yukihub.Kirikiroid2"
             android:screenOrientation="sensorLandscape"
+            android:resizeableActivity="true"
             android:theme="@style/Theme.YukiHub.Kirikiroid2Compatible"
             android:windowSoftInputMode="adjustPan"
-            android:configChanges="keyboardHidden|screenSize" />
+            android:configChanges="keyboardHidden|screenSize|screenLayout|smallestScreenSize|uiMode|density" />
 
         <activity
             android:name="com.yuki.yukihub.tyrano.TyranoActivity"

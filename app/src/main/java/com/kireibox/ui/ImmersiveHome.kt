@@ -171,6 +171,7 @@ internal fun ImmersiveHome(
     reducedTransparency: Boolean = false,
     adaptiveMetrics: AdaptiveUiMetrics? = null,
     haze: HazeState? = null,
+    onOpenOverview: (() -> Unit)? = null,
     debugFrozenTrackProgress: Float? = null,
     modifier: Modifier = Modifier,
 ) {
@@ -411,6 +412,12 @@ internal fun ImmersiveHome(
                 onTheme = {
                     menuExpanded = false
                     actions.setDarkMode(!colors.isDark)
+                },
+                onOpenOverview = onOpenOverview?.let { open ->
+                    {
+                        menuExpanded = false
+                        open()
+                    }
                 },
             )
         }

@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.res.Configuration;
 import android.graphics.PixelFormat;
 import android.opengl.GLSurfaceView;
 import android.os.Build;
@@ -177,6 +178,13 @@ public abstract class Cocos2dxActivity extends Activity implements Cocos2dxHelpe
         Log.d(TAG, "onWindowFocusChanged() hasFocus=" + hasFocus);
         super.onWindowFocusChanged(hasFocus);
         applyForegroundTransition(foregroundState.onWindowFocusChanged(hasFocus));
+    }
+
+    @Override
+    public void onMultiWindowModeChanged(boolean isInMultiWindowMode, Configuration newConfig) {
+        Log.d(TAG, "onMultiWindowModeChanged() isInMultiWindowMode=" + isInMultiWindowMode);
+        super.onMultiWindowModeChanged(isInMultiWindowMode, newConfig);
+        applyForegroundTransition(foregroundState.onMultiWindowModeChanged(isInMultiWindowMode));
     }
 
     @Override

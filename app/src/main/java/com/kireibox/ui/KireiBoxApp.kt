@@ -1602,6 +1602,7 @@ private fun HomePage(
                 reducedMotion = LocalResolvedMotionMode.current == MotionMode.REDUCED,
                 reducedTransparency = state.settings?.reducedTransparency == true,
                 adaptiveMetrics = adaptiveMetrics,
+                onOpenOverview = onOpenOverview,
             )
         } else {
             ComponentsHomePage(
@@ -1807,10 +1808,13 @@ internal fun HomeControlMenu(
     menuDiameterDp: Dp = 48.dp,
     menuIconSizeDp: Dp = 27.dp,
     opaqueFill: Boolean = false,
+    /** Immersive home has no stats card, so it reaches the play-time ranking from this menu. */
+    onOpenOverview: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val polished = LocalResolvedMotionMode.current == MotionMode.POLISHED
-    Box(modifier.size(150.dp, menuDiameterDp)) {
+    val menuWidthDp = if (onOpenOverview != null) 202.dp else 150.dp
+    Box(modifier.size(menuWidthDp, menuDiameterDp)) {
         AnimatedVisibility(
             visible = expanded,
             enter = fadeIn(tween(if (polished) 150 else 90)) +
@@ -1836,6 +1840,18 @@ internal fun HomeControlMenu(
                 haze,
                 onTheme
             )
+        }
+        if (onOpenOverview != null) {
+            AnimatedVisibility(
+                visible = expanded,
+                enter = fadeIn(tween(if (polished) 200 else 90)) +
+                    slideInHorizontally(tween(if (polished) 230 else 90)) { it / 2 },
+                exit = fadeOut(tween(if (polished) 90 else 90)) +
+                    slideOutHorizontally(tween(if (polished) 110 else 90)) { it / 2 },
+                modifier = Modifier.align(Alignment.CenterStart).offset(x = 104.dp)
+            ) {
+                HomeMenuAction(Icons.Rounded.Timer, "游玩时长排名", colors, haze, onOpenOverview)
+            }
         }
         GlassSurface(
             colors,
@@ -6143,6 +6159,7 @@ private fun KrkrGameEditor(settings: KrkrGameSettings, onChange: (KrkrGameSettin
             Slider(settings.menuOpacity, { onChange(settings.copy(menuOpacity = it)) }, valueRange = .05f..1f)
             Text("虚拟光标：${(settings.cursorScale * 100).toInt()}%", color = colors.secondary)
             Slider(settings.cursorScale, { onChange(settings.copy(cursorScale = it)) }, valueRange = .25f..2f)
+            SwitchRow("启动游戏默认呼出指针", settings.showVirtualCursorOnStart, colors) { onChange(settings.copy(showVirtualCursorOnStart = it)) }
             SwitchRow("打印日志", settings.outputLog, colors) { onChange(settings.copy(outputLog = it)) }
             SwitchRow("显示 FPS", settings.showFps, colors) { onChange(settings.copy(showFps = it)) }
             SwitchRow("保持屏幕常亮", settings.keepScreenAwake, colors) { onChange(settings.copy(keepScreenAwake = it)) }
