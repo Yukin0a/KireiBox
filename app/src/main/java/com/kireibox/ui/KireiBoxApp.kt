@@ -382,6 +382,7 @@ data class KireiActions(
     val launchKrkrNative: () -> Unit,
     val checkPermissions: () -> Unit,
     val repairPermission: (String?) -> Unit,
+    val restoreRemovedGame: (Game) -> Unit,
     val copyLogs: () -> Unit,
     val exportLogs: () -> Unit,
     val setDarkMode: (Boolean) -> Unit,
@@ -6756,6 +6757,67 @@ private fun ModalSystemBarVisibilityEffect(isDark: Boolean) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun RemovedGamesSheet(
+    games: List<Game>,
+    colors: KireiColors,
+    onDismiss: () -> Unit,
+    onRestore: (Game) -> Unit,
+) {
+    val screenHeight = LocalConfiguration.current.screenHeightDp.dp
+    val listHeight = (screenHeight * .52f).coerceIn(280.dp, 430.dp)
+    KireiActionSheet(
+        title = "已移除的游戏 · ${games.size} 部",
+        colors = colors,
+        onDismiss = onDismiss,
+        scrollableContent = false,
+    ) {
+        if (games.isEmpty()) {
+            Box(
+                Modifier.fillMaxWidth().height(listHeight).background(Color.Transparent),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("没有已移除的游戏", color = colors.secondary, style = AppleTypography.bodyMedium)
+            }
+        } else {
+            LazyColumn(
+                Modifier.fillMaxWidth().height(listHeight),
+                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                items(games, key = { it.id }) { game ->
+                    Row(
+                        Modifier.fillMaxWidth().padding(vertical = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        GameCoverArtwork(game, Modifier.size(44.dp, 58.dp), ContentScale.Crop, 10.dp)
+                        Column(Modifier.weight(1f).padding(horizontal = 14.dp)) {
+                            Text(
+                                game.title.orEmpty(),
+                                color = colors.text,
+                                style = AppleTypography.bodyLargeEmphasis,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                game.engine?.displayName ?: "游戏",
+                                color = colors.secondary,
+                                style = AppleTypography.bodySmall,
+                                maxLines = 1,
+                            )
+                        }
+                        TextButton(onClick = { onRestore(game) }) {
+                            Text("恢复", color = colors.accent)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun LibraryOverviewSheet(
     games: List<Game>,
@@ -7173,6 +7235,7 @@ private fun LibrarySettings(state: KireiUiState, colors: KireiColors, viewModel:
     val context = LocalContext.current
     var actionRoot by remember { mutableStateOf<String?>(null) }
     var removalRoot by remember { mutableStateOf<String?>(null) }
+    var showRemovedGames by remember { mutableStateOf(false) }
     SettingsSection("文件选择", colors) {
         SwitchRow(
             "使用内置文件浏览器",
@@ -7216,6 +7279,22 @@ private fun LibrarySettings(state: KireiUiState, colors: KireiColors, viewModel:
             checked = state.settings?.keepRemovedGamesHiddenOnRefresh ?: true,
             colors = colors,
             onCheckedChange = viewModel::setKeepRemovedGamesHiddenOnRefresh,
+        )
+        SettingsRow(
+            Icons.Rounded.DeleteOutline,
+            "已移除的游戏（${state.removedGames.size}）",
+            "点开可以恢复被移出的卡片",
+            colors,
+        ) {
+            showRemovedGames = true
+        }
+    }
+    if (showRemovedGames) {
+        RemovedGamesSheet(
+            games = state.removedGames,
+            colors = colors,
+            onDismiss = { showRemovedGames = false },
+            onRestore = actions.restoreRemovedGame,
         )
     }
     actionRoot?.let { root ->

@@ -175,6 +175,7 @@ class LauncherActivity : AppCompatActivity() {
                     launchKrkrNative = ::launchKrkrNative,
                     checkPermissions = ::checkPermissions,
                     repairPermission = ::repairPermission,
+                    restoreRemovedGame = viewModel::restoreRemovedGame,
                     copyLogs = ::copyDiagnosticLogs,
                     exportLogs = ::exportDiagnosticLogs,
                     setDarkMode = { dark ->

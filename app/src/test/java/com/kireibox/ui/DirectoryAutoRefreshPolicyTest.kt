@@ -23,6 +23,7 @@ class DirectoryAutoRefreshPolicyTest {
     @Test
     fun noChangesAndNoFailuresStaySilent() {
         assertNull(DirectoryAutoRefreshPolicy.notice(ScanImportSummary(), 0))
+        assertNull(DirectoryAutoRefreshPolicy.notice(ScanImportSummary(), 0, 0))
     }
 
     @Test
@@ -41,6 +42,34 @@ class DirectoryAutoRefreshPolicyTest {
             failedDirectoryCount = 1,
         )
         assertEquals("自动更新：添加 2 个新游戏，1 个目录扫描失败", notice)
+    }
+
+    @Test
+    fun prunedOnlyNoticeUsesCleanupWording() {
+        assertEquals(
+            "自动更新：已清理 3 张失效卡片",
+            DirectoryAutoRefreshPolicy.notice(ScanImportSummary(), 0, 3),
+        )
+    }
+
+    @Test
+    fun addedAndPrunedShareOneNotice() {
+        assertEquals(
+            "自动更新：添加 2 个新游戏，已清理 1 张失效卡片",
+            DirectoryAutoRefreshPolicy.notice(
+                ScanImportSummary(addedGames = listOf(Game(id = 1L), Game(id = 2L))),
+                failedDirectoryCount = 0,
+                prunedCount = 1,
+            ),
+        )
+    }
+
+    @Test
+    fun prunedAndFailedShareOneNotice() {
+        assertEquals(
+            "自动更新：已清理 1 张失效卡片，2 个目录扫描失败",
+            DirectoryAutoRefreshPolicy.notice(ScanImportSummary(), 2, 1),
+        )
     }
 
     @Test

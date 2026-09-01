@@ -229,6 +229,7 @@ data class KireiUiState(
     val games: List<Game> = emptyList(),
     val settings: com.yuki.yukihub.settings.YukiSettingsStore.Snapshot? = null,
     val selectedGame: Game? = null,
+    val removedGames: List<Game> = emptyList(),
     val krkrEditorGame: Game? = null,
     val krkrSettings: KrkrGameSettings = KrkrGameSettings(),
     val coverSearch: CoverSearchUi? = null,
@@ -266,6 +267,7 @@ internal data class ReloadPayload(
     val snapshot: com.yuki.yukihub.settings.YukiSettingsStore.Snapshot,
     val trend: List<PlayTrendPoint>,
     val searchIndex: Map<Long, String>,
+    val removedGames: List<Game> = emptyList(),
 )
 
 class KireiViewModel
@@ -916,6 +918,9 @@ internal constructor(
                 _state.value = if (result.isSuccess) {
                     _state.value.copy(
                         games = _state.value.games.filterNot { it.id == game.id },
+                        removedGames = (_state.value.removedGames + hiddenGame)
+                            .distinctBy { it.id }
+                            .sortedByDescending { it.updatedAt },
                         externalShortcutPicker = markShortcutImported(
                             _state.value.externalShortcutPicker,
                             game,
@@ -944,6 +949,7 @@ internal constructor(
                     }
                     _state.value = _state.value.copy(
                         games = GameLibraryOrdering.sorted(restored, _state.value.settings?.sortMode.orEmpty()),
+                        removedGames = _state.value.removedGames.filterNot { it.id == restoredGame.id },
                         externalShortcutPicker = markShortcutImported(
                             _state.value.externalShortcutPicker,
                             restoredGame,
@@ -1087,6 +1093,7 @@ internal constructor(
                 if (!immersiveReloadGate.isCurrent(observedImmersiveGeneration)) return@withContext
                 _state.value = _state.value.copy(
                     games = payload.games,
+                    removedGames = payload.removedGames,
                     settings = snapshot,
                     dashboardCompact = snapshot.dashboardCompact,
                     dashboardWide = snapshot.dashboardWide,
@@ -1150,11 +1157,15 @@ internal constructor(
             }
             game.id to GameSearchIndex.build(game, aliases)
         }
+        val removedGames = repository.loadAllIncludingHidden()
+            .filter { it.hidden }
+            .sortedByDescending { it.updatedAt }
         return ReloadPayload(
             games = games,
             snapshot = core.settings.snapshot(),
             trend = repository.dailyPlayTrend(30),
             searchIndex = searchIndex,
+            removedGames = removedGames,
         )
     }
 
@@ -1421,6 +1432,24 @@ internal constructor(
         }
     }
 
+    fun restoreRemovedGame(game: Game) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val restored = game.copy(hidden = false, updatedAt = System.currentTimeMillis())
+            val result = runCatching { check(repository.update(restored) == 1) { "恢复失败" } }
+            withContext(Dispatchers.Main) {
+                _state.value = if (result.isSuccess) {
+                    _state.value.copy(
+                        removedGames = _state.value.removedGames.filterNot { it.id == game.id },
+                        notice = "已恢复 ${game.title ?: "游戏"}",
+                    )
+                } else {
+                    _state.value.copy(notice = result.exceptionOrNull()?.message ?: "恢复失败")
+                }
+            }
+            if (result.isSuccess) reloadInternal()
+        }
+    }
+
     fun setMetadataSource(source: CoverSourceMode) {
         core.settings.putString(com.yuki.yukihub.settings.YukiSettingsStore.KEY_METADATA_SOURCE, source.key)
         reload()
@@ -1450,14 +1479,16 @@ internal constructor(
             try {
                 val roots = DirectoryAutoRefreshPolicy.enabledRoots(snapshot.scanRoots, snapshot.scanRootEnabled)
                 var failed = 0
+                var pruned = 0
                 var total = ScanImportSummary()
                 roots.forEach { root ->
                     val parsed = runCatching { Uri.parse(root) }.getOrNull()
                     if (parsed == null) { failed += 1; return@forEach }
                     val report = runCatching { core.scan(parsed) }.getOrElse { failed += 1; return@forEach }
                     total += core.importScan(report, snapshot.keepRemovedGamesHiddenOnRefresh)
+                    pruned += core.pruneMissingGames(parsed, report)
                 }
-                val message = DirectoryAutoRefreshPolicy.notice(total, failed)
+                val message = DirectoryAutoRefreshPolicy.notice(total, failed, pruned)
                 withContext(Dispatchers.Main) {
                     if (message != null) _state.value = _state.value.copy(notice = message)
                 }

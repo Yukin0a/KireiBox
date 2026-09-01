@@ -106,6 +106,7 @@ class ImmersiveFixtureActivity : ComponentActivity() {
                         launchKrkrNative = {},
                         checkPermissions = {},
                         repairPermission = { _ -> },
+                        restoreRemovedGame = {},
                         copyLogs = {},
                         exportLogs = {},
                         setDarkMode = {},

@@ -7,6 +7,7 @@ import com.yuki.yukihub.scanner.GameScanner
 import com.yuki.yukihub.scanner.ScanReport
 import com.yuki.yukihub.scanner.ScanRequest
 import com.yuki.yukihub.settings.YukiSettingsStore
+import com.yuki.yukihub.storage.StorageNodes
 
 data class ScanImportSummary(
     val addedGames: List<Game> = emptyList(),
@@ -90,6 +91,35 @@ class YukiCoreFacade(context: Context) {
             keptHiddenCount = keptHidden,
             skippedCount = skipped,
         )
+    }
+
+    /**
+     * Permanently deletes visible cards under [root] whose directory can no
+     * longer be resolved and which were not seen by this scan. Hidden cards
+     * are deliberate removals and are never pruned. Returns the deleted count.
+     */
+    fun pruneMissingGames(root: Uri, report: ScanReport): Int {
+        val rootResolves = runCatching {
+            StorageNodes.resolve(app, root)?.isDirectory == true
+        }.getOrDefault(false)
+        if (!rootResolves) return 0
+
+        val seenKeys = report.results
+            .mapNotNull { result -> GameRepository.normalizeRootUriKey(result.uri).takeIf(String::isNotBlank) }
+            .toHashSet()
+        var pruned = 0
+        for (game in games.gamesUnderRoot(root.toString())) {
+            val rawUri = game.rootUri?.takeIf(String::isNotBlank) ?: continue
+            val key = GameRepository.normalizeRootUriKey(rawUri)
+            val seen = key.isNotBlank() && key in seenKeys
+            val resolves = runCatching {
+                StorageNodes.resolve(app, Uri.parse(rawUri))?.isDirectory == true
+            }.getOrDefault(false)
+            if (ScanPrunePolicy.shouldPrune(seen = seen, resolves = resolves, hidden = game.hidden)) {
+                if (games.delete(game.id) > 0) pruned += 1
+            }
+        }
+        return pruned
     }
 
     private fun defaultPackage(engine: String?): String = when (engine) {
