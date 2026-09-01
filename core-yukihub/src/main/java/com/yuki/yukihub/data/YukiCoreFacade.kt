@@ -78,10 +78,10 @@ class YukiCoreFacade(context: Context) {
                 if (game.hidden) keptHidden += 1
                 game.id
             } else {
-                games.insertIfNotExists(game)
-            }
-            if (id > 0 && game.id == id && !game.hidden) {
-                games.findById(id)?.let(added::add)
+                val insertedId = games.insertIfNotExists(game)
+                ScanImportClassification.addedIdFor(existingId = game.id, insertedId = insertedId)
+                    ?.let { newId -> games.findById(newId)?.let(added::add) }
+                insertedId
             }
         }
         return ScanImportSummary(
