@@ -38,9 +38,9 @@ class KireiCoverStore(context: Context) {
     ): Result<String> = gameLock(gameId).withLock { runCatching {
         require(gameId > 0) { "Game does not exist" }
         require(candidate.coverUrl.isNotBlank()) { "Cover candidate has no image" }
-        val directory = File(app.filesDir, "covers/yukihub/game_" + gameId).apply { mkdirs() }
+        val directory = File(app.filesDir, "covers/yukihub/game_$gameId").apply { mkdirs() }
         directory.listFiles()?.filter { it.isFile && it.name.endsWith(".part") }?.forEach(File::delete)
-        val temp = File(directory, "." + UUID.randomUUID().toString() + ".part")
+        val temp = File(directory, ".${UUID.randomUUID()}.part")
         try {
             downloader.download(candidate.coverUrl, temp, onProgress).getOrThrow()
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -50,7 +50,7 @@ class KireiCoverStore(context: Context) {
             if (bindingMode.equals("AUTO", ignoreCase = true) && !AutomaticCoverCommitPolicy.canCommit(game)) {
                 return@runCatching game.coverUri.orEmpty()
             }
-            val final = File(directory, "cover-" + UUID.randomUUID().toString() + ".jpg")
+            val final = File(directory, "cover-${UUID.randomUUID()}.jpg")
             check(temp.renameTo(final)) { "Cover atomic commit failed" }
             val uri = Uri.fromFile(final).toString()
             val previous = game.copy()
@@ -97,9 +97,9 @@ class KireiCoverStore(context: Context) {
             require(gameId > 0) { "Game does not exist" }
             require(sourceUri.scheme.equals("content", ignoreCase = true) ||
                 sourceUri.scheme.equals("file", ignoreCase = true)) { "Unsupported image URI" }
-            val directory = File(app.filesDir, "covers/yukihub/game_" + gameId).apply { mkdirs() }
+            val directory = File(app.filesDir, "covers/yukihub/game_$gameId").apply { mkdirs() }
             directory.listFiles()?.filter { it.isFile && it.name.endsWith(".part") }?.forEach(File::delete)
-            val temp = File(directory, "." + UUID.randomUUID().toString() + ".part")
+            val temp = File(directory, ".${UUID.randomUUID()}.part")
             try {
                 val input = app.contentResolver.openInputStream(sourceUri) ?: error("Unable to read selected image")
                 var copied = 0L
@@ -121,11 +121,8 @@ class KireiCoverStore(context: Context) {
                 BitmapFactory.decodeFile(temp.path, bounds)
                 check(bounds.outWidth > 0 && bounds.outHeight > 0) { "Selected file is not a usable image" }
                 check(LocalCoverImportPolicy.acceptsDimensions(bounds.outWidth, bounds.outHeight)) { "Image resolution too large" }
-
-                val final = File(
-                    directory,
-                    "cover-" + UUID.randomUUID().toString() + "." + LocalCoverImportPolicy.extensionFor(app.contentResolver.getType(sourceUri)),
-                )
+                val extension = LocalCoverImportPolicy.extensionFor(app.contentResolver.getType(sourceUri))
+                val final = File(directory, "cover-${UUID.randomUUID()}.$extension")
                 check(temp.renameTo(final)) { "Cover file save failed" }
                 val uri = Uri.fromFile(final).toString()
                 val game = repository.findById(gameId) ?: run {
@@ -161,6 +158,4 @@ class KireiCoverStore(context: Context) {
                 if (previousUri.isNullOrBlank() || Uri.parse(previousUri).path == old.path) old.delete()
             }
     }
-
 }
-

@@ -65,7 +65,7 @@ class UpdateManifestTest {
             releases = listOf(ignored, newer),
         )
         assertTrue(selected is UpdateCheckResult.Available)
-        assertEquals(21, (selected as UpdateCheckResult.Available).release.manifest.versionCode)
+        assertEquals(21, (selected as UpdateCheckResult.Available).release.versionCode)
     }
 
     @Test
@@ -76,7 +76,39 @@ class UpdateManifestTest {
             releases = listOf(release(21), release(20), release(23), release(22)),
         ) as UpdateCheckResult.Available
 
-        assertEquals(23, selected.release.manifest.versionCode)
+        assertEquals(23, selected.release.versionCode)
+    }
+
+    @Test
+    fun semanticVersionOrdersAlphaBetaRcAndStable() {
+        val values = listOf(
+            "0.5.0",
+            "0.5.0-rc.1",
+            "0.5.0-beta.2",
+            "0.5.0-alpha.15",
+        ).map { requireNotNull(KireiVersion.parse(it)) }
+
+        assertEquals(values, values.sortedDescending())
+        assertEquals("0.5.0-alpha.13", KireiVersion.normalize("v0.5.0-alpha.13"))
+    }
+
+    @Test
+    fun releaseCacheRoundTripsBareAndManifestReleases() {
+        val bare = UpdateRelease(
+            releaseId = 13,
+            tagName = "v0.5.0-alpha.13",
+            releaseName = "Alpha 13",
+            notes = "notes",
+            pageUrl = "https://github.com/Yukin0a/KireiBox/releases/tag/v0.5.0-alpha.13",
+            apkUrl = "https://github.com/Yukin0a/KireiBox/releases/download/v0.5.0-alpha.13/app-release.apk",
+            apkSize = 12,
+            apkAssetName = "app-release.apk",
+            fallbackVersionName = "0.5.0-alpha.13",
+        )
+
+        assertEquals(bare, UpdateReleaseCacheCodec.decode(UpdateReleaseCacheCodec.encode(bare)))
+        val strict = release(22)
+        assertEquals(strict, UpdateReleaseCacheCodec.decode(UpdateReleaseCacheCodec.encode(strict)))
     }
 
     private fun release(versionCode: Int) = UpdateRelease(

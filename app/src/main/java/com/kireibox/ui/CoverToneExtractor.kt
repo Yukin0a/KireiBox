@@ -72,6 +72,8 @@ object CoverToneExtractor {
         return tone
     }
 
+    fun clearCache() = toneCache.clear()
+
     /**
      * Bounded, thread-safe tone cache that never holds its lock while a tone is
      * computed: only lookups and inserts are synchronized, so a slow pixel read
@@ -94,6 +96,8 @@ object CoverToneExtractor {
         fun put(key: String, tone: CoverTone) {
             synchronized(lock) { tones[key] = tone }
         }
+
+        fun clear() = synchronized(lock) { tones.clear() }
     }
 
     /**

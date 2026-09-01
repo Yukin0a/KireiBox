@@ -16,6 +16,7 @@ import java.util.zip.ZipFile
 internal data class UpdatePackageMetadata(
     val packageName: String,
     val versionCode: Int,
+    val versionName: String = "",
     val minSdk: Int,
     val abis: List<String>,
     val signerSha256: String,
@@ -42,6 +43,9 @@ internal object UpdatePackagePolicy {
         if (archive.versionCode != manifest.versionCode || archive.versionCode <= installedVersionCode) {
             return invalid("更新 APK 版本无效")
         }
+        if (KireiVersion.normalize(archive.versionName) != KireiVersion.normalize(manifest.versionName)) {
+            return invalid("更新 APK 版本名称不匹配")
+        }
         if (archive.minSdk != manifest.minSdk || archive.minSdk > deviceSdk) {
             return invalid("更新 APK 不支持当前 Android 版本")
         }
@@ -57,23 +61,56 @@ internal object UpdatePackagePolicy {
         }
         return UpdatePackageValidation.Valid
     }
+
+    fun validateSignedApkFallback(
+        installedVersionCode: Int,
+        currentSignerSha256: String,
+        deviceSdk: Int,
+        deviceAbis: List<String>,
+        archive: UpdatePackageMetadata,
+        expectedVersionName: String,
+    ): UpdatePackageValidation {
+        fun invalid(message: String) = UpdatePackageValidation.Invalid(message)
+        if (archive.packageName != KIREIBOX_PACKAGE_NAME) return invalid("更新 APK 包名不匹配")
+        if (archive.versionCode <= installedVersionCode) return invalid("更新 APK 版本无效")
+        if (KireiVersion.normalize(archive.versionName) != KireiVersion.normalize(expectedVersionName)) {
+            return invalid("更新 APK 版本名称与 GitHub Release 不匹配")
+        }
+        if (archive.minSdk > deviceSdk) return invalid("更新 APK 不支持当前 Android 版本")
+        if (archive.abis.toSet().intersect(deviceAbis.toSet()).isEmpty()) {
+            return invalid("更新 APK ABI 不兼容")
+        }
+        val archiveSigner = UpdateManifestCodec.normalizeDigest(archive.signerSha256)
+        val installedSigner = UpdateManifestCodec.normalizeDigest(currentSignerSha256)
+        if (archiveSigner != installedSigner) return invalid("更新 APK 签名不匹配")
+        return UpdatePackageValidation.Valid
+    }
 }
 
 internal class UpdateInstaller(private val context: Context) {
     private val packageManager: PackageManager get() = context.packageManager
 
-    fun validate(file: File, manifest: UpdateManifest): UpdatePackageValidation {
+    fun validate(file: File, release: UpdateRelease): UpdatePackageValidation {
         val archive = inspectArchive(file)
             ?: return UpdatePackageValidation.Invalid("无法读取更新 APK")
         val installed = installedPackageMetadata()
             ?: return UpdatePackageValidation.Invalid("无法读取当前应用签名")
-        return UpdatePackagePolicy.validate(
+        return release.manifest?.let { manifest ->
+            UpdatePackagePolicy.validate(
+                installedVersionCode = installed.versionCode,
+                currentSignerSha256 = installed.signerSha256,
+                deviceSdk = Build.VERSION.SDK_INT,
+                deviceAbis = Build.SUPPORTED_ABIS.toList(),
+                archive = archive,
+                manifest = manifest,
+            )
+        } ?: UpdatePackagePolicy.validateSignedApkFallback(
             installedVersionCode = installed.versionCode,
             currentSignerSha256 = installed.signerSha256,
             deviceSdk = Build.VERSION.SDK_INT,
             deviceAbis = Build.SUPPORTED_ABIS.toList(),
             archive = archive,
-            manifest = manifest,
+            expectedVersionName = release.versionName,
         )
     }
 
@@ -130,6 +167,7 @@ internal class UpdateInstaller(private val context: Context) {
         return UpdatePackageMetadata(
             packageName = info.packageName,
             versionCode = versionCode,
+            versionName = info.versionName.orEmpty(),
             minSdk = info.applicationInfo?.minSdkVersion ?: 1,
             abis = abis.distinct(),
             signerSha256 = signer,

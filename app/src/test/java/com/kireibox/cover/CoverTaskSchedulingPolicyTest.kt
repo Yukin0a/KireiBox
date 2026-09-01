@@ -1,5 +1,6 @@
 package com.kireibox.cover
 
+import com.kireibox.external.shortcut.ExternalShortcutIdentity
 import com.yuki.yukihub.metadata.CoverSourceMode
 import com.yuki.yukihub.model.EngineType
 import com.yuki.yukihub.model.Game
@@ -21,6 +22,18 @@ class CoverTaskSchedulingPolicyTest {
                 game(id = 0, title = "Unsaved", engine = EngineType.TYRANO),
                 game(id = -1, title = "Invalid", engine = EngineType.ARTEMIS),
                 game(id = 70, title = "Android", engine = EngineType.ANDROID_APP),
+                game(
+                    id = 75,
+                    title = "External shortcut",
+                    engine = EngineType.ANDROID_APP,
+                    rootUri = ExternalShortcutIdentity.rootUri(0, "com.example.game", "game-id"),
+                ),
+                game(
+                    id = 76,
+                    title = "Second external shortcut",
+                    engine = EngineType.ANDROID_APP,
+                    rootUri = ExternalShortcutIdentity.rootUri(0, "other.package", "shortcut"),
+                ),
                 game(id = 80, title = "Unknown", engine = EngineType.UNKNOWN),
                 game(id = 90, title = "Blank binding", engine = EngineType.KIRIKIRI, bindingMode = ""),
                 game(id = 100, title = "None binding", engine = EngineType.ARTEMIS, bindingMode = "NONE"),
@@ -32,6 +45,10 @@ class CoverTaskSchedulingPolicyTest {
             listOf(
                 CoverTaskRequest(gameId = 20, title = "Second", source = source),
                 CoverTaskRequest(gameId = 10, title = "First", source = source),
+                CoverTaskRequest(gameId = 40, title = "Review", source = source, forceReview = true),
+                CoverTaskRequest(gameId = 50, title = "Retry", source = source),
+                CoverTaskRequest(gameId = 75, title = "External shortcut", source = source),
+                CoverTaskRequest(gameId = 76, title = "Second external shortcut", source = source),
                 CoverTaskRequest(gameId = 90, title = "Blank binding", source = source),
                 CoverTaskRequest(gameId = 100, title = "None binding", source = source),
             ),
@@ -45,11 +62,13 @@ class CoverTaskSchedulingPolicyTest {
         engine: EngineType,
         coverUri: String? = null,
         bindingMode: String = "NONE",
+        rootUri: String? = null,
     ) = Game(
         id = id,
         title = title,
         engine = engine,
         coverUri = coverUri,
         vndbBindingMode = bindingMode,
+        rootUri = rootUri,
     )
 }

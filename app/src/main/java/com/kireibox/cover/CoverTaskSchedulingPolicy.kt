@@ -1,5 +1,6 @@
 package com.kireibox.cover
 
+import com.kireibox.external.shortcut.ExternalShortcutIdentity
 import com.yuki.yukihub.metadata.CoverSourceMode
 import com.yuki.yukihub.model.EngineType
 import com.yuki.yukihub.model.Game
@@ -9,12 +10,17 @@ internal object CoverTaskSchedulingPolicy {
         if (
             game.id <= 0 ||
             !game.coverUri.isNullOrBlank() ||
-            game.engine !in SUPPORTED_ENGINES ||
+            !supportsAutomaticCover(game) ||
             game.vndbBindingMode !in ELIGIBLE_BINDING_MODES
         ) {
             null
         } else {
-            CoverTaskRequest(gameId = game.id, title = game.title.orEmpty(), source = source)
+            CoverTaskRequest(
+                gameId = game.id,
+                title = game.title.orEmpty(),
+                source = source,
+                forceReview = game.vndbBindingMode == "REVIEW",
+            )
         }
     }
 
@@ -24,5 +30,8 @@ internal object CoverTaskSchedulingPolicy {
         EngineType.TYRANO,
         EngineType.ARTEMIS,
     )
-    private val ELIGIBLE_BINDING_MODES = setOf("", "NONE")
+    private fun supportsAutomaticCover(game: Game): Boolean =
+        game.engine in SUPPORTED_ENGINES || ExternalShortcutIdentity.isExternalShortcut(game)
+
+    private val ELIGIBLE_BINDING_MODES = setOf("", "NONE", "RETRY", "REVIEW")
 }

@@ -55,7 +55,6 @@
 - 支持 VNDB、Bangumi、月幕 Gal、Hikarinagi 等封面来源
 - 提供封面下载进度、取消和失败重试
 - 支持通过包名和 Activity 添加 Android 应用
-- 支持通过 Shizuku 授权导入桌面游戏快捷方式
 - 支持应用内检查、下载和验证新版本
 
 除封面搜索、元数据获取和版本检查等主动使用的功能外，KireiBox 主要围绕本地游戏库运行。
@@ -71,9 +70,8 @@
 | Tyrano | `index.html` 及 Tyrano / Electron 目录特征 | 使用内置 Tyrano 引擎启动 |
 | Artemis | `system.ini`、`system/first.iet`、`.pfs` | 使用内置 Artemis 引擎启动 |
 | Android 应用 | 应用包名与 Activity | 通过手动添加的应用条目启动 |
-| 桌面游戏快捷方式 | 桌面已固定的游戏快捷方式 | 通过 Shizuku 授权导入为游戏卡片；兼容条目可直接启动，其他条目通过 Shizuku 启动 |
 
-Android 应用和桌面游戏快捷方式目前不参与游戏目录自动扫描，需要通过应用内入口手动添加或导入。
+Android 应用目前不参与游戏目录自动扫描，需要通过应用内入口手动添加。
 
 ***
 
@@ -112,7 +110,7 @@ KireiBox 使用 Kotlin、Jetpack Compose、Coroutines / Flow 与 MVVM 架构构�
 
 - Application ID：`com.kireibox.app`
 - 当前版本：`0.5.0-alpha.15`
-- Version Code：`23`
+- Version Code：`22`
 - Min SDK：`26`
 - Target SDK：`29`
 - Compile SDK：`36`

@@ -50,6 +50,13 @@ class ImmersiveHomeWiringTest {
     }
 
     @Test
+    fun `caller wires the persisted time setting and overview action`() {
+        val call = immersiveHomeCall(source())
+        assertTrue(call.contains("showPlayTime = state.settings?.immersivePlayTimeVisible != false"))
+        assertTrue(call.contains("onOpenPlayTime = onOpenOverview"))
+    }
+
+    @Test
     fun `caller does not pass removed onEdit parameter`() {
         val call = immersiveHomeCall(source())
         org.junit.Assert.assertFalse("ImmersiveHome no longer accepts onEdit, got: $call", call.contains("onEdit"))
@@ -110,6 +117,23 @@ class ImmersiveHomeWiringTest {
         assertTrue(button.contains("pxDp(rect.x, density)"))
         assertTrue(button.contains(".size(pxDp(rect.w, density), pxDp(rect.h, density))"))
         assertFalse(button.contains("SharedControlSizePolicy.playSizeDp"))
+    }
+
+    @Test
+    fun `play time is positioned independently and landscape only makes text clickable`() {
+        val immersiveSource = listOf(
+            File("src/main/java/com/kireibox/ui/ImmersiveHome.kt"),
+            File("../app/src/main/java/com/kireibox/ui/ImmersiveHome.kt"),
+        ).firstOrNull { it.isFile }?.readText() ?: error("ImmersiveHome.kt missing")
+        val start = immersiveSource.indexOf("private fun ImmersivePlayTimeIndicator(")
+        val end = immersiveSource.indexOf("private fun ImmersivePager(", start)
+        val indicator = immersiveSource.substring(start, end)
+
+        assertTrue(immersiveSource.contains("resolveImmersivePlayTimeAnchor("))
+        assertTrue(indicator.contains(".clickable(onClick = onClick)"))
+        assertTrue(indicator.contains("Icons.Rounded.Schedule"))
+        assertTrue(indicator.contains("Text("))
+        assertFalse(indicator.contains("layout.play ="))
     }
 
     @Test

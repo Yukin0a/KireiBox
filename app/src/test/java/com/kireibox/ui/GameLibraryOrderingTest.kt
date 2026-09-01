@@ -20,10 +20,33 @@ class GameLibraryOrderingTest {
     }
 
     @Test fun sqlOrderAlwaysBeginsWithFavoriteAndHasStableIdFallback() {
-        listOf(YukiSettingsStore.SORT_RECENT, YukiSettingsStore.SORT_NEWEST, YukiSettingsStore.SORT_NAME).forEach {
+        listOf(
+            YukiSettingsStore.SORT_RECENT,
+            YukiSettingsStore.SORT_NEWEST,
+            YukiSettingsStore.SORT_NAME,
+            YukiSettingsStore.SORT_MANUAL,
+        ).forEach {
             val clause = GameLibraryOrdering.orderByClause(it)
             assertTrue(clause.startsWith("favorite DESC"))
             assertTrue(clause.endsWith("id ASC"))
         }
+    }
+
+    @Test fun manualOrderKeepsFavoritesFirstAndOrdersInsideEachGroup() {
+        val games = listOf(
+            Game(id = 1, title = "Regular first", favorite = false, manualOrder = 10),
+            Game(id = 2, title = "Favorite second", favorite = true, manualOrder = 20),
+            Game(id = 3, title = "Favorite first", favorite = true, manualOrder = 10),
+            Game(id = 4, title = "Regular second", favorite = false, manualOrder = 20),
+        )
+
+        assertEquals(
+            listOf(3L, 2L, 1L, 4L),
+            GameLibraryOrdering.sorted(games, YukiSettingsStore.SORT_MANUAL).map { it.id },
+        )
+        assertEquals(
+            "favorite DESC, manual_order ASC, id ASC",
+            GameLibraryOrdering.orderByClause(YukiSettingsStore.SORT_MANUAL),
+        )
     }
 }

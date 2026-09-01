@@ -24,8 +24,15 @@ data class UpdateRelease(
     val pageUrl: String,
     val apkUrl: String,
     val apkSize: Long,
-    val manifest: UpdateManifest,
-)
+    val manifest: UpdateManifest? = null,
+    val apkAssetName: String = manifest?.apkAsset.orEmpty(),
+    val fallbackVersionName: String = "",
+) {
+    val versionName: String get() = manifest?.versionName ?: fallbackVersionName
+    val versionCode: Int? get() = manifest?.versionCode
+    val apkAsset: String get() = manifest?.apkAsset ?: apkAssetName
+    val hasStrictManifest: Boolean get() = manifest != null
+}
 
 internal sealed interface UpdateCheckResult {
     data class Available(val release: UpdateRelease) : UpdateCheckResult
@@ -97,19 +104,122 @@ internal object UpdateManifestCodec {
         .lowercase()
 }
 
+internal data class KireiVersion(
+    val major: Int,
+    val minor: Int,
+    val patch: Int,
+    val channel: String?,
+    val channelNumber: Int,
+) : Comparable<KireiVersion> {
+    override fun compareTo(other: KireiVersion): Int {
+        compareValuesBy(this, other, KireiVersion::major, KireiVersion::minor, KireiVersion::patch)
+            .takeIf { it != 0 }?.let { return it }
+        val rank = channelRank(channel).compareTo(channelRank(other.channel))
+        return if (rank != 0) rank else channelNumber.compareTo(other.channelNumber)
+    }
+
+    companion object {
+        private val pattern = Regex("^v?(\\d+)\\.(\\d+)\\.(\\d+)(?:-(alpha|beta|rc)\\.(\\d+))?$", RegexOption.IGNORE_CASE)
+
+        fun parse(value: String?): KireiVersion? {
+            val match = pattern.matchEntire(value?.trim().orEmpty()) ?: return null
+            return KireiVersion(
+                major = match.groupValues[1].toIntOrNull() ?: return null,
+                minor = match.groupValues[2].toIntOrNull() ?: return null,
+                patch = match.groupValues[3].toIntOrNull() ?: return null,
+                channel = match.groupValues[4].lowercase().ifBlank { null },
+                channelNumber = match.groupValues[5].toIntOrNull() ?: 0,
+            )
+        }
+
+        fun normalize(value: String?): String? = parse(value)?.let { version ->
+            buildString {
+                append(version.major).append('.').append(version.minor).append('.').append(version.patch)
+                version.channel?.let { append('-').append(it).append('.').append(version.channelNumber) }
+            }
+        }
+
+        private fun channelRank(channel: String?): Int = when (channel) {
+            "alpha" -> 0
+            "beta" -> 1
+            "rc" -> 2
+            null -> 3
+            else -> -1
+        }
+    }
+}
+
+internal object UpdateReleaseCacheCodec {
+    fun encode(release: UpdateRelease?): String {
+        if (release == null) return ""
+        return JSONObject().apply {
+            put("releaseId", release.releaseId)
+            put("tagName", release.tagName)
+            put("releaseName", release.releaseName)
+            put("notes", release.notes)
+            put("pageUrl", release.pageUrl)
+            put("apkUrl", release.apkUrl)
+            put("apkSize", release.apkSize)
+            put("apkAssetName", release.apkAssetName)
+            put("fallbackVersionName", release.fallbackVersionName)
+            release.manifest?.let { manifest ->
+                put("manifest", JSONObject().apply {
+                    put("schemaVersion", 1)
+                    put("packageName", manifest.packageName)
+                    put("versionCode", manifest.versionCode)
+                    put("versionName", manifest.versionName)
+                    put("minSdk", manifest.minSdk)
+                    put("abis", org.json.JSONArray(manifest.abis))
+                    put("apkAsset", manifest.apkAsset)
+                    put("sha256", manifest.sha256)
+                    put("signingCertSha256", manifest.signingCertSha256)
+                })
+            }
+        }.toString()
+    }
+
+    fun decode(value: String?): UpdateRelease? = runCatching {
+        if (value.isNullOrBlank()) return null
+        val json = JSONObject(value)
+        val manifest = json.optJSONObject("manifest")?.let { UpdateManifestCodec.parse(it.toString()) }
+        val fallbackVersion = json.optString("fallbackVersionName")
+        require(manifest != null || KireiVersion.parse(fallbackVersion) != null)
+        UpdateRelease(
+            releaseId = json.getLong("releaseId"),
+            tagName = json.getString("tagName"),
+            releaseName = json.getString("releaseName"),
+            notes = json.optString("notes"),
+            pageUrl = json.getString("pageUrl"),
+            apkUrl = json.getString("apkUrl"),
+            apkSize = json.optLong("apkSize", 0L).coerceAtLeast(0L),
+            manifest = manifest,
+            apkAssetName = json.optString("apkAssetName"),
+            fallbackVersionName = fallbackVersion,
+        ).also { require(it.apkAsset.endsWith(".apk", ignoreCase = true)) }
+    }.getOrNull()
+}
+
 internal object UpdateSelectionPolicy {
     fun select(
         installedVersionCode: Int,
         ignoredVersionCode: Int,
         releases: List<UpdateRelease>,
+        installedVersionName: String = "",
     ): UpdateCheckResult {
         if (releases.isEmpty()) return UpdateCheckResult.NoPublishedRelease
-        val latest = releases.maxByOrNull { it.manifest.versionCode }
+        val installedSemantic = KireiVersion.parse(installedVersionName)
+        val latest = releases.maxWithOrNull(
+            compareBy<UpdateRelease> { KireiVersion.parse(it.versionName) }
+                .thenBy { it.versionCode ?: Int.MIN_VALUE },
+        )
             ?: return UpdateCheckResult.NoPublishedRelease
-        return if (
-            latest.manifest.versionCode <= installedVersionCode ||
-            latest.manifest.versionCode <= ignoredVersionCode
-        ) {
+        val newer = latest.manifest?.let {
+            it.versionCode > installedVersionCode && it.versionCode > ignoredVersionCode
+        } ?: run {
+            val releaseSemantic = KireiVersion.parse(latest.versionName)
+            releaseSemantic != null && installedSemantic != null && releaseSemantic > installedSemantic
+        }
+        return if (!newer) {
             UpdateCheckResult.UpToDate
         } else {
             UpdateCheckResult.Available(latest)

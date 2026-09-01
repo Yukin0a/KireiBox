@@ -94,6 +94,29 @@ class CoverTaskQueueTest {
     }
 
     @Test
+    fun gameHandoffCancelsActiveWorkBackToQueueAndRespectsUserPause() = runTest {
+        val backend = FakeCoverTaskBackend()
+        val queue = CoverTaskQueue(backgroundScope, backend)
+        queue.enqueue(request(81))
+        runCurrent()
+
+        queue.suspendForGame()
+        runCurrent()
+        assertEquals(CoverQueueStatus.PAUSED, queue.state.value.queueStatus)
+        assertEquals(CoverTaskStatus.QUEUED, queue.state.value.tasks.single().status)
+
+        queue.pause()
+        queue.resumeAfterGame()
+        runCurrent()
+        assertEquals(CoverQueueStatus.PAUSED, queue.state.value.queueStatus)
+        assertEquals(CoverTaskStatus.QUEUED, queue.state.value.tasks.single().status)
+
+        queue.resume()
+        runCurrent()
+        assertEquals(CoverTaskStatus.SEARCHING, queue.state.value.tasks.single().status)
+    }
+
+    @Test
     fun lowConfidenceSearchNeedsReviewAndCachesCandidates() = runTest {
         val backend = FakeCoverTaskBackend()
         val queue = CoverTaskQueue(backgroundScope, backend)
@@ -126,6 +149,37 @@ class CoverTaskQueueTest {
 
         assertEquals(CoverTaskStatus.COMPLETED, queue.state.value.tasks.single().status)
         assertEquals(listOf(BindingCall(30, "REVIEW", 51.0)), backend.bindingCalls)
+    }
+
+    @Test
+    fun persistedManualCoverRemovesFailedRowImmediately() = runTest {
+        val backend = FakeCoverTaskBackend()
+        val queue = CoverTaskQueue(backgroundScope, backend)
+        queue.enqueue(request(33))
+        runCurrent()
+        backend.completeSearch(33, automatic = true, candidates = emptyList())
+        runCurrent()
+        assertEquals(CoverTaskStatus.FAILED, queue.state.value.tasks.single().status)
+
+        queue.resolvePersistedCover(33, keepCompletedRow = false)
+        runCurrent()
+
+        assertTrue(queue.state.value.tasks.isEmpty())
+    }
+
+    @Test
+    fun persistedManualCoverCancelsActiveSearchAndIgnoresLateResult() = runTest {
+        val backend = FakeCoverTaskBackend(ignoreSearchCancellation = true)
+        val queue = CoverTaskQueue(backgroundScope, backend)
+        queue.enqueue(request(34))
+        runCurrent()
+
+        queue.resolvePersistedCover(34, keepCompletedRow = false)
+        backend.completeSearch(34, automatic = true)
+        runCurrent()
+
+        assertTrue(queue.state.value.tasks.isEmpty())
+        assertFalse(queue.state.value.hasActiveTasks)
     }
 
     @Test

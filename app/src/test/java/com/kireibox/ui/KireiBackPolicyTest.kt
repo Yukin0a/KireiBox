@@ -34,7 +34,7 @@ class KireiBackPolicyTest {
             KireiSettingsPage.ROOT to null,
             KireiSettingsPage.LIBRARY_HUB to KireiSettingsPage.ROOT,
             KireiSettingsPage.LIBRARY to KireiSettingsPage.LIBRARY_HUB,
-            KireiSettingsPage.COVERS to KireiSettingsPage.LIBRARY_HUB,
+            KireiSettingsPage.COVERS to KireiSettingsPage.ROOT,
             KireiSettingsPage.KRKR to KireiSettingsPage.ROOT,
             KireiSettingsPage.INTERFACE to KireiSettingsPage.ROOT,
             KireiSettingsPage.PERMISSIONS to KireiSettingsPage.ROOT,
@@ -50,7 +50,7 @@ class KireiBackPolicyTest {
         assertEquals(0, KireiBackPolicy.settingsDepth(KireiSettingsPage.ROOT))
         assertEquals(1, KireiBackPolicy.settingsDepth(KireiSettingsPage.LIBRARY_HUB))
         assertEquals(2, KireiBackPolicy.settingsDepth(KireiSettingsPage.LIBRARY))
-        assertEquals(2, KireiBackPolicy.settingsDepth(KireiSettingsPage.COVERS))
+        assertEquals(1, KireiBackPolicy.settingsDepth(KireiSettingsPage.COVERS))
         assertEquals(1, KireiBackPolicy.settingsDepth(KireiSettingsPage.DIAGNOSTICS))
     }
 

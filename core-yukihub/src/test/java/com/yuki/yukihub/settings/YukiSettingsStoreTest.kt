@@ -121,6 +121,26 @@ class YukiSettingsStoreTest {
     fun `settings key is the persisted contract`() {
         assertEquals("kireibox_home_presentation_mode", YukiSettingsStore.KEY_HOME_PRESENTATION_MODE)
         assertEquals("kireibox_immersive_gallery_auto", YukiSettingsStore.KEY_IMMERSIVE_GALLERY_AUTO)
+        assertEquals(
+            "kireibox_immersive_play_time_visible",
+            YukiSettingsStore.KEY_IMMERSIVE_PLAY_TIME_VISIBLE,
+        )
+    }
+
+    @Test
+    fun `immersive play time visibility defaults on and survives store recreation`() {
+        val prefs = fakePrefs()
+
+        assertEquals(true, YukiSettingsStore(prefs).snapshot().immersivePlayTimeVisible)
+
+        YukiSettingsStore(prefs).setImmersivePlayTimeVisible(false)
+        assertEquals(false, YukiSettingsStore(prefs).snapshot().immersivePlayTimeVisible)
+
+        YukiSettingsStore(prefs).setHomePresentationMode(HomePresentationMode.COMPONENTS)
+        assertEquals(false, YukiSettingsStore(prefs).snapshot().immersivePlayTimeVisible)
+
+        YukiSettingsStore(prefs).setImmersivePlayTimeVisible(true)
+        assertEquals(true, YukiSettingsStore(prefs).snapshot().immersivePlayTimeVisible)
     }
 
     @Test
@@ -319,6 +339,16 @@ class YukiSettingsStoreTest {
     }
 
     @Test
+    fun `database duplicate merge remaps immersive gallery ids without duplicates`() {
+        val store = YukiSettingsStore(fakePrefs())
+        store.setImmersiveGalleryIds(listOf(30L, 20L, 10L))
+
+        store.remapImmersiveGalleryIds(mapOf(30L to 10L, 20L to 10L))
+
+        assertEquals(listOf(10L), store.snapshot().immersiveGalleryIds)
+    }
+
+    @Test
     fun `illegal stored immersive gallery values resolve to defaults`() {
         val prefs = fakePrefs()
         prefs.edit().putString(YukiSettingsStore.KEY_IMMERSIVE_GALLERY_MODE, "garbage").apply()
@@ -375,5 +405,94 @@ class YukiSettingsStoreTest {
         assertEquals(20, recreated.ignoredUpdateVersionCode)
         assertEquals("release-etag", recreated.updateEtag)
         assertEquals(123456789L, recreated.lastUpdateCheckAt)
+    }
+
+    @Test
+    fun `update release cache survives process recreation and can be cleared`() {
+        val prefs = fakePrefs()
+        YukiSettingsStore(prefs).setUpdateReleaseCache("{\"releaseId\":13}")
+
+        assertEquals("{\"releaseId\":13}", YukiSettingsStore(prefs).snapshot().updateReleaseCache)
+
+        YukiSettingsStore(prefs).setUpdateReleaseCache("")
+        assertEquals("", YukiSettingsStore(prefs).snapshot().updateReleaseCache)
+    }
+
+    @Test
+    fun `file and SAF aliases replace one scan root in place`() {
+        val store = YukiSettingsStore(fakePrefs())
+        store.addOrReplaceScanRoot("file:///storage/emulated/0/Games")
+        val change = store.addOrReplaceScanRoot(
+            "content://com.android.externalstorage.documents/tree/primary%3AGames",
+        )
+
+        assertEquals(true, change?.replaced)
+        assertEquals(
+            listOf("content://com.android.externalstorage.documents/tree/primary%3AGames"),
+            store.scanRoots(),
+        )
+        assertEquals(listOf(true), store.scanRootEnabled())
+    }
+
+    @Test
+    fun `permission repair replaces requested root and removes colliding alias`() {
+        val store = YukiSettingsStore(fakePrefs())
+        store.replaceScanRoots(
+            listOf(
+                "file:///storage/emulated/0/Games",
+                "content://com.android.externalstorage.documents/tree/primary%3AGames",
+                "file:///storage/emulated/0/Other",
+            ),
+            listOf(true, false, true),
+        )
+
+        store.addOrReplaceScanRoot(
+            "content://com.android.externalstorage.documents/tree/primary%3AGames",
+            replacedUri = "file:///storage/emulated/0/Games",
+        )
+
+        assertEquals(2, store.scanRoots().size)
+        assertEquals(1, store.scanRoots().count { it.contains("primary%3AGames") })
+    }
+
+    @Test
+    fun `remove scan root uses canonical identity and keeps state arrays aligned`() {
+        val store = YukiSettingsStore(fakePrefs())
+        store.replaceScanRoots(
+            listOf("file:///sdcard/Games", "file:///sdcard/Other"),
+            listOf(false, true),
+        )
+
+        val removed = store.removeScanRoot(
+            "content://com.android.externalstorage.documents/tree/primary%3AGames",
+        )
+
+        assertEquals(0, removed?.index)
+        assertEquals(listOf("file:///sdcard/Other"), store.scanRoots())
+        assertEquals(listOf(true), store.scanRootEnabled())
+    }
+
+    @Test
+    fun `scan root migration keeps preferred SAF alias and merges enabled state`() {
+        val store = YukiSettingsStore(fakePrefs())
+        store.replaceScanRoots(
+            listOf(
+                "file:///storage/emulated/0/Games",
+                "content://com.android.externalstorage.documents/tree/primary%3AGames",
+                "file:///storage/emulated/0/Other",
+            ),
+            listOf(false, true, false),
+        )
+
+        store.migrateScanRootsIfNeeded()
+
+        assertEquals(
+            listOf(
+                "content://com.android.externalstorage.documents/tree/primary%3AGames",
+                "file:///storage/emulated/0/Other",
+            ),
+            store.scanRoots(),
+        )
+        assertEquals(listOf(true, false), store.scanRootEnabled())
     }
 }

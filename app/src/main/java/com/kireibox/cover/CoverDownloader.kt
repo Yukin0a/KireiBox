@@ -22,6 +22,19 @@ internal class CoverDownloader(
         url: String,
         tempFile: File,
         onProgress: (CoverDownloadProgress) -> Unit,
+    ): Result<File> = CoverTimeoutRetryPolicy.run(
+        onRetry = {
+            tempFile.delete()
+            onProgress(CoverDownloadProgress(0L, null))
+        },
+    ) {
+        downloadOnce(url, tempFile, onProgress)
+    }
+
+    private suspend fun downloadOnce(
+        url: String,
+        tempFile: File,
+        onProgress: (CoverDownloadProgress) -> Unit,
     ): Result<File> = suspendCancellableCoroutine { continuation ->
         val call = client.newCall(Request.Builder().url(url).build())
         continuation.invokeOnCancellation {

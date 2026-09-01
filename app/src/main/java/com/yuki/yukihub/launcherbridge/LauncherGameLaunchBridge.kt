@@ -5,8 +5,12 @@ import android.app.ActivityManager
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import com.kireibox.external.shortcut.ExternalShortcutDirectLauncher
+import com.kireibox.external.shortcut.ExternalShortcutIdentity
+import com.kireibox.external.shortcut.ShizukuShortcutGateway
 import com.yuki.yukihub.data.GameRepository
 import com.yuki.yukihub.launcher.EmulatorLauncher
+import com.yuki.yukihub.launcher.ArtemisVersion
 import com.yuki.yukihub.model.EngineType
 import com.yuki.yukihub.model.Game
 import com.yuki.yukihub.model.SupportedEngines
@@ -66,6 +70,27 @@ object LauncherGameLaunchBridge {
             return LaunchResult.failure(prepared.message)
         }
         DevLogger.event("launch start engine=${launchGame.engine} root=${launchGame.rootUri} target=${launchGame.launchTarget}")
+        val externalShortcut = ExternalShortcutIdentity.fromGame(launchGame)
+        if (externalShortcut != null) {
+            val sessionId = repository.startPlaySession(launchGame.id, System.currentTimeMillis(), "external.shortcut")
+            if (sessionId <= 0L) return LaunchResult.failure("无法记录本次快捷方式启动")
+            val direct = ExternalShortcutDirectLauncher.launch(appContext, externalShortcut, launchGame.launchTarget)
+            val launched = if (direct?.isSuccess == true) direct else {
+                ShizukuShortcutGateway(appContext).launch(externalShortcut).recoverCatching { fallbackError ->
+                    val directMessage = direct?.exceptionOrNull()?.message
+                    if (!directMessage.isNullOrBlank()) throw IllegalStateException("$directMessage Shizuku 回退也不可用：${fallbackError.message.orEmpty()}", fallbackError)
+                    throw fallbackError
+                }
+            }
+            return if (launched.isSuccess) {
+                repository.markPlaySessionLaunched(sessionId, System.currentTimeMillis())
+                repository.finishPlaySessionWithDuration(sessionId, System.currentTimeMillis(), 0L, MIN_RECORDED_PLAY_MS, MAX_RECORDED_PLAY_MS)
+                LaunchResult.success(0L, LaunchHandoff.SHORTCUT)
+            } else {
+                repository.cancelPlaySession(sessionId)
+                LaunchResult.failure(launched.exceptionOrNull()?.message ?: "快捷方式已失效，请重新扫描。")
+            }
+        }
         val emulatorPackage = resolveEmulatorPackage(launchGame)
         val launchTarget = resolveLaunchTarget(launchGame)
         val validationError = validate(launchGame, emulatorPackage)
@@ -84,7 +109,11 @@ object LauncherGameLaunchBridge {
         if (launchError == null) {
             DevLogger.event("launch started session=$sessionId engine=$emulatorPackage")
             repository.markPlaySessionLaunched(sessionId, System.currentTimeMillis())
-            return LaunchResult.success(sessionId)
+            if (launchGame.engine == EngineType.ANDROID_APP) {
+                repository.finishPlaySessionWithDuration(sessionId, System.currentTimeMillis(), 0L, MIN_RECORDED_PLAY_MS, MAX_RECORDED_PLAY_MS)
+                return LaunchResult.success(0L, LaunchHandoff.EXTERNAL_APP)
+            }
+            return LaunchResult.success(sessionId, LaunchHandoff.INTERNAL_ENGINE)
         }
         repository.cancelPlaySession(sessionId)
         DevLogger.event("launch failed: $launchError")
@@ -186,7 +215,7 @@ object LauncherGameLaunchBridge {
             EngineType.KIRIKIRI -> "internal.krkr"
             EngineType.ONS -> "internal.ons"
             EngineType.TYRANO -> "internal.tyrano"
-            EngineType.ARTEMIS -> "internal.artemis"
+            EngineType.ARTEMIS -> ArtemisVersion.fromStored(game.emulatorPackage).emulatorPackage
             EngineType.ANDROID_APP -> game.emulatorPackage?.trim().orEmpty()
             else -> ""
         }
@@ -272,19 +301,26 @@ object LauncherGameLaunchBridge {
         return "external"
     }
 
+    enum class LaunchHandoff { NONE, INTERNAL_ENGINE, EXTERNAL_APP, SHORTCUT }
+
     class LaunchResult private constructor(
         @JvmField val success: Boolean,
         @JvmField val sessionId: Long,
-        @JvmField val message: String
+        @JvmField val message: String,
+        @JvmField val handoff: LaunchHandoff,
     ) {
         companion object {
             @JvmStatic
             fun success(sessionId: Long): LaunchResult =
-                LaunchResult(true, sessionId, "")
+                LaunchResult(true, sessionId, "", LaunchHandoff.INTERNAL_ENGINE)
+
+            @JvmStatic
+            fun success(sessionId: Long, handoff: LaunchHandoff): LaunchResult =
+                LaunchResult(true, sessionId, "", handoff)
 
             @JvmStatic
             fun failure(message: String?): LaunchResult =
-                LaunchResult(false, -1L, if (message.isNullOrBlank()) "启动失败" else message)
+                LaunchResult(false, -1L, if (message.isNullOrBlank()) "启动失败" else message, LaunchHandoff.NONE)
         }
     }
 }

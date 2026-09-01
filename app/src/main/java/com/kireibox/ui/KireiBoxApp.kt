@@ -15,6 +15,7 @@ import android.os.Build
 import android.os.PowerManager
 import android.util.LruCache
 import android.view.View
+import com.kireibox.external.shortcut.ShortcutServiceStatus
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -106,6 +107,7 @@ import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -251,6 +253,7 @@ import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -286,6 +289,7 @@ import com.yuki.yukihub.data.GameSearchIndex
 import com.yuki.yukihub.data.PlayTrendPoint
 import com.yuki.yukihub.model.EngineType
 import com.yuki.yukihub.model.Game
+import com.yuki.yukihub.storage.StorageRootIdentity
 import com.yuki.yukihub.settings.YukiSettingsStore
 import com.yuki.yukihub.settings.MotionDecisionInputs
 import com.yuki.yukihub.settings.MotionMode
@@ -371,7 +375,9 @@ data class KireiActions(
     val chooseAndroidApp: () -> Unit,
     val chooseCoverFromAlbum: () -> Unit,
     val chooseCoverFromFiles: () -> Unit,
+    val chooseExternalShortcuts: () -> Unit,
     val launchGame: (Game) -> Unit,
+    val pinGameShortcut: (Game) -> Unit,
     val selectedGame: (Game) -> Unit,
     val launchKrkrNative: () -> Unit,
     val checkPermissions: () -> Unit,
@@ -502,11 +508,16 @@ fun KireiBoxApp(
         val homeSpotlightPage by viewModel.homeSpotlightPage.collectAsState()
         var showLibraryOverview by remember { mutableStateOf(false) }
         var libraryOverviewSort by remember { mutableStateOf(LibraryOverviewSort.RECENT) }
+        val openPlayTimeOverview: () -> Unit = {
+            libraryOverviewSort = LibraryOverviewSort.PLAY_TIME
+            showLibraryOverview = true
+        }
         val uiScope = rememberCoroutineScope()
         val rootBackHasPriorityScreen = prompt == null &&
             fileBrowserRequest == null &&
             state.xp3Picker == null &&
             state.androidAppPicker == null &&
+            state.externalShortcutPicker == null &&
             state.krkrEditorGame == null &&
             state.coverSearch == null &&
             homeEditorProfile == null &&
@@ -563,9 +574,11 @@ fun KireiBoxApp(
                 val coverSearch = state.coverSearch
                 val xp3Picker = state.xp3Picker
                 val androidAppPicker = state.androidAppPicker
+                val externalShortcutPicker = state.externalShortcutPicker
                 val showMainDock = fileBrowserRequest == null &&
                     xp3Picker == null &&
                     androidAppPicker == null &&
+                    externalShortcutPicker == null &&
                     editorGame == null &&
                     coverSearch == null &&
                     homeEditorProfile == null
@@ -594,6 +607,15 @@ fun KireiBoxApp(
                         haze = haze,
                         onDismiss = viewModel::dismissAndroidAppPicker,
                         onSelected = viewModel::selectAndroidApp,
+                    )
+                    externalShortcutPicker != null -> ExternalShortcutPickerPage(
+                        picker = externalShortcutPicker,
+                        colors = colors,
+                        haze = haze,
+                        onDismiss = viewModel::dismissExternalShortcutPicker,
+                        onToggle = viewModel::toggleExternalShortcutSelection,
+                        onToggleAll = viewModel::toggleAllExternalShortcuts,
+                        onImport = viewModel::importSelectedExternalShortcuts,
                     )
                     editorGame != null -> Box(Modifier.fillMaxSize()) { KrkrGameSettingsPage(
                         game = editorGame,
@@ -637,7 +659,7 @@ fun KireiBoxApp(
                                     windowClass = windowClass,
                                     currentSpotlightPage = homeSpotlightPage,
                                     onSpotlightPageChanged = viewModel::setHomeSpotlightPage,
-                                    onOpenOverview = { showLibraryOverview = true },
+                                    onOpenOverview = openPlayTimeOverview,
                                     onEditDashboard = { homeEditorProfile = it },
                                 )
                                 KireiTab.GAMES -> LibraryPage(
@@ -661,6 +683,7 @@ fun KireiBoxApp(
                 ) {
                     KireiMainDock(
                         tab = state.tab,
+                        pendingReviewCount = state.pendingCoverReviewCount,
                         colors = if (
                             state.tab == KireiTab.HOME &&
                             (state.settings?.homePresentationMode ?: HomePresentationMode.IMMERSIVE) ==
@@ -682,6 +705,15 @@ fun KireiBoxApp(
                 }
                 state.undoRemoval?.let { undo ->
                     UndoRemovalNotice(undo.game.title ?: "游戏", colors, haze, viewModel::undoLastRemoval, viewModel::dismissUndoRemoval)
+                }
+                state.undoScanRootRemoval?.let { undo ->
+                    UndoRemovalNotice(
+                        "目录和 ${undo.gameIds.size} 部游戏",
+                        colors,
+                        haze,
+                        viewModel::undoScanRootRemoval,
+                        viewModel::dismissUndoScanRootRemoval,
+                    )
                 }
                 state.selectedGame?.let { game ->
                     GameActionSheet(
@@ -780,7 +812,6 @@ fun KireiBoxApp(
                     state = if (prompt == null && homeErrorPrompt == null) state.updateState else UpdateUiState.Idle,
                     colors = colors,
                     haze = haze,
-                    onIgnore = viewModel::ignoreAvailableUpdate,
                     onDownload = viewModel::downloadAvailableUpdate,
                     onCancelDownload = viewModel::cancelUpdateDownload,
                     onInstall = actions.installUpdate,
@@ -953,7 +984,6 @@ private fun UpdatePromptHost(
     state: UpdateUiState,
     colors: KireiColors,
     haze: HazeState?,
-    onIgnore: () -> Unit,
     onDownload: () -> Unit,
     onCancelDownload: () -> Unit,
     onInstall: (String) -> Unit,
@@ -961,9 +991,13 @@ private fun UpdatePromptHost(
     onDismiss: () -> Unit,
 ) {
     if (state == UpdateUiState.Idle || state == UpdateUiState.Checking(manual = false)) return
-    // Update prompts require an explicit action so Back/outside taps cannot silently
-    // suppress a version without recording "忽略此版本".
-    BackHandler { }
+    BackHandler {
+        when (updatePromptBackAction(state)) {
+            UpdatePromptBackAction.LATER -> onDismiss()
+            UpdatePromptBackAction.CANCEL_DOWNLOAD -> onCancelDownload()
+            UpdatePromptBackAction.DISCARD_READY -> onDiscard()
+        }
+    }
     Box(
         Modifier.fillMaxSize()
             .background(Color.Black.copy(alpha = if (colors.isDark) .28f else .16f))
@@ -993,7 +1027,7 @@ private fun UpdatePromptHost(
                     is UpdateUiState.Available -> {
                         Text("发现新版本", color = colors.text, style = AppleTypography.headlineMedium)
                         Text(
-                            "${BuildConfig.VERSION_NAME}  →  ${state.release.manifest.versionName} · ${formatUpdateBytes(state.release.apkSize)}",
+                            "${BuildConfig.VERSION_NAME}  →  ${state.release.versionName} · ${formatUpdateBytes(state.release.apkSize)}",
                             color = colors.secondary,
                             style = AppleTypography.bodyMedium,
                         )
@@ -1005,7 +1039,7 @@ private fun UpdatePromptHost(
                                 modifier = Modifier.fillMaxWidth().heightIn(max = 260.dp).verticalScroll(rememberScrollState()),
                             )
                         }
-                        UpdatePromptButtons("忽略此版本", onIgnore, "下载更新", onDownload, colors)
+                        UpdatePromptButtons("稍后", onDismiss, "更新", onDownload, colors)
                     }
                     is UpdateUiState.Downloading -> {
                         val progress = if (state.totalBytes > 0L) {
@@ -1030,14 +1064,22 @@ private fun UpdatePromptHost(
                     is UpdateUiState.ReadyToInstall -> {
                         Text("更新已校验", color = colors.text, style = AppleTypography.headlineMedium)
                         Text(
-                            "包名、版本、ABI、SDK、SHA-256 和签名证书均已通过校验。安装仍需由 Android 系统确认。",
+                            if (state.release.hasStrictManifest) {
+                                "包名、版本、ABI、SDK、SHA-256 和签名证书均已通过校验。安装仍需由 Android 系统确认。"
+                            } else {
+                                "包名、版本、ABI、SDK 和已安装应用签名均已通过校验。安装仍需由 Android 系统确认。"
+                            },
                             color = colors.secondary,
                             style = AppleTypography.bodyMedium,
                         )
-                        UpdatePromptButtons("稍后", onDiscard, "安装更新", { onInstall(state.apkPath) }, colors)
+                        UpdatePromptButtons("稍后安装", onDiscard, "安装更新", { onInstall(state.apkPath) }, colors)
                     }
                     is UpdateUiState.Error -> {
-                        Text("更新检查失败", color = colors.text, style = AppleTypography.headlineMedium)
+                        Text(
+                            if (state.release == null) "更新检查失败" else "更新失败",
+                            color = colors.text,
+                            style = AppleTypography.headlineMedium,
+                        )
                         Text(state.message, color = colors.secondary, style = AppleTypography.bodyMedium)
                         if (state.release == null) {
                             UpdateSinglePromptButton("关闭", onDismiss, colors, emphasized = false)
@@ -1050,6 +1092,14 @@ private fun UpdatePromptHost(
             }
         }
     }
+}
+
+internal enum class UpdatePromptBackAction { LATER, CANCEL_DOWNLOAD, DISCARD_READY }
+
+internal fun updatePromptBackAction(state: UpdateUiState): UpdatePromptBackAction = when (state) {
+    is UpdateUiState.Downloading -> UpdatePromptBackAction.CANCEL_DOWNLOAD
+    is UpdateUiState.ReadyToInstall -> UpdatePromptBackAction.DISCARD_READY
+    else -> UpdatePromptBackAction.LATER
 }
 
 @Composable
@@ -1313,6 +1363,165 @@ private fun AndroidAppPickerPage(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ExternalShortcutPickerPage(
+    picker: ExternalShortcutPickerUi,
+    colors: KireiColors,
+    haze: HazeState?,
+    onDismiss: () -> Unit,
+    onToggle: (String) -> Unit,
+    onToggleAll: () -> Unit,
+    onImport: () -> Unit,
+) {
+    BackHandler(onBack = onDismiss)
+    var query by remember { mutableStateOf("") }
+    val normalized = query.trim()
+    val visible = remember(picker.entries, normalized) {
+        ExternalShortcutPickerPolicy.visible(picker.entries, normalized)
+    }
+    val selectable = picker.entries.count { !it.imported }
+    val allSelected = selectable > 0 && picker.selectedKeys.size == selectable
+
+    Box(
+        Modifier.fillMaxSize().background(colors.background),
+        contentAlignment = Alignment.TopCenter,
+    ) {
+        Column(
+            Modifier.fillMaxSize().widthIn(max = 840.dp).statusBarsPadding().navigationBarsPadding()
+                .padding(horizontal = 18.dp, vertical = 12.dp),
+        ) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                GlassIconButton(Icons.Rounded.ArrowBack, "返回", colors, haze, onDismiss)
+                Column(Modifier.weight(1f).padding(start = 14.dp)) {
+                    Text("导入桌面游戏快捷方式", color = colors.text, style = AppleTypography.headlineMedium)
+                    Text(
+                        "首次扫描使用 Shizuku · 支持的盖世游戏导入后可直接启动",
+                        color = colors.secondary,
+                        style = AppleTypography.labelLarge,
+                    )
+                }
+                if (!picker.loading && picker.error == null && selectable > 0) {
+                    TextButton(onClick = onToggleAll) {
+                        Text(if (allSelected) "取消全选" else "全选未导入", color = colors.accent)
+                    }
+                }
+            }
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                singleLine = true,
+                leadingIcon = { Icon(Icons.Rounded.Search, null) },
+                placeholder = { Text("搜索标题、应用、包名或快捷方式 ID") },
+                shape = RoundedCornerShape(16.dp),
+            )
+            GlassSurface(
+                colors,
+                haze,
+                Modifier.fillMaxWidth().weight(1f),
+                RoundedCornerShape(26.dp),
+                KireiGlassRole.CONTENT,
+            ) {
+                when {
+                    picker.loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = colors.accent)
+                    }
+                    picker.error != null -> Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+                        Text(picker.error, color = colors.danger, textAlign = TextAlign.Center)
+                    }
+                    visible.isEmpty() -> Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+                        Text(
+                            if (query.isBlank()) "没有找到可导入的桌面快捷方式" else "没有匹配的快捷方式",
+                            color = colors.secondary,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                    else -> LazyColumn(
+                        Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(vertical = 8.dp),
+                    ) {
+                        items(visible, key = ExternalShortcutPickerEntry::stableKey) { entry ->
+                            val selected = entry.stableKey in picker.selectedKeys
+                            Row(
+                                Modifier.fillMaxWidth()
+                                    .clickable(enabled = !entry.imported) { onToggle(entry.stableKey) }
+                                    .padding(horizontal = 18.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Box(
+                                    Modifier.size(44.dp).background(colors.surfaceRaised, RoundedCornerShape(14.dp)),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Icon(Icons.Rounded.Gamepad, null, tint = if (entry.imported) colors.secondary else colors.accent)
+                                }
+                                Column(Modifier.weight(1f).padding(horizontal = 13.dp)) {
+                                    Text(
+                                        entry.shortcut.title,
+                                        color = if (entry.imported) colors.secondary else colors.text,
+                                        style = AppleTypography.bodyLargeEmphasis,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    Text(
+                                        buildString {
+                                            append(entry.shortcut.appName)
+                                            append(" · ")
+                                            append(if (entry.shortcut.pinned) "桌面固定" else "动态")
+                                            if (entry.shortcut.directLaunchTarget != null) {
+                                                append(" · 导入后免 Shizuku")
+                                            }
+                                            append(" · ")
+                                            append(entry.shortcut.shortcutId)
+                                        },
+                                        color = colors.secondary,
+                                        style = AppleTypography.labelMedium,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                                if (entry.imported) {
+                                    Text("已导入", color = colors.secondary, style = AppleTypography.labelLarge)
+                                } else {
+                                    Box(
+                                        Modifier.size(24.dp).border(
+                                            1.5.dp,
+                                            if (selected) colors.accent else colors.outline,
+                                            RoundedCornerShape(8.dp),
+                                        ).background(
+                                            if (selected) colors.accent else Color.Transparent,
+                                            RoundedCornerShape(8.dp),
+                                        ),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        if (selected) Icon(
+                                            Icons.Rounded.Check,
+                                            null,
+                                            tint = colors.onAccent,
+                                            modifier = Modifier.size(17.dp),
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            Button(
+                onClick = onImport,
+                enabled = picker.selectedKeys.isNotEmpty() && !picker.loading,
+                modifier = Modifier.fillMaxWidth().padding(top = 12.dp).height(52.dp),
+                shape = RoundedCornerShape(18.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = colors.accent,
+                    contentColor = colors.onAccent,
+                ),
+            ) {
+                Text("导入所选（${picker.selectedKeys.size}）", style = AppleTypography.bodyLargeEmphasis)
             }
         }
     }
@@ -1600,9 +1809,10 @@ private fun HomePage(
                     },
                 ),
                 reducedMotion = LocalResolvedMotionMode.current == MotionMode.REDUCED,
+                showPlayTime = state.settings?.immersivePlayTimeVisible != false,
+                onOpenPlayTime = onOpenOverview,
                 reducedTransparency = state.settings?.reducedTransparency == true,
                 adaptiveMetrics = adaptiveMetrics,
-                onOpenOverview = onOpenOverview,
             )
         } else {
             ComponentsHomePage(
@@ -1808,13 +2018,10 @@ internal fun HomeControlMenu(
     menuDiameterDp: Dp = 48.dp,
     menuIconSizeDp: Dp = 27.dp,
     opaqueFill: Boolean = false,
-    /** Immersive home has no stats card, so it reaches the play-time ranking from this menu. */
-    onOpenOverview: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val polished = LocalResolvedMotionMode.current == MotionMode.POLISHED
-    val menuWidthDp = if (onOpenOverview != null) 202.dp else 150.dp
-    Box(modifier.size(menuWidthDp, menuDiameterDp)) {
+    Box(modifier.size(150.dp, menuDiameterDp)) {
         AnimatedVisibility(
             visible = expanded,
             enter = fadeIn(tween(if (polished) 150 else 90)) +
@@ -1840,18 +2047,6 @@ internal fun HomeControlMenu(
                 haze,
                 onTheme
             )
-        }
-        if (onOpenOverview != null) {
-            AnimatedVisibility(
-                visible = expanded,
-                enter = fadeIn(tween(if (polished) 200 else 90)) +
-                    slideInHorizontally(tween(if (polished) 230 else 90)) { it / 2 },
-                exit = fadeOut(tween(if (polished) 90 else 90)) +
-                    slideOutHorizontally(tween(if (polished) 110 else 90)) { it / 2 },
-                modifier = Modifier.align(Alignment.CenterStart).offset(x = 104.dp)
-            ) {
-                HomeMenuAction(Icons.Rounded.Timer, "游玩时长排名", colors, haze, onOpenOverview)
-            }
         }
         GlassSurface(
             colors,
@@ -4510,7 +4705,7 @@ internal fun resolveLibraryGridBottomContentPaddingDp(
  */
 internal object LibraryCardLayoutPolicy {
     const val PORTRAIT_COVER_ASPECT_RATIO = .72f
-    const val SHORT_LANDSCAPE_COVER_ASPECT_RATIO = 16f / 9f
+    const val SHORT_LANDSCAPE_COVER_ASPECT_RATIO = .94f
     const val SHORT_LANDSCAPE_MAX_HEIGHT_FRACTION = .60f
     const val MIN_HEADER_GAP_DP = 8f
     const val MIN_TITLE_GAP_DP = 6f
@@ -4719,6 +4914,11 @@ private fun LibraryGameGrid(
     viewModel: KireiViewModel,
     onRequestRemove: (Game) -> Unit,
     onEditModeChange: (Boolean) -> Unit,
+    manualSort: Boolean,
+    customReorderEnabled: Boolean,
+    customDraft: ManualOrderSelectionDraft?,
+    customPositions: Map<Long, Int>,
+    onCustomToggle: (Game) -> Unit,
     contentTopDp: Float,
     modifier: Modifier,
 ) {
@@ -4736,7 +4936,30 @@ private fun LibraryGameGrid(
         horizontalArrangement = Arrangement.spacedBy(adaptiveMetrics.gridSpacingDp.dp),
         verticalArrangement = Arrangement.spacedBy(adaptiveMetrics.gridSpacingDp.dp),
     ) {
-        items(visible, key = { it.id }) { game ->
+        val grouped = editMode && customReorderEnabled && (manualSort || customDraft != null)
+        if (customDraft != null) {
+            item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+                Text(
+                    "依次点按卡片，设置 1、2、3… 顺序",
+                    color = colors.accent,
+                    style = AppleTypography.bodySmall,
+                    modifier = Modifier.padding(bottom = 4.dp),
+                )
+            }
+        }
+        if (grouped && visible.any(Game::favorite)) {
+            item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+                val total = visible.count(Game::favorite)
+                val selected = ManualOrderSelectionPolicy.selectedCount(customDraft, favorite = true, visible)
+                Text(
+                    if (customDraft == null) "收藏" else "收藏 · 已选 $selected/$total",
+                    color = colors.secondary,
+                    style = AppleTypography.bodySmall,
+                )
+            }
+        }
+        val favorites = if (grouped) visible.filter(Game::favorite) else visible
+        items(favorites, key = { it.id }) { game ->
             GameCard(
                 game = game,
                 colors = colors,
@@ -4761,9 +4984,48 @@ private fun LibraryGameGrid(
                 reducedMotion = reducedMotion,
                 compact = compactCards,
                 onOpen = { viewModel.selectedGame(game) },
+                customOrderPosition = customPositions[game.id],
+                customSelectionActive = customDraft != null,
                 onLongClick = { onEditModeChange(true) },
+                onEditClick = { onCustomToggle(game) },
                 onRemove = { onRequestRemove(game) },
             )
+        }
+        if (grouped && visible.any { !it.favorite }) {
+            item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+                val total = visible.count { !it.favorite }
+                val selected = ManualOrderSelectionPolicy.selectedCount(customDraft, favorite = false, visible)
+                Text(
+                    if (customDraft == null) "其他游戏" else "其他游戏 · 已选 $selected/$total",
+                    color = colors.secondary,
+                    style = AppleTypography.bodySmall,
+                )
+            }
+            items(visible.filterNot(Game::favorite), key = { it.id }) { game ->
+                GameCard(
+                    game = game,
+                    colors = colors,
+                    modifier = if (polishedMotion) Modifier.animateItem(
+                        fadeInSpec = tween(180),
+                        placementSpec = spring(dampingRatio = .82f, stiffness = Spring.StiffnessMediumLow),
+                        fadeOutSpec = tween(160),
+                    ) else Modifier.animateItem(
+                        fadeInSpec = tween(100),
+                        placementSpec = tween(1),
+                        fadeOutSpec = tween(100),
+                    ),
+                    editMode = editMode,
+                    removing = removingGameId == game.id,
+                    reducedMotion = reducedMotion,
+                    compact = compactCards,
+                    onOpen = { viewModel.selectedGame(game) },
+                    customOrderPosition = customPositions[game.id],
+                    customSelectionActive = customDraft != null,
+                    onLongClick = { onEditModeChange(true) },
+                    onEditClick = { onCustomToggle(game) },
+                    onRemove = { onRequestRemove(game) },
+                )
+            }
         }
     }
 }
@@ -4801,6 +5063,8 @@ private fun LibraryPage(
     var requestSearchFocus by remember { mutableStateOf(false) }
     var filterMenuExpanded by remember { mutableStateOf(false) }
     var editMode by remember { mutableStateOf(false) }
+    var customOrderDraft by remember { mutableStateOf<ManualOrderSelectionDraft?>(null) }
+    var showDiscardCustomOrder by remember { mutableStateOf(false) }
     var showAddGame by remember { mutableStateOf(false) }
     val gridState = rememberLazyGridState()
     val taskCenterListState = rememberLazyListState()
@@ -4860,7 +5124,9 @@ private fun LibraryPage(
                 requestSearchFocus = false
                 searchReveal.hide()
             }
-            KireiLibraryBackAction.EXIT_EDIT_MODE -> editMode = false
+            KireiLibraryBackAction.EXIT_EDIT_MODE -> {
+                if (customOrderDraft != null) showDiscardCustomOrder = true else editMode = false
+            }
             KireiLibraryBackAction.PAGE -> Unit
         }
     }
@@ -4921,6 +5187,35 @@ private fun LibraryPage(
             .filter { filter == null || it.engine == filter }
             .filter { GameSearchIndex.matches(state.gameSearchIndex[it.id], query) }
             .toList()
+    }
+    val manualSort = state.settings?.sortMode == YukiSettingsStore.SORT_MANUAL
+    val customReorderEnabled = filter == null && query.isBlank() && !searchFocused
+    val customPositions = remember(state.games, customOrderDraft, manualSort, editMode) {
+        ManualOrderSelectionPolicy.positions(
+            games = state.games,
+            draft = customOrderDraft,
+            showExistingOrder = editMode && manualSort,
+        )
+    }
+    val selectLibrarySort: (String) -> Unit = { mode ->
+        if (mode == YukiSettingsStore.SORT_MANUAL) {
+            if (!customReorderEnabled) {
+                viewModel.showNotice("请清空搜索并切换到全部后再自定义排序")
+            } else {
+                customOrderDraft = ManualOrderSelectionPolicy.empty()
+            }
+        } else {
+            customOrderDraft = null
+            viewModel.setSortMode(mode)
+        }
+    }
+    val finishLibraryEdit: () -> Unit = {
+        customOrderDraft?.let { draft ->
+            val order = ManualOrderSelectionPolicy.finalize(state.games, draft)
+            viewModel.saveManualOrder(order.favoriteIds, order.regularIds)
+        }
+        customOrderDraft = null
+        editMode = false
     }
     val taskButtonState = CoverTaskPresentationPolicy.buttonState(state.coverQueue.tasks)
     val shouldDismissCompletedRows = CoverTaskPresentationPolicy.shouldDismissCompletedRows(
@@ -5029,7 +5324,17 @@ private fun LibraryPage(
                     adaptiveMetrics = adaptiveMetrics,
                     viewModel = viewModel,
                     onRequestRemove = onRequestRemove,
-                    onEditModeChange = { editMode = it },
+                    onEditModeChange = {
+                        editMode = it
+                        if (!it) customOrderDraft = null
+                    },
+                    manualSort = manualSort,
+                    customReorderEnabled = customReorderEnabled,
+                    customDraft = customOrderDraft,
+                    customPositions = customPositions,
+                    onCustomToggle = { game ->
+                        customOrderDraft = customOrderDraft?.let { ManualOrderSelectionPolicy.toggle(it, game) }
+                    },
                     contentTopDp = compactGridTopPaddingDp + searchRevealHeightDp.value,
                     modifier = Modifier.fillMaxSize(),
                 )
@@ -5071,7 +5376,12 @@ private fun LibraryPage(
                     )
                     Spacer(Modifier.weight(1f))
                     if (editMode) {
-                        TextButton(onClick = { editMode = false }, modifier = Modifier.heightIn(min = 48.dp)) {
+                        LibraryEditSortMenu(
+                            value = if (customOrderDraft != null) YukiSettingsStore.SORT_MANUAL else state.settings?.sortMode.orEmpty(),
+                            colors = colors,
+                            onChange = selectLibrarySort,
+                        )
+                        TextButton(onClick = finishLibraryEdit, modifier = Modifier.heightIn(min = 48.dp)) {
                             Icon(Icons.Rounded.Done, null, tint = colors.accent)
                             Text("完成", color = colors.accent, modifier = Modifier.padding(start = 4.dp))
                         }
@@ -5196,7 +5506,12 @@ private fun LibraryPage(
                     Text("${visible.size} 部游戏", color = colors.secondary)
                 }
                 if (editMode) {
-                    TextButton(onClick = { editMode = false }) {
+                    LibraryEditSortMenu(
+                        value = if (customOrderDraft != null) YukiSettingsStore.SORT_MANUAL else state.settings?.sortMode.orEmpty(),
+                        colors = colors,
+                        onChange = selectLibrarySort,
+                    )
+                    TextButton(onClick = finishLibraryEdit) {
                         Icon(Icons.Rounded.Done, null, tint = colors.accent)
                         Text("完成", color = colors.accent, modifier = Modifier.padding(start = 4.dp))
                     }
@@ -5266,13 +5581,15 @@ private fun LibraryPage(
                     shape = RoundedCornerShape(16.dp)
                 )
             }
-            Row(
-                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 14.dp),
-                horizontalArrangement = Arrangement.spacedBy(9.dp)
-            ) {
-                FilterChip("全部", filter == null, colors) { filter = null; editMode = false }
-                libraryEngines.forEach { engine ->
-                    FilterChip(engine.displayName, filter == engine, colors) { filter = engine; editMode = false }
+            if (!editMode) {
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 14.dp),
+                    horizontalArrangement = Arrangement.spacedBy(9.dp)
+                ) {
+                    FilterChip("全部", filter == null, colors) { filter = null }
+                    libraryEngines.forEach { engine ->
+                        FilterChip(engine.displayName, filter == engine, colors) { filter = engine }
+                    }
                 }
             }
             LibraryGameGrid(
@@ -5289,7 +5606,17 @@ private fun LibraryPage(
                 adaptiveMetrics = adaptiveMetrics,
                 viewModel = viewModel,
                 onRequestRemove = onRequestRemove,
-                onEditModeChange = { editMode = it },
+                onEditModeChange = {
+                    editMode = it
+                    if (!it) customOrderDraft = null
+                },
+                manualSort = manualSort,
+                customReorderEnabled = customReorderEnabled,
+                customDraft = customOrderDraft,
+                customPositions = customPositions,
+                onCustomToggle = { game ->
+                    customOrderDraft = customOrderDraft?.let { ManualOrderSelectionPolicy.toggle(it, game) }
+                },
                 contentTopDp = LibraryHeaderTransitionPolicy.topGapDp(adaptiveMetrics.scale),
                 modifier = Modifier.weight(1f),
             )
@@ -5306,6 +5633,23 @@ private fun LibraryPage(
             onReview = viewModel::openCoverReview,
             onRetry = viewModel::retryCoverTask,
             onCancel = viewModel::cancelCoverTask,
+        )
+    }
+    if (showDiscardCustomOrder) {
+        AlertDialog(
+            onDismissRequest = { showDiscardCustomOrder = false },
+            title = { Text("放弃自定义排序？", color = colors.text) },
+            text = { Text("尚未保存的编号顺序将被放弃。", color = colors.secondary) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDiscardCustomOrder = false
+                    customOrderDraft = null
+                    editMode = false
+                }) { Text("放弃更改", color = colors.danger) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDiscardCustomOrder = false }) { Text("继续编辑", color = colors.accent) }
+            },
         )
     }
     if (showAddGame) {
@@ -5336,6 +5680,26 @@ private fun LibraryPage(
             ) {
                 showAddGame = false
                 actions.chooseAndroidApp()
+            }
+            SheetActionRow(
+                Icons.Rounded.Gamepad,
+                "导入桌面游戏快捷方式",
+                when (state.shortcutServiceStatus) {
+                    ShortcutServiceStatus.READY -> "扫描桌面游戏图标 · 支持的盖世游戏只需导入一次"
+                    ShortcutServiceStatus.NOT_INSTALLED -> "未安装 Shizuku"
+                    ShortcutServiceStatus.NOT_RUNNING -> "Shizuku 未运行 · 请先完成无线调试配对"
+                    ShortcutServiceStatus.PERMISSION_REQUIRED -> "等待授权 KireiBox 使用 Shizuku"
+                    ShortcutServiceStatus.PERMISSION_DENIED -> "权限已拒绝 · 请在 Shizuku 中重新允许"
+                    ShortcutServiceStatus.BINDING -> "正在绑定 Shizuku 快捷方式服务"
+                    ShortcutServiceStatus.UNSUPPORTED_IDENTITY -> "不支持 Root/Sui · 请使用 shell 模式"
+                    ShortcutServiceStatus.SYSTEM_PERMISSION_MISSING -> "当前系统未向 shell 开放快捷方式权限"
+                    ShortcutServiceStatus.UNSUPPORTED_VERSION -> "需要 Shizuku 13.1.5 或更新版本"
+                    ShortcutServiceStatus.CONNECTION_LOST -> "连接已失效 · 请重新启动 Shizuku"
+                },
+                colors,
+            ) {
+                showAddGame = false
+                actions.chooseExternalShortcuts()
             }
         }
     }
@@ -5584,6 +5948,47 @@ private fun CoverTaskCenterContent(
 }
 
 @Composable
+private fun LibraryEditSortMenu(
+    value: String,
+    colors: KireiColors,
+    onChange: (String) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val selected = value.ifBlank { "recent" }
+    Box {
+        TextButton(
+            onClick = { expanded = true },
+            modifier = Modifier.heightIn(min = 48.dp),
+        ) {
+            Text("排序：${choiceLabel(selected)}", color = colors.accent, maxLines = 1)
+            Icon(Icons.Rounded.ExpandMore, null, tint = colors.secondary, modifier = Modifier.size(18.dp))
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.widthIn(min = 180.dp),
+        ) {
+            listOf("recent", "newest", "name", YukiSettingsStore.SORT_MANUAL).forEach { option ->
+                DropdownMenuItem(
+                    text = { Text(choiceLabel(option), color = colors.text) },
+                    leadingIcon = {
+                        if (selected == option) {
+                            Icon(Icons.Rounded.Check, null, tint = colors.accent)
+                        } else {
+                            Spacer(Modifier.size(24.dp))
+                        }
+                    },
+                    onClick = {
+                        expanded = false
+                        onChange(option)
+                    },
+                )
+            }
+        }
+    }
+}
+
+@Composable
 @OptIn(ExperimentalFoundationApi::class)
 private fun GameCard(
     game: Game,
@@ -5594,7 +5999,10 @@ private fun GameCard(
     reducedMotion: Boolean,
     compact: Boolean,
     onOpen: () -> Unit,
+    customOrderPosition: Int?,
+    customSelectionActive: Boolean,
     onLongClick: () -> Unit,
+    onEditClick: () -> Unit,
     onRemove: () -> Unit
 ) {
     val rotation = if (editMode && !reducedMotion) {
@@ -5626,7 +6034,7 @@ private fun GameCard(
         }
         Column(
             Modifier.fillMaxWidth().then(cardAnimationModifier).combinedClickable(
-                onClick = { if (!editMode) onOpen() },
+                onClick = { if (!editMode) onOpen() else if (customSelectionActive) onEditClick() },
                 onLongClick = onLongClick
             )
         ) {
@@ -5650,12 +6058,27 @@ private fun GameCard(
                         contentColor = Color.White,
                         shape = CircleShape,
                         shadowElevation = 4.dp,
-                        modifier = Modifier.align(Alignment.TopStart)
+                        modifier = Modifier.align(if (editMode && customOrderPosition != null) Alignment.BottomEnd else Alignment.TopStart)
                             .padding(if (compact) 6.dp else 10.dp)
                             .size(if (compact) 26.dp else 30.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(Icons.Rounded.Favorite, "已收藏", Modifier.size(if (compact) 16.dp else 18.dp))
+                        }
+                    }
+                }
+                if (editMode && customOrderPosition != null) {
+                    Surface(
+                        color = colors.accent,
+                        contentColor = Color.White,
+                        shape = CircleShape,
+                        shadowElevation = 5.dp,
+                        modifier = Modifier.align(Alignment.TopStart)
+                            .padding(if (compact) 6.dp else 10.dp)
+                            .size(if (compact) 28.dp else 32.dp),
+                    ) {
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text(customOrderPosition.toString(), style = AppleTypography.labelLarge)
                         }
                     }
                 }
@@ -5768,6 +6191,7 @@ private fun SettingsRootPage(
             KireiSettingsPage.LIBRARY_HUB,
             KireiSettingsPage.KRKR,
             KireiSettingsPage.INTERFACE,
+            KireiSettingsPage.COVERS,
             KireiSettingsPage.PERMISSIONS,
             KireiSettingsPage.DIAGNOSTICS,
             KireiSettingsPage.ABOUT,
@@ -5813,7 +6237,7 @@ private fun SettingsRootPage(
                 SettingsCategoryRow(
                     Icons.Rounded.Folder,
                     "游戏库",
-                    "扫描目录、封面与元数据",
+                    "管理扫描目录与排序",
                     colors,
                     categoryFocusRequesters.getValue(KireiSettingsPage.LIBRARY_HUB),
                     adaptiveMetrics.orientation,
@@ -5822,8 +6246,8 @@ private fun SettingsRootPage(
                 }
                 SettingsCategoryRow(
                     Icons.Rounded.Gamepad,
-                    "引擎",
-                    "KRKR 全局默认设置",
+                    "KRKR 引擎",
+                    "版本、兼容和启动选项",
                     colors,
                     categoryFocusRequesters.getValue(KireiSettingsPage.KRKR),
                     adaptiveMetrics.orientation,
@@ -5833,7 +6257,7 @@ private fun SettingsRootPage(
                 SettingsCategoryRow(
                     Icons.Rounded.Palette,
                     "界面与辅助",
-                    "动画、透明度与对比度",
+                    "首页、动画和显示效果",
                     colors,
                     categoryFocusRequesters.getValue(KireiSettingsPage.INTERFACE),
                     adaptiveMetrics.orientation,
@@ -5841,9 +6265,24 @@ private fun SettingsRootPage(
                     openCategory(KireiSettingsPage.INTERFACE)
                 }
                 SettingsCategoryRow(
+                    Icons.Rounded.CollectionsBookmark,
+                    "封面与元数据",
+                    if (state.pendingCoverReviewCount > 0) {
+                        "${state.pendingCoverReviewCount} 个封面待确认"
+                    } else {
+                        "选择来源并管理游戏封面"
+                    },
+                    colors,
+                    categoryFocusRequesters.getValue(KireiSettingsPage.COVERS),
+                    adaptiveMetrics.orientation,
+                    badgeCount = state.pendingCoverReviewCount,
+                ) {
+                    openCategory(KireiSettingsPage.COVERS)
+                }
+                SettingsCategoryRow(
                     Icons.Rounded.Folder,
                     "存储与权限",
-                    "SAF 目录和兼容权限",
+                    "扫描授权和原生引擎权限",
                     colors,
                     categoryFocusRequesters.getValue(KireiSettingsPage.PERMISSIONS),
                     adaptiveMetrics.orientation,
@@ -5853,7 +6292,7 @@ private fun SettingsRootPage(
                 SettingsCategoryRow(
                     Icons.Rounded.Terminal,
                     "日志与诊断",
-                    "记录、导出或复制诊断日志",
+                    "记录、导出和复制日志",
                     colors,
                     categoryFocusRequesters.getValue(KireiSettingsPage.DIAGNOSTICS),
                     adaptiveMetrics.orientation,
@@ -5885,6 +6324,7 @@ private fun SettingsCategoryRow(
     colors: KireiColors,
     focusRequester: FocusRequester,
     orientation: HomeOrientation,
+    badgeCount: Int = 0,
     onClick: () -> Unit,
 ) {
     val metrics = resolveSettingsCategoryRowMetrics(orientation)
@@ -5898,6 +6338,12 @@ private fun SettingsCategoryRow(
         verticalPaddingDp = metrics.verticalPaddingDp,
         minimumHeightDp = metrics.minimumHeightDp,
         iconSizeDp = metrics.iconSizeDp,
+        trailingContent = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CountBadge(badgeCount, colors)
+                Icon(Icons.Rounded.ChevronRight, null, tint = colors.secondary)
+            }
+        },
     )
 }
 
@@ -5992,23 +6438,30 @@ private fun LibraryHubSettings(
     colors: KireiColors,
     viewModel: KireiViewModel,
 ) {
-    SettingsSection("游戏库", colors) {
+    SettingsSection("目录管理", colors) {
         SettingsRow(
             Icons.Rounded.Folder,
             "扫描目录",
             "${state.settings?.scanRoots?.size ?: 0} 个目录",
             colors,
         ) { viewModel.openSettingsPage(KireiSettingsPage.LIBRARY) }
-        SettingsRow(
-            Icons.Rounded.CollectionsBookmark,
-            "封面与元数据",
-            if (state.pendingCoverCount > 0) {
-                "待确认 ${state.pendingCoverCount} · YukiHub 来源与候选"
-            } else {
-                "YukiHub 来源与候选"
-            },
+    }
+    SettingsSection("游戏卡片", colors) {
+        ChoiceRow(
+            "游戏库顺序",
+            state.settings?.sortMode ?: "recent",
+            listOf("recent", "newest", "name", YukiSettingsStore.SORT_MANUAL),
             colors,
-        ) { viewModel.openSettingsPage(KireiSettingsPage.COVERS) }
+            viewModel::setSortMode,
+        )
+        if (state.settings?.sortMode == YukiSettingsStore.SORT_MANUAL) {
+            Text(
+                "长按游戏卡片后依次编号。",
+                color = colors.secondary,
+                style = AppleTypography.bodySmall,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+        }
     }
 }
 
@@ -6021,15 +6474,38 @@ private fun InterfaceSettings(state: KireiUiState, colors: KireiColors, viewMode
             colors = colors,
             onChange = viewModel::setMotionMode,
         )
-        SwitchRow("减少透明度", state.settings?.reducedTransparency == true, colors, viewModel::setReducedTransparency)
-        SwitchRow("增强对比度", state.settings?.increasedContrast == true, colors, viewModel::setContrast)
+        SettingsSwitchRow(
+            "减少透明度",
+            "使用更实的背景",
+            state.settings?.reducedTransparency == true,
+            colors,
+            viewModel::setReducedTransparency,
+        )
+        SettingsSwitchRow(
+            "增强对比度",
+            "加强文字和边界对比",
+            state.settings?.increasedContrast == true,
+            colors,
+            viewModel::setContrast,
+        )
     }
     SettingsSection("首页", colors) {
+        val homeMode = state.settings?.homePresentationMode
+            ?: com.yuki.yukihub.settings.HomePresentationMode.IMMERSIVE
         HomePresentationModeRow(
-            value = state.settings?.homePresentationMode ?: com.yuki.yukihub.settings.HomePresentationMode.IMMERSIVE,
+            value = homeMode,
             colors = colors,
             onChange = viewModel::setHomePresentationMode,
         )
+        AnimatedVisibility(visible = homeMode == com.yuki.yukihub.settings.HomePresentationMode.IMMERSIVE) {
+            SettingsSwitchRow(
+                "显示游玩时长",
+                "在沉浸式首页显示当前游戏时长",
+                state.settings?.immersivePlayTimeVisible != false,
+                colors,
+                viewModel::setImmersivePlayTimeVisible,
+            )
+        }
     }
 }
 
@@ -6042,8 +6518,8 @@ private fun DiagnosticSettings(
 ) {
     SettingsSection("日志", colors) {
         SwitchRow("记录诊断日志", state.diagnosticLoggingEnabled, colors, viewModel::setDiagnosticLogging)
-        SettingsRow(Icons.Rounded.Description, "导出日志", "生成文本文件并选择分享目标", colors, actions.exportLogs)
-        SettingsRow(Icons.Rounded.Terminal, "复制日志", "复制设备信息与最近日志到剪贴板", colors, actions.copyLogs)
+        SettingsRow(Icons.Rounded.Description, "导出日志", "保存日志并选择分享应用", colors, actions.exportLogs)
+        SettingsRow(Icons.Rounded.Terminal, "复制日志", "复制设备信息和最近日志", colors, actions.copyLogs)
     }
 }
 
@@ -6076,7 +6552,7 @@ private fun KrkrSettings(
         SettingsRow(
             Icons.Rounded.PlayArrow,
             "启动 KRKR 原生模拟器",
-            "打开原生文件选择与兼容工具界面",
+            "直接选择文件并启动 KRKR",
             colors,
             actions.launchKrkrNative,
         )
@@ -6089,13 +6565,13 @@ private fun KrkrSettings(
             viewModel::setKrSkipStartupInfoDialog
         )
         Text(
-            "开启后仅自动确认启动后 30 秒内的单按钮信息；多按钮、输入框和剧情弹窗不会跳过。",
+            "仅跳过启动后 30 秒内的单按钮信息弹窗。",
             color = colors.secondary,
             style = AppleTypography.bodySmall,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
         )
     }
-    Text("单个游戏的渲染、内存、FPS 与字体设置，请点按游戏卡片并打开“KRKR 游戏设置”页面。", color = colors.secondary, modifier = Modifier.padding(horizontal = 4.dp, vertical = 14.dp))
+    Text("单个游戏设置请从游戏卡片进入“KRKR 游戏设置”。", color = colors.secondary, modifier = Modifier.padding(horizontal = 4.dp, vertical = 14.dp))
 }
 
 @Composable
@@ -6159,7 +6635,6 @@ private fun KrkrGameEditor(settings: KrkrGameSettings, onChange: (KrkrGameSettin
             Slider(settings.menuOpacity, { onChange(settings.copy(menuOpacity = it)) }, valueRange = .05f..1f)
             Text("虚拟光标：${(settings.cursorScale * 100).toInt()}%", color = colors.secondary)
             Slider(settings.cursorScale, { onChange(settings.copy(cursorScale = it)) }, valueRange = .25f..2f)
-            SwitchRow("启动游戏默认呼出指针", settings.showVirtualCursorOnStart, colors) { onChange(settings.copy(showVirtualCursorOnStart = it)) }
             SwitchRow("打印日志", settings.outputLog, colors) { onChange(settings.copy(outputLog = it)) }
             SwitchRow("显示 FPS", settings.showFps, colors) { onChange(settings.copy(showFps = it)) }
             SwitchRow("保持屏幕常亮", settings.keepScreenAwake, colors) { onChange(settings.copy(keepScreenAwake = it)) }
@@ -6291,10 +6766,22 @@ private fun LibraryOverviewSheet(
     onGame: (Game) -> Unit
 ) {
     val orderedGames = remember(games, sort) { LibraryOverviewPolicy.sorted(games, sort) }
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(sort) {
+        listState.scrollToItem(0)
+    }
+    val selectSort: (LibraryOverviewSort) -> Unit = { target ->
+        if (target == sort) {
+            scope.launch { listState.scrollToItem(0) }
+        } else {
+            onSortChange(target)
+        }
+    }
     val screenHeight = LocalConfiguration.current.screenHeightDp.dp
     val listHeight = (screenHeight * .52f).coerceIn(280.dp, 430.dp)
     KireiActionSheet(
-        title = "库内 ${games.size} 部游戏",
+        title = "游玩记录 · ${games.size} 部游戏",
         colors = colors,
         onDismiss = onDismiss,
         scrollableContent = false
@@ -6304,10 +6791,10 @@ private fun LibraryOverviewSheet(
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             FilterChip("最近游玩", sort == LibraryOverviewSort.RECENT, colors) {
-                onSortChange(LibraryOverviewSort.RECENT)
+                selectSort(LibraryOverviewSort.RECENT)
             }
             FilterChip("游玩时长", sort == LibraryOverviewSort.PLAY_TIME, colors) {
-                onSortChange(LibraryOverviewSort.PLAY_TIME)
+                selectSort(LibraryOverviewSort.PLAY_TIME)
             }
         }
         if (orderedGames.isEmpty()) {
@@ -6320,6 +6807,7 @@ private fun LibraryOverviewSheet(
         } else {
             LazyColumn(
                 Modifier.fillMaxWidth().height(listHeight),
+                state = listState,
                 contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
@@ -6382,6 +6870,8 @@ private fun GameActionSheet(
     onRemove: () -> Unit
 ) {
     val context = LocalContext.current
+    var artemisVersionMenuExpanded by remember(game.id) { mutableStateOf(false) }
+    val selectedArtemisVersion = com.yuki.yukihub.launcher.ArtemisVersion.fromStored(game.emulatorPackage)
     KireiActionSheet(game.title ?: "游戏操作", colors, onDismiss, expanded = true) {
             Text(
                 GameLocationLabel.forGame(context, game),
@@ -6394,7 +6884,7 @@ private fun GameActionSheet(
             SheetActionRow(
                 icon = Icons.Rounded.PlayArrow,
                 title = "启动游戏",
-                subtitle = game.launchTarget?.takeIf(String::isNotBlank) ?: "游戏目录",
+                subtitle = GameLocationLabel.launchSubtitle(game),
                 colors = colors,
                 prominent = true
             ) {
@@ -6404,37 +6894,100 @@ private fun GameActionSheet(
             if (game.engine == EngineType.KIRIKIRI) {
                 SheetActionRow(
                     icon = Icons.Rounded.Description,
-                    title = "选择 XP3 启动文件",
-                    subtitle = game.launchTarget?.takeIf(String::isNotBlank) ?: "自动选择",
+                    title = "XP3 启动文件",
+                    subtitle = GameLocationLabel.xp3LaunchSubtitle(game),
                     colors = colors,
                     trailing = Icons.Rounded.ChevronRight,
                 ) {
                     viewModel.openXp3Picker(game)
                 }
-            }
-            SheetActionRow(Icons.Rounded.Edit, "修改游戏名称", "只修改游戏库显示名称", colors, onClick = onRename)
-            SheetActionRow(
-                if (game.favorite) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
-                if (game.favorite) "取消收藏" else "加入收藏",
-                "保留游戏文件和游玩记录",
-                colors
-            ) { viewModel.toggleFavorite(game) }
-            if (game.engine == EngineType.KIRIKIRI) {
                 SheetActionRow(
                     icon = Icons.Rounded.Tune,
                     title = "KRKR 游戏设置",
-                    subtitle = "在独立页面调整渲染、内存、FPS、光标与字体",
+                    subtitle = "渲染、性能、FPS 和字体",
                     colors = colors,
                     trailing = Icons.Rounded.ExpandMore
                 ) {
                     viewModel.openKrkrEditor(game)
                 }
             }
-            SheetActionRow(Icons.Rounded.CollectionsBookmark, "搜索并更换封面", "使用当前元数据来源查找候选", colors) {
+            if (game.engine == EngineType.ARTEMIS) {
+                Box(Modifier.fillMaxWidth()) {
+                    SheetActionRow(
+                        icon = Icons.Rounded.Tune,
+                        title = "Artemis 版本",
+                        subtitle = selectedArtemisVersion.displayName,
+                        colors = colors,
+                        trailing = if (artemisVersionMenuExpanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+                    ) {
+                        artemisVersionMenuExpanded = !artemisVersionMenuExpanded
+                    }
+                    DropdownMenu(
+                        expanded = artemisVersionMenuExpanded,
+                        onDismissRequest = { artemisVersionMenuExpanded = false },
+                        modifier = Modifier.widthIn(min = 220.dp, max = 280.dp).heightIn(max = 240.dp),
+                        properties = PopupProperties(
+                            focusable = true,
+                            dismissOnBackPress = true,
+                            dismissOnClickOutside = true,
+                        ),
+                    ) {
+                        com.yuki.yukihub.launcher.ArtemisVersion.entries.forEach { version ->
+                            DropdownMenuItem(
+                                text = {
+                                    Column {
+                                        Text(version.displayName, color = colors.text)
+                                        Text(
+                                            if (version == com.yuki.yukihub.launcher.ArtemisVersion.AUTO) {
+                                                "自动探测并保留兼容回退"
+                                            } else {
+                                                "固定使用 Artemis ${version.displayName}"
+                                            },
+                                            color = colors.secondary,
+                                            style = AppleTypography.labelSmall,
+                                        )
+                                    }
+                                },
+                                leadingIcon = {
+                                    if (version == selectedArtemisVersion) {
+                                        Icon(Icons.Rounded.Check, null, tint = colors.accent)
+                                    } else {
+                                        Spacer(Modifier.size(24.dp))
+                                    }
+                                },
+                                onClick = {
+                                    viewModel.setArtemisVersion(game, version)
+                                    artemisVersionMenuExpanded = false
+                                },
+                            )
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(6.dp))
+            SheetActionRow(Icons.Rounded.Edit, "游戏名称", "只修改 KireiBox 中的显示名称", colors, onClick = onRename)
+            SheetActionRow(Icons.Rounded.CollectionsBookmark, "游戏封面", "搜索并选择新的封面", colors) {
                 onDismiss()
                 viewModel.searchCover(game, game.title.orEmpty(), CoverSourceMode.fromStored(state.settings?.metadataSource))
             }
-            SheetActionRow(Icons.Rounded.DeleteOutline, "移出游戏库", "不会删除磁盘中的游戏文件", colors, destructive = true, onClick = onRemove)
+            Spacer(Modifier.height(6.dp))
+            SheetActionRow(
+                Icons.Rounded.Home,
+                "桌面快捷方式",
+                "添加由 KireiBox 启动的快捷方式",
+                colors,
+            ) {
+                onDismiss()
+                actions.pinGameShortcut(game)
+            }
+            SheetActionRow(
+                if (game.favorite) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+                if (game.favorite) "取消收藏" else "加入收藏",
+                null,
+                colors
+            ) { viewModel.toggleFavorite(game) }
+            Spacer(Modifier.height(6.dp))
+            SheetActionRow(Icons.Rounded.DeleteOutline, "移出游戏库", "保留游戏文件和游玩记录", colors, destructive = true, onClick = onRemove)
             TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 4.dp)) {
                 Text("取消", color = colors.secondary)
             }
@@ -6445,7 +6998,7 @@ private fun GameActionSheet(
 private fun SheetActionRow(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     title: String,
-    subtitle: String,
+    subtitle: String?,
     colors: KireiColors,
     prominent: Boolean = false,
     destructive: Boolean = false,
@@ -6462,7 +7015,7 @@ private fun SheetActionRow(
     Row(
         Modifier.fillMaxWidth().background(background)
             .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-            .padding(horizontal = 22.dp, vertical = 13.dp),
+            .padding(horizontal = 22.dp, vertical = if (subtitle.isNullOrBlank()) 10.dp else 13.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
@@ -6476,7 +7029,9 @@ private fun SheetActionRow(
         }
         Column(Modifier.padding(start = 14.dp).weight(1f)) {
             Text(title, color = if (destructive) colors.danger else colors.text, style = AppleTypography.headlineSmall)
-            Text(subtitle, color = colors.secondary, style = AppleTypography.labelLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            subtitle?.takeIf(String::isNotBlank)?.let {
+                Text(it, color = colors.secondary, style = AppleTypography.labelLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
         }
         trailing?.let { Icon(it, null, tint = colors.secondary, modifier = Modifier.size(22.dp)) }
     }
@@ -6512,11 +7067,11 @@ private fun RenameGameDialog(
 private fun RemoveGameSheet(game: Game, colors: KireiColors, onDismiss: () -> Unit, onConfirm: () -> Unit) {
     KireiActionSheet("移出游戏库", colors, onDismiss) {
         Text(
-            "只会隐藏“${game.title ?: "游戏"}”的卡片，不会删除游戏文件、封面、元数据或游玩记录。",
+            "只从游戏库移除；游戏文件和游玩记录会保留。",
             color = colors.secondary,
             modifier = Modifier.padding(horizontal = 22.dp, vertical = 16.dp)
         )
-        SheetActionRow(Icons.Rounded.DeleteOutline, "移出 ${game.title ?: "游戏"}", "可在 5 秒内撤销", colors, destructive = true, onClick = onConfirm)
+        SheetActionRow(Icons.Rounded.DeleteOutline, "移出 ${game.title ?: "游戏"}", "5 秒内可撤销", colors, destructive = true, onClick = onConfirm)
         TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.CenterHorizontally)) { Text("取消", color = colors.secondary) }
     }
 }
@@ -6547,21 +7102,19 @@ private fun CoverSettings(state: KireiUiState, colors: KireiColors, haze: HazeSt
             ) { showTokenEditor = true }
         }
     }
-    SettingsSection("选择游戏封面", colors) {
-        val orderedGames = state.games.sortedBy { if (it.vndbBindingMode in setOf("REVIEW", "RETRY")) 0 else 1 }
-        orderedGames.forEach { game ->
-            val subtitle = when {
-                game.id in state.coverTaskGameIds -> "正在后台匹配…"
-                game.vndbBindingMode == "REVIEW" -> "待确认 · 最高匹配 ${game.vndbMatchScore.toInt()}%"
-                game.vndbBindingMode == "RETRY" -> "匹配失败 · 点按重试"
-                game.vndbBindingMode == "AUTO" -> "已自动匹配 ${game.vndbMatchScore.toInt()}%"
-                game.vndbBindingMode == "MANUAL" -> "已手动选择"
-                game.vndbBindingMode == "DISABLED" -> "使用引擎默认封面"
-                else -> "搜索候选后确认并下载"
-            }
-            SettingsRow(Icons.Rounded.CollectionsBookmark, game.title.orEmpty(), subtitle, colors) {
-                viewModel.searchCover(game, game.title.orEmpty(), source)
-            }
+    val coverGroups = CoverSettingsPolicy.groups(state.games)
+    SettingsSection("待选择封面", colors) {
+        if (coverGroups.pending.isEmpty()) {
+            SettingsEmptyMessage("没有待选择的封面", colors)
+        } else {
+            CoverGameSettingsRows(coverGroups.pending, state, source, colors, viewModel)
+        }
+    }
+    SettingsSection("已设置封面", colors) {
+        if (coverGroups.configured.isEmpty()) {
+            SettingsEmptyMessage("还没有已设置的封面", colors)
+        } else {
+            CoverGameSettingsRows(coverGroups.configured, state, source, colors, viewModel)
         }
     }
     if (showTokenEditor && tokenVisible) {
@@ -6582,8 +7135,44 @@ private fun CoverSettings(state: KireiUiState, colors: KireiColors, haze: HazeSt
 }
 
 @Composable
+private fun CoverGameSettingsRows(
+    games: List<Game>,
+    state: KireiUiState,
+    source: CoverSourceMode,
+    colors: KireiColors,
+    viewModel: KireiViewModel,
+) {
+    games.forEach { game ->
+        val subtitle = when {
+            game.id in state.coverTaskGameIds -> "正在后台匹配…"
+            game.vndbBindingMode == "REVIEW" -> "待确认 · 最高匹配 ${game.vndbMatchScore.toInt()}%"
+            game.vndbBindingMode == "RETRY" -> "匹配失败 · 点按重试"
+            game.vndbBindingMode == "AUTO" -> "已自动匹配 ${game.vndbMatchScore.toInt()}%"
+            game.vndbBindingMode == "MANUAL" -> "已手动选择"
+            game.vndbBindingMode == "DISABLED" -> "使用引擎默认封面"
+            else -> "搜索候选后确认并下载"
+        }
+        SettingsRow(Icons.Rounded.CollectionsBookmark, game.title.orEmpty(), subtitle, colors) {
+            viewModel.searchCover(game, game.title.orEmpty(), source)
+        }
+    }
+}
+
+@Composable
+private fun SettingsEmptyMessage(message: String, colors: KireiColors) {
+    Text(
+        message,
+        color = colors.secondary,
+        style = AppleTypography.bodySmall,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+    )
+}
+
+@Composable
 private fun LibrarySettings(state: KireiUiState, colors: KireiColors, viewModel: KireiViewModel, actions: KireiActions) {
     val context = LocalContext.current
+    var actionRoot by remember { mutableStateOf<String?>(null) }
+    var removalRoot by remember { mutableStateOf<String?>(null) }
     SettingsSection("文件选择", colors) {
         SwitchRow(
             "使用内置文件浏览器",
@@ -6592,45 +7181,100 @@ private fun LibrarySettings(state: KireiUiState, colors: KireiColors, viewModel:
             viewModel::setUseBuiltinFileChooser
         )
         Text(
-            "默认使用 KireiBox 浏览器；SD 卡和受限制存储可随时切换到系统 SAF。",
+            "关闭后改用系统文件选择器。",
             color = colors.secondary,
             style = AppleTypography.bodySmall,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
         )
     }
-    SettingsSection("扫描更新", colors) {
-        SwitchRow(
-            "目录自动更新",
-            state.settings?.autoScanOnStartup != false,
-            colors,
-            viewModel::setAutoScanOnStartup,
-        )
-        Text(
-            "回到 KireiBox 时自动扫描已开启的目录，只添加新游戏。",
-            color = colors.secondary,
-            style = AppleTypography.bodySmall,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-        )
-        SwitchRow(
-            "已移除游戏更新目录不会再添加",
-            state.settings?.keepRemovedGamesHiddenOnRefresh != false,
-            colors,
-            viewModel::setKeepRemovedGamesHiddenOnRefresh,
-        )
-        Text(
-            "打开时，移出游戏库的记录扫目录也不会加回来。关掉才会重新出现。",
-            color = colors.secondary,
-            style = AppleTypography.bodySmall,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-        )
-    }
     SettingsSection("扫描目录", colors) {
         state.settings?.scanRoots.orEmpty().forEachIndexed { index, root ->
-            SettingsRow(Icons.Rounded.Folder, "目录 ${index + 1}", GameLocationLabel.format(context, root), colors) { actions.repairPermission(root) }
+            val gameCount = state.games.count { game -> StorageRootIdentity.contains(root, game.rootUri) }
+            SettingsRowContent(
+                icon = Icons.Rounded.Folder,
+                title = GameLocationLabel.format(context, root),
+                subtitle = "已导入 $gameCount 部游戏",
+                colors = colors,
+                modifier = Modifier,
+                onClick = { actionRoot = root },
+                trailingContent = {
+                    Icon(Icons.Rounded.MoreHoriz, "管理目录 ${index + 1}", tint = colors.secondary)
+                },
+            )
         }
-        SettingsRow(Icons.Rounded.Add, "添加扫描目录", "选择并保存 SAF 读写授权", colors, actions.chooseDirectory)
+        SettingsRow(Icons.Rounded.Add, "添加扫描目录", "选择目录并保存访问权限", colors, actions.chooseDirectory)
+        SettingsSwitchRow(
+            title = "目录自动更新",
+            subtitle = "回到 KireiBox 时重新扫描已启用目录并添加新游戏",
+            checked = state.settings?.autoScanOnStartup ?: true,
+            colors = colors,
+            onCheckedChange = viewModel::setAutoScanOnStartup,
+        )
+        SettingsSwitchRow(
+            title = "已移除游戏更新目录不会再添加",
+            subtitle = "自动更新时不再恢复你手动移出游戏库的卡片",
+            checked = state.settings?.keepRemovedGamesHiddenOnRefresh ?: true,
+            colors = colors,
+            onCheckedChange = viewModel::setKeepRemovedGamesHiddenOnRefresh,
+        )
     }
-    SettingsSection("排序", colors) { ChoiceRow("游戏库顺序", state.settings?.sortMode ?: "recent", listOf("recent", "newest", "name"), colors, viewModel::setSortMode) }
+    actionRoot?.let { root ->
+        val gameCount = state.games.count { game -> StorageRootIdentity.contains(root, game.rootUri) }
+        KireiActionSheet(
+            title = GameLocationLabel.format(context, root),
+            colors = colors,
+            onDismiss = { actionRoot = null },
+        ) {
+            SheetActionRow(
+                Icons.Rounded.Refresh,
+                "重新授权",
+                "重新选择同一文件夹并更新访问权限",
+                colors,
+            ) {
+                actionRoot = null
+                actions.repairPermission(root)
+            }
+            SheetActionRow(
+                Icons.Rounded.DeleteOutline,
+                "移除扫描目录",
+                "同时从游戏库移出该目录下的 $gameCount 部游戏",
+                colors,
+                destructive = true,
+            ) {
+                actionRoot = null
+                removalRoot = root
+            }
+            TextButton(
+                onClick = { actionRoot = null },
+                modifier = Modifier.align(Alignment.CenterHorizontally),
+            ) { Text("取消", color = colors.secondary) }
+        }
+    }
+    removalRoot?.let { root ->
+        val gameCount = state.games.count { game -> StorageRootIdentity.contains(root, game.rootUri) }
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text("移除扫描目录？", color = colors.text) },
+            text = {
+                Text(
+                    "将从游戏库移出该目录下的 $gameCount 部游戏。不会删除游戏文件、封面或游玩记录；重新添加目录后可恢复原有卡片和历史。",
+                    color = colors.secondary,
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    removalRoot = null
+                    viewModel.removeScanRoot(root)
+                }) { Text("移除目录与游戏", color = colors.danger) }
+            },
+            dismissButton = {
+                TextButton(onClick = { removalRoot = null }) { Text("取消", color = colors.secondary) }
+            },
+            shape = RoundedCornerShape(28.dp),
+            containerColor = colors.surface,
+            properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false),
+        )
+    }
 }
 
 @Composable
@@ -6639,11 +7283,11 @@ private fun PermissionSettings(state: KireiUiState, colors: KireiColors, actions
     SettingsSection("访问状态", colors) {
         Text(
             if (com.yuki.yukihub.engine.EngineStorageProbe.isHuaweiFamily()) {
-                "SAF 用于扫描、封面和目录管理；KRKR 原生内核直接读取 XP3，还需单独开启存储权限。华为/HarmonyOS 路径：设置 → 应用 → KireiBox → 权限管理 → 存储 → 允许；HarmonyOS 3 及以上还需开启“所有文件访问”。"
+                "扫描目录需要访问授权；KRKR 还需要存储和所有文件访问权限。"
             } else if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-                "SAF 用于扫描、封面和目录管理；KRKR 原生内核直接读取 XP3，还需要单独检查所有文件访问权限。"
+                "扫描目录需要访问授权；KRKR 还需要所有文件访问权限。"
             } else {
-                "SAF 用于扫描、封面和目录管理；KRKR 原生内核直接读取 XP3，Android 10 及以下还需要单独开启存储权限。"
+                "扫描目录需要访问授权；KRKR 还需要存储权限。"
             },
             color = colors.secondary,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)
@@ -6656,7 +7300,13 @@ private fun PermissionSettings(state: KireiUiState, colors: KireiColors, actions
 }
 
 @Composable
-private fun CoverPickerPage(search: CoverSearchUi, colors: KireiColors, haze: HazeState?, viewModel: KireiViewModel, actions: KireiActions) {
+private fun CoverPickerPage(
+    search: CoverSearchUi,
+    colors: KireiColors,
+    haze: HazeState?,
+    viewModel: KireiViewModel,
+    actions: KireiActions,
+) {
     BackHandler(onBack = viewModel::dismissCoverSearch)
     BoxWithConstraints(Modifier.fillMaxSize().background(colors.background), contentAlignment = Alignment.Center) {
         val wide = maxWidth >= 700.dp
@@ -6864,6 +7514,41 @@ private fun SettingsRowContent(
     }
 }
 @Composable private fun SwitchRow(label: String, checked: Boolean, colors: KireiColors, onCheckedChange: (Boolean) -> Unit) { Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) { Text(label, color = colors.text, modifier = Modifier.weight(1f)); Switch(checked, onCheckedChange, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = colors.success, uncheckedThumbColor = if (colors.isDark) Color(0xFFB7B3C2) else Color(0xFF8E8998), uncheckedTrackColor = colors.surfaceRaised, uncheckedBorderColor = colors.outline)) } }
+
+@Composable
+private fun SettingsSwitchRow(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    colors: KireiColors,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        Modifier.fillMaxWidth().toggleable(
+            value = checked,
+            role = Role.Switch,
+            onValueChange = onCheckedChange,
+        )
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, color = colors.text)
+            Text(subtitle, color = colors.secondary, style = AppleTypography.bodySmall, maxLines = 2)
+        }
+        Switch(
+            checked = checked,
+            onCheckedChange = null,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = Color.White,
+                checkedTrackColor = colors.success,
+                uncheckedThumbColor = if (colors.isDark) Color(0xFFB7B3C2) else Color(0xFF8E8998),
+                uncheckedTrackColor = colors.surfaceRaised,
+                uncheckedBorderColor = colors.outline,
+            ),
+        )
+    }
+}
 @Composable
 private fun MotionModeRow(
     requested: MotionMode,
@@ -6922,9 +7607,9 @@ private fun motionModeLabel(mode: MotionMode): String = when (mode) {
 }
 
 private fun motionModeDescription(mode: MotionMode): String = when (mode) {
-    MotionMode.AUTO -> "自动选择"
-    MotionMode.POLISHED -> "完整弹性、缩放与补位动画"
-    MotionMode.REDUCED -> "短淡入淡出，减少持续动画"
+    MotionMode.AUTO -> "按设备状态自动选择"
+    MotionMode.POLISHED -> "使用完整动画"
+    MotionMode.REDUCED -> "减少动画和移动"
 }
 
 @Composable
@@ -6939,7 +7624,7 @@ private fun OrientationModeRow(
     SettingsRowContent(
         icon = Icons.Rounded.ScreenRotation,
         title = "界面方向",
-        subtitle = "自动跟随传感器、固定竖屏或横屏",
+        subtitle = "自动旋转或固定屏幕方向",
         colors = colors,
         modifier = Modifier,
         onClick = { expanded = true },
@@ -7101,6 +7786,7 @@ private fun choiceLabel(value: String): String = when (value) {
     "recent" -> "最近游玩"
     "newest" -> "添加时间"
     "name" -> "名称"
+    "manual" -> "自定义"
     "auto" -> "自动"
     else -> value
 }
@@ -7187,6 +7873,7 @@ private fun PlayTriangleButton(
 @Composable
 internal fun KireiMainDock(
     tab: KireiTab,
+    pendingReviewCount: Int,
     colors: KireiColors,
     haze: HazeState?,
     viewModel: KireiViewModel,
@@ -7226,7 +7913,14 @@ internal fun KireiMainDock(
             ) {
                 DockButton("首页", Icons.Rounded.Home, tab == KireiTab.HOME, colors, presentation) { viewModel.selectTab(KireiTab.HOME) }
                 DockButton("游戏", Icons.Rounded.Gamepad, tab == KireiTab.GAMES, colors, presentation) { viewModel.selectTab(KireiTab.GAMES) }
-                DockButton("设置", Icons.Rounded.Settings, tab == KireiTab.SETTINGS, colors, presentation) { viewModel.selectTab(KireiTab.SETTINGS) }
+                DockButton(
+                    "设置",
+                    Icons.Rounded.Settings,
+                    tab == KireiTab.SETTINGS,
+                    colors,
+                    presentation,
+                    badgeCount = pendingReviewCount,
+                ) { viewModel.selectTab(KireiTab.SETTINGS) }
             }
         }
     }
@@ -7375,12 +8069,15 @@ private fun DockButton(
     selected: Boolean,
     colors: KireiColors,
     presentation: DockPresentation,
+    badgeCount: Int = 0,
     onClick: () -> Unit,
 ) {
     val tint by animateColorAsState(if (selected) colors.accent else colors.secondary, tween(160), label = "dockTint")
+    Box(
+        Modifier.width(presentation.buttonWidthDp.dp).heightIn(min = presentation.touchHeightDp.dp),
+    ) {
     PressScaleBox(
-        Modifier.width(presentation.buttonWidthDp.dp)
-            .heightIn(min = presentation.touchHeightDp.dp),
+        Modifier.fillMaxSize(),
         RoundedCornerShape(18.dp), onClick, pressedScale = .92f,
     ) {
         if (presentation.layout == DockPresentationLayout.HORIZONTAL) {
@@ -7415,6 +8112,42 @@ private fun DockButton(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
+        }
+    }
+        CountBadge(
+            count = badgeCount,
+            colors = colors,
+            modifier = Modifier.align(Alignment.TopEnd).padding(top = 2.dp, end = 4.dp),
+        )
+    }
+}
+
+@Composable
+private fun CountBadge(
+    count: Int,
+    colors: KireiColors,
+    modifier: Modifier = Modifier,
+) {
+    val presentation = CoverTaskBadgePolicy.presentation(count)
+    if (!presentation.visible) return
+    Surface(
+        color = colors.danger,
+        contentColor = Color.White,
+        shape = CircleShape,
+        modifier = modifier.height(presentation.heightDp.dp)
+            .sizeIn(minWidth = presentation.minWidthDp.dp),
+    ) {
+        Box(
+            Modifier.padding(horizontal = presentation.horizontalPaddingDp.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                presentation.label,
+                style = AppleTypography.labelSmall,
+                modifier = Modifier.semantics {
+                    contentDescription = "${presentation.accessibilityCount} 个封面待确认"
+                },
+            )
         }
     }
 }
@@ -7624,6 +8357,17 @@ private val CoverPreviewClient = okhttp3.OkHttpClient.Builder()
     .connectTimeout(12, java.util.concurrent.TimeUnit.SECONDS)
     .readTimeout(20, java.util.concurrent.TimeUnit.SECONDS)
     .build()
+
+internal suspend fun releaseLauncherCoverResources() {
+    CoverLoads.cancelAll()
+    CoverPreviewClient.dispatcher.cancelAll()
+    CoverPreviewClient.connectionPool.evictAll()
+    CoverBitmapCache.evictAll()
+    LibraryCardCoverBitmapCache.evictAll()
+    HeroCoverBitmapCache.evictAll()
+    BackdropCoverBitmapCache.evictAll()
+    CoverToneExtractor.clearCache()
+}
 
 @Composable
 internal fun rememberCover(

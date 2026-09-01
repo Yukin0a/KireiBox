@@ -53,6 +53,30 @@ class LibraryOverviewPolicyTest {
         assertEquals("2 小时", LibraryOverviewPolicy.summaryPlayTime(7_200_000))
     }
 
+    @Test fun immersiveTimeUsesReadableChineseThresholds() {
+        assertEquals("尚未游玩", LibraryOverviewPolicy.immersivePlayTime(-1))
+        assertEquals("尚未游玩", LibraryOverviewPolicy.immersivePlayTime(0))
+        assertEquals("不足 1 分钟", LibraryOverviewPolicy.immersivePlayTime(1))
+        assertEquals("不足 1 分钟", LibraryOverviewPolicy.immersivePlayTime(59_999))
+        assertEquals("已游玩 1 分钟", LibraryOverviewPolicy.immersivePlayTime(60_000))
+        assertEquals("已游玩 59 分钟", LibraryOverviewPolicy.immersivePlayTime(3_599_999))
+        assertEquals("已游玩 1 小时", LibraryOverviewPolicy.immersivePlayTime(3_600_000))
+        assertEquals("已游玩 1 小时 5 分钟", LibraryOverviewPolicy.immersivePlayTime(3_900_000))
+    }
+
+    @Test fun overviewSheetResetsToTheFirstItemForSortChangesAndReselection() {
+        val source = source("app/src/main/java/com/kireibox/ui/KireiBoxApp.kt")
+        val sheet = source.substringAfter("private fun LibraryOverviewSheet(")
+            .substringBefore("@OptIn(ExperimentalMaterial3Api::class)")
+
+        assertTrue(sheet.contains("val listState = rememberLazyListState()"))
+        assertTrue(sheet.contains("LaunchedEffect(sort)"))
+        assertTrue(sheet.contains("scope.launch { listState.scrollToItem(0) }"))
+        assertTrue(sheet.contains("state = listState"))
+        assertTrue(sheet.contains("itemsIndexed(orderedGames, key = { _, game -> game.id })"))
+        assertTrue(sheet.contains("游玩记录 · \${games.size} 部游戏"))
+    }
+
     @Test fun dockPaddingIncludesInsetsAndClearance() {
         assertEquals(106f, LibraryOverviewPolicy.dockContentPaddingDp(0f), .001f)
         assertEquals(130f, LibraryOverviewPolicy.dockContentPaddingDp(24f), .001f)
@@ -122,9 +146,10 @@ class LibraryOverviewPolicyTest {
         assertTrue(card.contains("if (!compact)"))
     }
 
-    @Test fun shortLandscape2400x1080UsesWidescreenCoverAndPortraitKeepsRatio() {
+    @Test fun shortLandscape2400x1080UsesNearSquareCoverAndPortraitKeepsRatio() {
         assertTrue(LibraryCardLayoutPolicy.isShortLandscape(2400f, 1080f))
-        assertEquals(16f / 9f, LibraryCardLayoutPolicy.coverAspectRatio(true), .001f)
+        assertTrue(LibraryCardLayoutPolicy.coverAspectRatio(true) in .90f..1.0f)
+        assertEquals(.94f, LibraryCardLayoutPolicy.coverAspectRatio(true), .001f)
         assertEquals(.72f, LibraryCardLayoutPolicy.coverAspectRatio(false), .001f)
     }
 

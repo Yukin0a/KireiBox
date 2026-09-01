@@ -2,6 +2,7 @@ package com.yuki.yukihub.settings
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.yuki.yukihub.storage.StorageRootIdentity
 
 enum class OrientationMode(val storedValue: String, val displayName: String) {
     AUTO("auto", "自动"),
@@ -48,6 +49,8 @@ class YukiSettingsStore internal constructor(
         val dashboardCompact: DashboardLayout,
         val dashboardWide: DashboardLayout,
         val homePresentationMode: HomePresentationMode = HomePresentationMode.IMMERSIVE,
+        /** Whether the selected game's cumulative play time is shown on immersive Home. */
+        val immersivePlayTimeVisible: Boolean = true,
         val orientationMode: OrientationMode = OrientationMode.AUTO,
         /** Immersive home gallery display selection (AUTOMATIC = recent-play order). */
         val immersiveGalleryMode: SpotlightSelectionMode = SpotlightSelectionMode.AUTOMATIC,
@@ -62,8 +65,9 @@ class YukiSettingsStore internal constructor(
         val ignoredUpdateVersionCode: Int = 0,
         val updateEtag: String = "",
         val lastUpdateCheckAt: Long = 0L,
+        val updateReleaseCache: String = "",
         /** Keeps user-removed cards hidden when a scan sees the same game again. */
-        val keepRemovedGamesHiddenOnRefresh: Boolean = true
+        val keepRemovedGamesHiddenOnRefresh: Boolean = true,
     ) {
         val immersiveGallerySettings: ImmersiveGallerySettings
             get() = ImmersiveGallerySettings(
@@ -181,6 +185,7 @@ class YukiSettingsStore internal constructor(
             prefs.getString(KEY_DASHBOARD_WIDE, null), DashboardProfile.WIDE
         ),
             homePresentationMode = resolveHomePresentationMode(),
+            immersivePlayTimeVisible = prefs.getBoolean(KEY_IMMERSIVE_PLAY_TIME_VISIBLE, true),
             orientationMode = orientationMode,
             immersiveGalleryMode = ImmersiveGallerySettingsPolicy.normalizeMode(
                 prefs.getString(KEY_IMMERSIVE_GALLERY_MODE, null),
@@ -195,10 +200,11 @@ class YukiSettingsStore internal constructor(
             ignoredUpdateVersionCode = prefs.getInt(KEY_IGNORED_UPDATE_VERSION_CODE, 0).coerceAtLeast(0),
             updateEtag = prefs.getString(KEY_UPDATE_ETAG, "").orEmpty(),
             lastUpdateCheckAt = prefs.getLong(KEY_LAST_UPDATE_CHECK_AT, 0L).coerceAtLeast(0L),
+            updateReleaseCache = prefs.getString(KEY_UPDATE_RELEASE_CACHE, "").orEmpty(),
             keepRemovedGamesHiddenOnRefresh = prefs.getBoolean(
                 KEY_KEEP_REMOVED_GAMES_HIDDEN_ON_REFRESH,
                 true,
-            )
+            ),
         )
     }
 
@@ -222,18 +228,96 @@ class YukiSettingsStore internal constructor(
     }
 
     fun addScanRoot(uri: String) {
-        if (uri.isBlank()) return
+        addOrReplaceScanRoot(uri)
+    }
+
+    data class ScanRootChange(
+        val roots: List<String>,
+        val enabled: List<Boolean>,
+        val index: Int,
+        val replaced: Boolean,
+    )
+
+    /** Adds a root or replaces an equivalent file/SAF representation in-place. */
+    fun addOrReplaceScanRoot(uri: String, replacedUri: String? = null): ScanRootChange? {
+        val cleanUri = uri.trim()
+        val identity = StorageRootIdentity.key(cleanUri)
+        if (cleanUri.isEmpty() || identity.isEmpty()) return null
         val roots = scanRoots().toMutableList()
         val states = scanRootEnabled().toMutableList()
-        val index = roots.indexOf(uri)
-        if (index >= 0) {
-            while (states.size <= index) states += true
-            states[index] = true
+        while (states.size < roots.size) states += true
+        val requestedIndex = replacedUri?.let { old ->
+            roots.indexOfFirst { StorageRootIdentity.equivalent(it, old) }
+        } ?: -1
+        val equivalentIndex = roots.indexOfFirst { StorageRootIdentity.key(it) == identity }
+        val targetIndex = when {
+            requestedIndex >= 0 -> requestedIndex
+            equivalentIndex >= 0 -> equivalentIndex
+            else -> roots.size
+        }
+        val replaced = targetIndex < roots.size
+        if (replaced) {
+            roots[targetIndex] = cleanUri
+            states[targetIndex] = true
         } else {
-            roots += uri
+            roots += cleanUri
             states += true
         }
+        // A repair may collide with another alias already stored for the same directory.
+        val dedupedRoots = ArrayList<String>()
+        val dedupedStates = ArrayList<Boolean>()
+        roots.forEachIndexed { index, root ->
+            val key = StorageRootIdentity.key(root)
+            val existing = dedupedRoots.indexOfFirst { StorageRootIdentity.key(it) == key }
+            if (existing < 0) {
+                dedupedRoots += root
+                dedupedStates += states.getOrElse(index) { true }
+            } else {
+                dedupedRoots[existing] = if (root == cleanUri) cleanUri else dedupedRoots[existing]
+                dedupedStates[existing] = dedupedStates[existing] || states.getOrElse(index) { true }
+            }
+        }
+        replaceScanRoots(dedupedRoots, dedupedStates)
+        val finalIndex = dedupedRoots.indexOfFirst { StorageRootIdentity.key(it) == identity }
+        return ScanRootChange(dedupedRoots, dedupedStates, finalIndex, replaced || equivalentIndex >= 0)
+    }
+
+    fun removeScanRoot(uri: String): ScanRootChange? {
+        val identity = StorageRootIdentity.key(uri)
+        if (identity.isEmpty()) return null
+        val roots = scanRoots().toMutableList()
+        val states = scanRootEnabled().toMutableList()
+        while (states.size < roots.size) states += true
+        val index = roots.indexOfFirst { StorageRootIdentity.key(it) == identity }
+        if (index < 0) return null
+        roots.removeAt(index)
+        states.removeAt(index)
         replaceScanRoots(roots, states)
+        return ScanRootChange(roots, states, index, true)
+    }
+
+    /** One-time-safe cleanup for roots stored before file/SAF canonical identity existed. */
+    fun migrateScanRootsIfNeeded() {
+        val roots = scanRoots()
+        val states = scanRootEnabled()
+        val cleanRoots = ArrayList<String>()
+        val cleanStates = ArrayList<Boolean>()
+        roots.forEachIndexed { index, root ->
+            val identity = StorageRootIdentity.key(root)
+            if (identity.isEmpty()) return@forEachIndexed
+            val existing = cleanRoots.indexOfFirst { StorageRootIdentity.key(it) == identity }
+            val enabled = states.getOrElse(index) { true }
+            if (existing < 0) {
+                cleanRoots += root
+                cleanStates += enabled
+            } else {
+                if (root.startsWith("content://", ignoreCase = true)) cleanRoots[existing] = root
+                cleanStates[existing] = cleanStates[existing] || enabled
+            }
+        }
+        if (cleanRoots != roots || cleanStates != roots.indices.map { states.getOrElse(it) { true } }) {
+            replaceScanRoots(cleanRoots, cleanStates)
+        }
     }
 
     fun putBoolean(key: String, value: Boolean) { prefs.edit().putBoolean(key, value).apply() }
@@ -250,6 +334,9 @@ class YukiSettingsStore internal constructor(
     fun setHomePresentationMode(mode: HomePresentationMode) {
         prefs.edit().putString(KEY_HOME_PRESENTATION_MODE, mode.storedValue).apply()
     }
+    fun setImmersivePlayTimeVisible(visible: Boolean) {
+        prefs.edit().putBoolean(KEY_IMMERSIVE_PLAY_TIME_VISIBLE, visible).apply()
+    }
     fun setOrientationMode(mode: OrientationMode) {
         prefs.edit().putString(KEY_ORIENTATION_MODE, mode.storedValue).apply()
     }
@@ -262,6 +349,9 @@ class YukiSettingsStore internal constructor(
     fun setLastUpdateCheckAt(timestampMillis: Long) {
         prefs.edit().putLong(KEY_LAST_UPDATE_CHECK_AT, timestampMillis.coerceAtLeast(0L)).apply()
     }
+    fun setUpdateReleaseCache(value: String?) {
+        prefs.edit().putString(KEY_UPDATE_RELEASE_CACHE, value.orEmpty()).apply()
+    }
     fun setImmersiveGalleryMode(mode: SpotlightSelectionMode) {
         prefs.edit().putString(KEY_IMMERSIVE_GALLERY_MODE, mode.name).apply()
     }
@@ -270,6 +360,16 @@ class YukiSettingsStore internal constructor(
             KEY_IMMERSIVE_GALLERY_IDS,
             ImmersiveGallerySettingsPolicy.encodeIds(ids),
         ).apply()
+    }
+    /** Keeps manual immersive-home selections valid when a database migration merges game ids. */
+    fun remapImmersiveGalleryIds(replacements: Map<Long, Long>) {
+        if (replacements.isEmpty()) return
+        val current = ImmersiveGallerySettingsPolicy.decodeIds(
+            prefs.getString(KEY_IMMERSIVE_GALLERY_IDS, null),
+        )
+        if (current.isEmpty()) return
+        val remapped = current.map { id -> replacements[id] ?: id }
+        if (remapped != current) setImmersiveGalleryIds(remapped)
     }
     fun setImmersiveGalleryIds(ids: List<Long>, validGameIds: Set<Long>) {
         prefs.edit().putString(
@@ -398,10 +498,12 @@ class YukiSettingsStore internal constructor(
         const val KEY_DASHBOARD_WIDE = "kireibox_dashboard_wide_v1"
         const val KEY_COVER_QUEUE_PAUSED = "kireibox_cover_queue_paused"
         const val KEY_HOME_PRESENTATION_MODE = "kireibox_home_presentation_mode"
+        const val KEY_IMMERSIVE_PLAY_TIME_VISIBLE = "kireibox_immersive_play_time_visible"
         const val KEY_ORIENTATION_MODE = "kireibox_orientation_mode"
         const val KEY_IGNORED_UPDATE_VERSION_CODE = "kireibox_ignored_update_version_code"
         const val KEY_UPDATE_ETAG = "kireibox_update_etag"
         const val KEY_LAST_UPDATE_CHECK_AT = "kireibox_last_update_check_at"
+        const val KEY_UPDATE_RELEASE_CACHE = "kireibox_update_release_cache_v1"
         const val KEY_IMMERSIVE_GALLERY_MODE = "kireibox_immersive_gallery_mode"
         const val KEY_IMMERSIVE_GALLERY_IDS = "kireibox_immersive_gallery_ids"
         const val KEY_IMMERSIVE_GALLERY_AUTO = "kireibox_immersive_gallery_auto"
@@ -416,6 +518,7 @@ class YukiSettingsStore internal constructor(
         const val SORT_RECENT = "recent"
         const val SORT_NEWEST = "newest"
         const val SORT_NAME = "name"
+        const val SORT_MANUAL = "manual"
         const val SOURCE_VNDB = "vndb"
         const val SOURCE_BANGUMI = "bangumi"
         const val SOURCE_BANGUMI_MIRROR = "bangumi_mirror"

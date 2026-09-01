@@ -4,8 +4,7 @@ import com.yuki.yukihub.metadata.CoverSourceMode
 
 /** User-facing project and cover-source copy kept separate from developer diagnostics. */
 internal object KireiPublicCopy {
-    const val aboutText: String = """Rinne Mobile的分支版本
-QQ交流群:163603635
+    const val aboutText: String = """Rinne Mobile的分支版本 QwQ
 开源地址:
 https://github.com/Yukin0a/KireiBox"""
 

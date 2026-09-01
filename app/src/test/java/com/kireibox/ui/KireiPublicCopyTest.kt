@@ -9,8 +9,7 @@ class KireiPublicCopyTest {
     @Test
     fun aboutTextContainsOnlyUserFacingProjectInformation() {
         assertEquals(
-            """Rinne Mobile的分支版本
-QQ交流群:163603635
+            """Rinne Mobile的分支版本 QwQ
 开源地址:
 https://github.com/Yukin0a/KireiBox""",
             KireiPublicCopy.aboutText,

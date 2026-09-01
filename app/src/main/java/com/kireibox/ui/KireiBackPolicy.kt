@@ -34,19 +34,18 @@ object KireiBackPolicy {
     fun settingsParent(page: KireiSettingsPage): KireiSettingsPage? = when (page) {
         KireiSettingsPage.ROOT -> null
         KireiSettingsPage.LIBRARY_HUB,
+        KireiSettingsPage.COVERS,
         KireiSettingsPage.KRKR,
         KireiSettingsPage.INTERFACE,
         KireiSettingsPage.PERMISSIONS,
         KireiSettingsPage.DIAGNOSTICS,
         KireiSettingsPage.ABOUT -> KireiSettingsPage.ROOT
-        KireiSettingsPage.LIBRARY,
-        KireiSettingsPage.COVERS -> KireiSettingsPage.LIBRARY_HUB
+        KireiSettingsPage.LIBRARY -> KireiSettingsPage.LIBRARY_HUB
     }
 
     fun settingsDepth(page: KireiSettingsPage): Int = when (page) {
         KireiSettingsPage.ROOT -> 0
-        KireiSettingsPage.LIBRARY,
-        KireiSettingsPage.COVERS -> 2
+        KireiSettingsPage.LIBRARY -> 2
         else -> 1
     }
 

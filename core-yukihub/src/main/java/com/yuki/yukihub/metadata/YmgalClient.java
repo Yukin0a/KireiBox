@@ -102,7 +102,7 @@ public class YmgalClient {
             } catch (Exception e) {
                 last = e;
                 String msg = e.getMessage() == null ? "" : e.getMessage();
-                boolean retryable = msg.contains("HTTP 429") || msg.contains("HTTP 5") || msg.contains("TOO_MANY_REQUEST") || msg.contains("TIME_OUT") || msg.contains("SYSTEM_ERROR");
+                boolean retryable = msg.contains("HTTP 429") || msg.contains("HTTP 5") || msg.contains("TOO_MANY_REQUEST") || msg.contains("TIME_OUT") || msg.contains("SYSTEM_ERROR") || MetadataUtils.isTimeout(e);
                 if (!retryable || attempt >= MAX_RETRIES) throw e;
                 MetadataUtils.sleepBeforeRetry(RETRY_DELAY_MS * (attempt + 1));
             }

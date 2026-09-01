@@ -9,6 +9,8 @@ object GameLibraryOrdering {
             "favorite DESC, created_at DESC, title COLLATE NOCASE ASC, id ASC"
         YukiSettingsStore.SORT_NAME ->
             "favorite DESC, title COLLATE NOCASE ASC, id ASC"
+        YukiSettingsStore.SORT_MANUAL ->
+            "favorite DESC, manual_order ASC, id ASC"
         else ->
             "favorite DESC, last_played_at DESC, created_at DESC, title COLLATE NOCASE ASC, id ASC"
     }
@@ -22,6 +24,9 @@ object GameLibraryOrdering {
                 .thenBy { it.id }
             YukiSettingsStore.SORT_NAME -> base
                 .thenBy(String.CASE_INSENSITIVE_ORDER) { it.title.orEmpty() }
+                .thenBy { it.id }
+            YukiSettingsStore.SORT_MANUAL -> base
+                .thenBy { it.manualOrder }
                 .thenBy { it.id }
             else -> base
                 .thenByDescending { it.lastPlayedAt }

@@ -44,6 +44,21 @@ object LibraryOverviewPolicy {
         }
     }
 
+    fun immersivePlayTime(milliseconds: Long): String {
+        val safeMilliseconds = milliseconds.coerceAtLeast(0L)
+        if (safeMilliseconds == 0L) return "尚未游玩"
+        if (safeMilliseconds < MILLIS_PER_MINUTE) return "不足 1 分钟"
+        val totalMinutes = safeMilliseconds / MILLIS_PER_MINUTE
+        if (totalMinutes < 60L) return "已游玩 ${totalMinutes} 分钟"
+        val hours = totalMinutes / 60L
+        val minutes = totalMinutes % 60L
+        return if (minutes == 0L) {
+            "已游玩 ${hours} 小时"
+        } else {
+            "已游玩 ${hours} 小时 ${minutes} 分钟"
+        }
+    }
+
     /** 66dp Dock + 28dp outer vertical padding + 12dp readable clearance. */
     fun dockContentPaddingDp(navigationBarInsetDp: Float): Float =
         navigationBarInsetDp.coerceAtLeast(0f) + 106f

@@ -73,7 +73,7 @@ class GitHubUpdateRepositoryTest {
         val response = repository.check(19, ignoredVersionCode = 0, etag = null)
 
         val available = response.result as UpdateCheckResult.Available
-        assertEquals(20, available.release.manifest.versionCode)
+        assertEquals(20, available.release.versionCode)
         assertEquals(apkUrl.toString(), available.release.apkUrl)
         assertEquals(123456L, available.release.apkSize)
     }
@@ -104,6 +104,74 @@ class GitHubUpdateRepositoryTest {
         val response = repository.check(19, ignoredVersionCode = 0, etag = null)
 
         assertEquals(UpdateCheckResult.NoPublishedRelease, response.result)
+    }
+
+    @Test
+    fun bareOfficialApkReleaseIsUsableAndComparedByTag() = runTest {
+        val apkUrl = server.url("/assets/app-release.apk")
+        server.enqueue(
+            MockResponse().setResponseCode(200).setBody(
+                """[{
+                  "id": 190,
+                  "tag_name": "v0.5.0-alpha.13",
+                  "name": "0.5.0-alpha.13",
+                  "body": "existing public release",
+                  "html_url": "https://github.com/Yukin0a/KireiBox/releases/tag/v0.5.0-alpha.13",
+                  "draft": false,
+                  "prerelease": true,
+                  "assets": [
+                    {"name":"app-release.apk","browser_download_url":"$apkUrl","size":57766345}
+                  ]
+                }]""",
+            ),
+        )
+
+        val response = repository.check(
+            installedVersionCode = 18,
+            ignoredVersionCode = 0,
+            etag = null,
+            installedVersionName = "0.5.0-alpha.12",
+        )
+
+        val release = (response.result as UpdateCheckResult.Available).release
+        assertEquals("0.5.0-alpha.13", release.versionName)
+        assertEquals("app-release.apk", release.apkAsset)
+        assertEquals(false, release.hasStrictManifest)
+    }
+
+    @Test
+    fun alpha15TreatsExistingAlpha13BareReleaseAsUpToDate() = runTest {
+        val apkUrl = server.url("/assets/app-release.apk")
+        server.enqueue(
+            MockResponse().setResponseCode(200).setBody(
+                """[{"id":190,"tag_name":"v0.5.0-alpha.13","name":"Alpha 13","body":"","html_url":"https://github.com/Yukin0a/KireiBox/releases/tag/v0.5.0-alpha.13","draft":false,"prerelease":true,"assets":[{"name":"app-release.apk","browser_download_url":"$apkUrl","size":12}]}]""",
+            ),
+        )
+
+        val response = repository.check(22, 0, null, "0.5.0-alpha.15")
+
+        assertEquals(UpdateCheckResult.UpToDate, response.result)
+    }
+
+    @Test
+    fun persistedReleaseRestoresSelectionAfterProcessRestartAnd304() = runTest {
+        val cached = UpdateRelease(
+            releaseId = 190,
+            tagName = "v0.5.0-alpha.13",
+            releaseName = "Alpha 13",
+            notes = "notes",
+            pageUrl = "https://github.com/Yukin0a/KireiBox/releases/tag/v0.5.0-alpha.13",
+            apkUrl = server.url("/assets/app-release.apk").toString(),
+            apkSize = 12,
+            apkAssetName = "app-release.apk",
+            fallbackVersionName = "0.5.0-alpha.13",
+        )
+        server.enqueue(MockResponse().setResponseCode(304))
+
+        val response = repository.check(18, 0, "etag", "0.5.0-alpha.12", cached)
+
+        assertTrue(response.result is UpdateCheckResult.Available)
+        assertEquals(190L, response.cachedRelease?.releaseId)
     }
 
     @Test

@@ -12,6 +12,7 @@ import org.json.JSONObject
 internal data class UpdateCheckResponse(
     val result: UpdateCheckResult,
     val etag: String? = null,
+    val cachedRelease: UpdateRelease? = null,
 )
 
 internal class GitHubUpdateRepository(
@@ -25,6 +26,8 @@ internal class GitHubUpdateRepository(
         installedVersionCode: Int,
         ignoredVersionCode: Int,
         etag: String?,
+        installedVersionName: String = "",
+        persistedRelease: UpdateRelease? = null,
     ): UpdateCheckResponse = withContext(Dispatchers.IO) {
         runCatching {
             val request = Request.Builder()
@@ -36,7 +39,17 @@ internal class GitHubUpdateRepository(
                 .build()
             client.newCall(request).execute().use { response ->
                 if (response.code == 304) {
-                    return@use UpdateCheckResponse(cachedResult ?: UpdateCheckResult.NotModified, etag)
+                    val cached = trustedCachedRelease(persistedRelease)
+                    val result = cached?.let {
+                        UpdateSelectionPolicy.select(
+                            installedVersionCode,
+                            ignoredVersionCode,
+                            listOf(it),
+                            installedVersionName,
+                        )
+                    } ?: cachedResult ?: UpdateCheckResult.NotModified
+                    cachedResult = result
+                    return@use UpdateCheckResponse(result, etag, cached)
                 }
                 if (!response.isSuccessful) {
                     return@use UpdateCheckResponse(
@@ -49,11 +62,17 @@ internal class GitHubUpdateRepository(
                         installedVersionCode = installedVersionCode,
                         ignoredVersionCode = ignoredVersionCode,
                         releases = releases,
+                        installedVersionName = installedVersionName,
                     )
                 cachedResult = result
+                val newest = releases.maxWithOrNull(
+                    compareBy<UpdateRelease> { KireiVersion.parse(it.versionName) }
+                        .thenBy { it.versionCode ?: Int.MIN_VALUE },
+                )
                 UpdateCheckResponse(
                     result = result,
                     etag = response.header("ETag") ?: etag,
+                    cachedRelease = newest,
                 )
             }
         }.getOrElse { error ->
@@ -87,19 +106,50 @@ internal class GitHubUpdateRepository(
             assetByName[name] = url to asset.optLong("size", 0L).coerceAtLeast(0L)
             if (name == UPDATE_MANIFEST_ASSET_NAME) manifestUrl = url
         }
-        val manifest = manifestUrl?.let(::fetchManifest) ?: return null
-        val apk = assetByName[manifest.apkAsset] ?: return null
-        if (assetByName["${manifest.apkAsset}.sha256"] == null) return null
+        val manifest = manifestUrl?.let(::fetchManifest)
+        if (manifest != null) {
+            val apk = assetByName[manifest.apkAsset] ?: return null
+            if (assetByName["${manifest.apkAsset}.sha256"] == null) return null
+            return UpdateRelease(
+                releaseId = release.optLong("id", 0L),
+                tagName = release.optString("tag_name"),
+                releaseName = release.optString("name").ifBlank { release.optString("tag_name") },
+                notes = release.optString("body"),
+                pageUrl = release.optString("html_url"),
+                apkUrl = apk.first.toString(),
+                apkSize = apk.second,
+                manifest = manifest,
+                apkAssetName = manifest.apkAsset,
+            )
+        }
+        val fallbackVersion = KireiVersion.normalize(release.optString("tag_name")) ?: return null
+        val fallbackApk = selectFallbackApk(assetByName) ?: return null
         return UpdateRelease(
             releaseId = release.optLong("id", 0L),
             tagName = release.optString("tag_name"),
             releaseName = release.optString("name").ifBlank { release.optString("tag_name") },
             notes = release.optString("body"),
             pageUrl = release.optString("html_url"),
-            apkUrl = apk.first.toString(),
-            apkSize = apk.second,
-            manifest = manifest,
+            apkUrl = fallbackApk.value.first.toString(),
+            apkSize = fallbackApk.value.second,
+            manifest = null,
+            apkAssetName = fallbackApk.key,
+            fallbackVersionName = fallbackVersion,
         )
+    }
+
+    private fun selectFallbackApk(
+        assets: Map<String, Pair<HttpUrl, Long>>,
+    ): Map.Entry<String, Pair<HttpUrl, Long>>? {
+        val apks = assets.entries.filter { (name, _) ->
+            val lower = name.lowercase()
+            lower.endsWith(".apk") && "debug" !in lower && "demo" !in lower
+        }
+        if (apks.isEmpty()) return null
+        val arm64 = apks.filter { "arm64" in it.key.lowercase() }
+        val candidates = arm64.ifEmpty { apks }
+        if (candidates.size == 1) return candidates.single()
+        return candidates.singleOrNull { it.key.equals("app-release.apk", ignoreCase = true) }
     }
 
     private fun fetchManifest(url: HttpUrl): UpdateManifest? = runCatching {
@@ -119,6 +169,15 @@ internal class GitHubUpdateRepository(
             return url.host == releasesUrl.host
         }
         return url.isHttps && (url.host == "github.com" || url.host.endsWith(".githubusercontent.com"))
+    }
+
+    private fun trustedCachedRelease(release: UpdateRelease?): UpdateRelease? {
+        val cached = release ?: return null
+        val url = cached.apkUrl.toHttpUrlOrNull() ?: return null
+        if (!isTrustedAssetUrl(url)) return null
+        if (!cached.apkAsset.endsWith(".apk", ignoreCase = true)) return null
+        if (cached.manifest == null && KireiVersion.parse(cached.versionName) == null) return null
+        return cached
     }
 
     private fun String.toHttpUrlOrNull(): HttpUrl? = runCatching { trim().toHttpUrl() }.getOrNull()

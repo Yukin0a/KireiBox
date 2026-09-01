@@ -9,6 +9,7 @@ import org.json.JSONObject
 
 import com.yuki.yukihub.model.EngineType
 import com.yuki.yukihub.model.Game
+import com.yuki.yukihub.storage.StorageRootIdentity
 
 import java.util.ArrayList
 import java.util.HashSet
@@ -120,6 +121,7 @@ class GameRepository(context: Context) {
         val now = System.currentTimeMillis()
         game.createdAt = if (game.createdAt == 0L) now else game.createdAt
         game.updatedAt = now
+        if (game.manualOrder <= 0L) game.manualOrder = nextManualOrder(db, game.favorite)
         val id = db.insert("games", null, toValues(game))
         game.id = id
         return id
@@ -169,6 +171,7 @@ class GameRepository(context: Context) {
         val now = System.currentTimeMillis()
         game.createdAt = if (game.createdAt == 0L) now else game.createdAt
         game.updatedAt = now
+        if (game.manualOrder <= 0L) game.manualOrder = nextManualOrder(db, game.favorite)
         val id = db.insertWithOnConflict("games", null, toValues(game), SQLiteDatabase.CONFLICT_IGNORE)
         if (id > 0) game.id = id
         // CONFLICT_IGNORE makes the scan/import identity check atomic.  Keep the
@@ -221,6 +224,119 @@ class GameRepository(context: Context) {
     fun update(game: Game, db: SQLiteDatabase): Int {
         game.updatedAt = System.currentTimeMillis()
         return db.update("games", toValues(game), "id=?", arrayOf(game.id.toString()))
+    }
+
+    fun gamesUnderRoot(rootUri: String, includeHidden: Boolean = false): List<Game> =
+        allIncludingHidden.filter { game ->
+            (includeHidden || !game.hidden) && StorageRootIdentity.contains(rootUri, game.rootUri)
+        }
+
+    fun setGamesHidden(ids: Collection<Long>, hidden: Boolean): Int {
+        val cleanIds = ids.filter { it > 0L }.distinct()
+        if (cleanIds.isEmpty()) return 0
+        val db = helper.writableDatabase
+        db.beginTransaction()
+        return try {
+            val values = ContentValues().apply {
+                put("hidden", if (hidden) 1 else 0)
+                put("updated_at", System.currentTimeMillis())
+            }
+            var changed = 0
+            cleanIds.forEach { id -> changed += db.update("games", values, "id=?", arrayOf(id.toString())) }
+            check(changed == cleanIds.size) { "批量更新游戏库状态失败" }
+            db.setTransactionSuccessful()
+            changed
+        } finally {
+            db.endTransaction()
+        }
+    }
+
+    /** Saves one complete favorite or regular-game group in a single transaction. */
+    fun reorderManual(favorite: Boolean, orderedIds: List<Long>) {
+        val cleanIds = orderedIds.filter { it > 0L }
+        require(cleanIds.size == cleanIds.distinct().size) { "手动排序包含重复游戏" }
+        val db = helper.writableDatabase
+        db.beginTransaction()
+        try {
+            cleanIds.forEachIndexed { index, id ->
+                val values = ContentValues().apply {
+                    put("manual_order", (index + 1L) * 1024L)
+                    put("updated_at", System.currentTimeMillis())
+                }
+                val changed = db.update(
+                    "games",
+                    values,
+                    "id=? AND favorite=? AND hidden=0",
+                    arrayOf(id.toString(), if (favorite) "1" else "0"),
+                )
+                check(changed == 1) { "手动排序游戏不存在或跨越收藏分组: $id" }
+            }
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+    }
+
+    /** Saves both visual groups atomically so a failed second group can never leave partial order. */
+    fun reorderManualGroups(favoriteIds: List<Long>, regularIds: List<Long>) {
+        val favorites = favoriteIds.filter { it > 0L }
+        val regular = regularIds.filter { it > 0L }
+        require(favorites.size == favorites.distinct().size) { "自定义排序的收藏组包含重复游戏" }
+        require(regular.size == regular.distinct().size) { "自定义排序的普通组包含重复游戏" }
+        require(favorites.none { it in regular.toHashSet() }) { "自定义排序包含跨组重复游戏" }
+        val db = helper.writableDatabase
+        db.beginTransaction()
+        try {
+            fun writeGroup(ids: List<Long>, favorite: Boolean) {
+                ids.forEachIndexed { index, id ->
+                    val values = ContentValues().apply {
+                        put("manual_order", (index + 1L) * 1024L)
+                        put("updated_at", System.currentTimeMillis())
+                    }
+                    val changed = db.update(
+                        "games",
+                        values,
+                        "id=? AND favorite=? AND hidden=0",
+                        arrayOf(id.toString(), if (favorite) "1" else "0"),
+                    )
+                    check(changed == 1) { "自定义排序游戏不存在或跨越收藏分组: $id" }
+                }
+            }
+            writeGroup(favorites, favorite = true)
+            writeGroup(regular, favorite = false)
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+    }
+
+    fun appendManualOrder(gameId: Long, favorite: Boolean): Boolean {
+        if (gameId <= 0L) return false
+        val values = ContentValues().apply {
+            put("manual_order", nextManualOrder(helper.readableDatabase, favorite))
+            put("updated_at", System.currentTimeMillis())
+        }
+        return helper.writableDatabase.update("games", values, "id=?", arrayOf(gameId.toString())) == 1
+    }
+
+    /**
+     * Persists a background cover state only while the game still has no selected/default cover.
+     * This prevents a late REVIEW/RETRY callback from replacing a newer manual choice.
+     */
+    fun updateCoverBindingIfUnconfigured(gameId: Long, mode: String, score: Double): Boolean {
+        if (gameId <= 0L) return false
+        val values = ContentValues().apply {
+            put("vndb_binding_mode", normalizeVndbBindingMode(mode))
+            put("vndb_match_score", score.coerceIn(0.0, 100.0))
+            put("updated_at", System.currentTimeMillis())
+        }
+        return helper.writableDatabase.update(
+            "games",
+            values,
+            "id=? AND (cover_uri IS NULL OR TRIM(cover_uri)='') " +
+                "AND vndb_binding_mode NOT IN ('MANUAL','AUTO','DISABLED')",
+            arrayOf(gameId.toString()),
+        ) == 1
     }
 
     fun loadAllIncludingHidden(): List<Game> = allIncludingHidden
@@ -691,6 +807,7 @@ class GameRepository(context: Context) {
                 o.put("updated_at", it.getLong(it.getColumnIndexOrThrow("updated_at")))
                 o.put("hidden", it.getInt(it.getColumnIndexOrThrow("hidden")) == 1)
                 o.put("favorite", it.getInt(it.getColumnIndexOrThrow("favorite")) == 1)
+                o.put("manual_order", getLongOrDefault(it, "manual_order", 0L))
                 arr.put(o)
             }
         }
@@ -765,6 +882,7 @@ class GameRepository(context: Context) {
                 g.playStatus = normalizePlayStatus(o.optString("play_status", g.playStatus))
                 g.hidden = o.optBoolean("hidden", g.hidden)
                 g.favorite = o.optBoolean("favorite", g.favorite)
+                g.manualOrder = Math.max(0L, o.optLong("manual_order", g.manualOrder))
             } else {
                 // Older card metadata must not overwrite newer local edits, but it may
                 // still fill identity fields that are missing locally.
@@ -1029,6 +1147,7 @@ class GameRepository(context: Context) {
         v.put("updated_at", g.updatedAt)
         v.put("hidden", if (g.hidden) 1 else 0)
         v.put("favorite", if (g.favorite) 1 else 0)
+        v.put("manual_order", g.manualOrder)
         return v
     }
 
@@ -1059,6 +1178,7 @@ class GameRepository(context: Context) {
         g.hidden = c.getInt(c.getColumnIndexOrThrow("hidden")) == 1
         val favoriteIndex = c.getColumnIndex("favorite")
         g.favorite = favoriteIndex >= 0 && !c.isNull(favoriteIndex) && c.getInt(favoriteIndex) == 1
+        g.manualOrder = getLongOrDefault(c, "manual_order", 0L)
         return g
     }
 
@@ -1075,6 +1195,14 @@ class GameRepository(context: Context) {
     private fun getDoubleOrDefault(c: Cursor, column: String, def: Double): Double {
         val index = c.getColumnIndex(column)
         return if (index >= 0 && !c.isNull(index)) c.getDouble(index) else def
+    }
+
+    private fun nextManualOrder(db: SQLiteDatabase, favorite: Boolean): Long = db.rawQuery(
+        "SELECT IFNULL(MAX(manual_order),0) FROM games WHERE favorite=?",
+        arrayOf(if (favorite) "1" else "0"),
+    ).use { cursor ->
+        val current = if (cursor.moveToFirst()) cursor.getLong(0).coerceAtLeast(0L) else 0L
+        (current + 1024L).coerceAtLeast(1024L)
     }
 
     private fun normalizeVndbBindingMode(value: String?): String = when (value?.uppercase(Locale.ROOT)) {
@@ -1111,23 +1239,7 @@ class GameRepository(context: Context) {
     companion object {
         @JvmStatic
         fun normalizeRootUriKey(value: String?): String {
-            if (value == null) return ""
-            var s = value.trim()
-            if (s.startsWith("file://")) s = s.substring("file://".length)
-            try {
-                if (s.startsWith("content://")) {
-                    val uri = android.net.Uri.parse(s)
-                    var docId: String? = null
-                    try { docId = android.provider.DocumentsContract.getDocumentId(uri) } catch (ignored: Throwable) { }
-                    if (docId == null || docId.isEmpty()) {
-                        try { docId = android.provider.DocumentsContract.getTreeDocumentId(uri) } catch (ignored: Throwable) { }
-                    }
-                    if (docId != null && docId.isNotEmpty()) s = android.net.Uri.decode(docId)
-                }
-            } catch (ignored: Throwable) { }
-            while (s.contains("//")) s = s.replace("//", "/")
-            while (s.endsWith("/") && s.length > 1) s = s.substring(0, s.length - 1)
-            return s.lowercase(Locale.ROOT)
+            return StorageRootIdentity.key(value)
         }
 
         @JvmStatic

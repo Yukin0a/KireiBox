@@ -33,6 +33,13 @@ internal class CoverLoadCoordinator<K : Any, V : Any>(
         }
     }
 
+    suspend fun cancelAll() {
+        val flights = mutex.withLock {
+            inFlight.values.map { it.deferred }.also { inFlight.clear() }
+        }
+        flights.forEach { it.cancelAndJoin() }
+    }
+
     private suspend fun acquire(key: K, decode: suspend () -> V?): Flight<V> = mutex.withLock {
         inFlight[key]?.also {
             it.consumers += 1

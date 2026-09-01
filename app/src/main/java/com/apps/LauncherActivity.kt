@@ -36,6 +36,12 @@ import com.kireibox.ui.KireiPrompt
 import com.kireibox.ui.KireiPublicCopy
 import com.kireibox.ui.KireiViewModel
 import com.kireibox.ui.SystemBarVisibilityPolicy
+import com.kireibox.ui.LauncherMemoryCoordinator
+import com.kireibox.shortcut.DesktopGameShortcutFactory
+import com.kireibox.external.shortcut.ExternalShortcutIdentity
+import com.kireibox.external.shortcut.ExternalShortcutLaunchPolicy
+import com.kireibox.external.shortcut.ShizukuShortcutGateway
+import com.kireibox.external.shortcut.ShortcutServiceStatus
 import com.kireibox.update.UpdateInstaller
 import com.yuki.yukihub.R
 import com.yuki.yukihub.data.GameRepository
@@ -49,6 +55,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import rikka.shizuku.Shizuku
 
 /** KireiBox Compose shell. YukiHub repositories are the only runtime data source. */
 class LauncherActivity : AppCompatActivity() {
@@ -58,6 +65,7 @@ class LauncherActivity : AppCompatActivity() {
     private var runningSessionId = -1L
     private var engineWasOpened = false
     private var runningSessionJournaled = false
+    private var launcherHandoffActive = false
     private var pendingNativeLaunch: Game? = null
     private val coverAlbumPicker = registerForActivityResult(
         ActivityResultContracts.PickVisualMedia(),
@@ -66,11 +74,28 @@ class LauncherActivity : AppCompatActivity() {
         ActivityResultContracts.OpenDocument(),
     ) { uri -> uri?.let(viewModel::importLocalCover) }
     private var pendingNativeShell = false
+    private var pendingShizukuLaunch: Game? = null
     private val launcherPrompt = androidx.compose.runtime.mutableStateOf<KireiPrompt?>(null)
     private val fileBrowserRequest = androidx.compose.runtime.mutableStateOf<BuiltinFileBrowserRequest?>(null)
     private var pendingBrowserMode: BuiltinFileBrowserMode? = null
     private var pendingUpdateApkPath: String? = null
     private val updateInstaller by lazy { UpdateInstaller(this) }
+    private val shortcutGateway by lazy { ShizukuShortcutGateway(this) }
+    private val shizukuPermissionListener = Shizuku.OnRequestPermissionResultListener { requestCode, grantResult ->
+        if (requestCode != ShizukuShortcutGateway.PERMISSION_REQUEST_CODE) return@OnRequestPermissionResultListener
+        val granted = grantResult == PackageManager.PERMISSION_GRANTED
+        viewModel.onShizukuPermissionResult(granted)
+        val pending = pendingShizukuLaunch
+        pendingShizukuLaunch = null
+        if (granted && pending != null) window.decorView.post { launchGame(pending) }
+    }
+    private val shizukuBinderReceivedListener = Shizuku.OnBinderReceivedListener {
+        if (::viewModel.isInitialized) viewModel.refreshShortcutServiceStatus()
+    }
+    private val shizukuBinderDeadListener = Shizuku.OnBinderDeadListener {
+        shortcutGateway.release()
+        if (::viewModel.isInitialized) viewModel.refreshShortcutServiceStatus()
+    }
 
     private val krkrStoragePermission =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
@@ -116,7 +141,7 @@ class LauncherActivity : AppCompatActivity() {
         pendingPermissionRoot = null
         if (uri != null && persist(uri)) {
             // Re-scan the new grant. Yuki identity matching preserves existing IDs and history.
-            viewModel.addScanRoot(uri)
+            viewModel.replaceScanRoot(old, uri)
             if (!old.isNullOrBlank()) showMessage("权限已更新", "目录授权已重新建立，游戏记录和封面不会删除。")
         }
     }
@@ -127,6 +152,9 @@ class LauncherActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         configureWindow()
         viewModel = ViewModelProvider(this)[KireiViewModel::class.java]
+        Shizuku.addRequestPermissionResultListener(shizukuPermissionListener)
+        Shizuku.addBinderReceivedListenerSticky(shizukuBinderReceivedListener)
+        Shizuku.addBinderDeadListener(shizukuBinderDeadListener)
         setContent {
             KireiBoxApp(
                 viewModel,
@@ -134,6 +162,7 @@ class LauncherActivity : AppCompatActivity() {
                     chooseDirectory = { chooseStorage(BuiltinFileBrowserMode.DIRECTORY) },
                     chooseLaunchFile = { chooseStorage(BuiltinFileBrowserMode.LAUNCH_FILE) },
                     chooseAndroidApp = viewModel::openAndroidAppPicker,
+                    chooseExternalShortcuts = viewModel::openExternalShortcutPicker,
                     chooseCoverFromAlbum = {
                         coverAlbumPicker.launch(
                             PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
@@ -141,6 +170,7 @@ class LauncherActivity : AppCompatActivity() {
                     },
                     chooseCoverFromFiles = { coverFilePicker.launch(arrayOf("image/*")) },
                     launchGame = ::launchGame,
+                    pinGameShortcut = ::pinGameShortcut,
                     selectedGame = viewModel::selectedGame,
                     launchKrkrNative = ::launchKrkrNative,
                     checkPermissions = ::checkPermissions,
@@ -176,11 +206,36 @@ class LauncherActivity : AppCompatActivity() {
             )
         }
         applySystemBars()
+        consumeDesktopGameIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        consumeDesktopGameIntent(intent)
+    }
+
+    override fun onDestroy() {
+        Shizuku.removeRequestPermissionResultListener(shizukuPermissionListener)
+        Shizuku.removeBinderReceivedListener(shizukuBinderReceivedListener)
+        Shizuku.removeBinderDeadListener(shizukuBinderDeadListener)
+        shortcutGateway.release()
+        super.onDestroy()
+    }
+
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        LauncherMemoryCoordinator.onTrimMemory(level)
     }
 
     override fun onResume() {
         super.onResume()
         applySystemBars()
+        viewModel.refreshShortcutServiceStatus()
+        if (launcherHandoffActive) {
+            launcherHandoffActive = false
+            viewModel.resumeAfterEngineHandoff()
+        }
         if (engineWasOpened && runningSessionId > 0) {
             val sessionId = runningSessionId
             val journaled = runningSessionJournaled
@@ -295,6 +350,25 @@ class LauncherActivity : AppCompatActivity() {
     }
 
     private fun launchGame(game: Game) {
+        if (ExternalShortcutLaunchPolicy.requiresShizuku(game)) {
+            when (shortcutGateway.status()) {
+                ShortcutServiceStatus.READY -> Unit
+                ShortcutServiceStatus.PERMISSION_REQUIRED -> {
+                    pendingShizukuLaunch = game
+                    shortcutGateway.requestPermission().onFailure {
+                        pendingShizukuLaunch = null
+                        showMessage("无法授权 Shizuku", it.message ?: "Shizuku 权限请求失败。")
+                    }
+                    return
+                }
+                else -> {
+                    val message = shortcutGateway.requestPermission().exceptionOrNull()?.message
+                        ?: "Shizuku 快捷方式服务不可用。"
+                    showMessage("无法启动快捷方式", message)
+                    return
+                }
+            }
+        }
         if (game.engine == EngineType.KIRIKIRI && !hasNativeFileAccess()) {
             DevLogger.event("krkr launch gate: native file access missing -> prompt")
             pendingNativeLaunch = game
@@ -304,13 +378,48 @@ class LauncherActivity : AppCompatActivity() {
         launchPreparedGame(game)
     }
 
+    private fun consumeDesktopGameIntent(source: Intent?) {
+        if (source?.action != DesktopGameShortcutFactory.ACTION_LAUNCH_GAME) return
+        val gameId = source.getLongExtra(DesktopGameShortcutFactory.EXTRA_GAME_ID, -1L)
+        source.action = Intent.ACTION_MAIN
+        source.removeExtra(DesktopGameShortcutFactory.EXTRA_GAME_ID)
+        if (gameId <= 0L) {
+            showMessage("快捷方式已失效", "桌面快捷方式没有有效的游戏 ID。")
+            return
+        }
+        lifecycleScope.launch(Dispatchers.IO) {
+            val game = GameRepository(applicationContext).findById(gameId)
+            withContext(Dispatchers.Main) {
+                when {
+                    game == null -> showMessage("快捷方式已失效", "游戏已不在 KireiBox 游戏库中。")
+                    game.hidden -> showMessage("快捷方式已失效", "该游戏已从 KireiBox 游戏库隐藏。")
+                    else -> launchGame(game)
+                }
+            }
+        }
+    }
+
+    private fun pinGameShortcut(game: Game) {
+        val result = DesktopGameShortcutFactory.requestPin(this, game)
+        if (result.isFailure) {
+            showMessage("无法添加到桌面", result.exceptionOrNull()?.message ?: "桌面快捷方式创建失败。")
+        } else if (result.getOrNull() == DesktopGameShortcutFactory.PinOutcome.UPDATED) {
+            viewModel.showNotice("已更新桌面快捷方式")
+        } else {
+            viewModel.showNotice("请在系统弹窗中确认添加到桌面")
+        }
+    }
+
     private fun launchPreparedGame(game: Game) {
         LauncherGameLaunchBridge.launchAsync(this, game, object : LauncherGameLaunchBridge.LaunchCallback {
             override fun onResult(result: LauncherGameLaunchBridge.LaunchResult) {
                 if (result.success) {
-                    runningSessionId = result.sessionId
-                    engineWasOpened = true
-                    runningSessionJournaled = game.engine != EngineType.ANDROID_APP
+                    runningSessionId = if (result.handoff == LauncherGameLaunchBridge.LaunchHandoff.INTERNAL_ENGINE) result.sessionId else -1L
+                    engineWasOpened = result.handoff == LauncherGameLaunchBridge.LaunchHandoff.INTERNAL_ENGINE
+                    runningSessionJournaled = engineWasOpened
+                    launcherHandoffActive = result.handoff != LauncherGameLaunchBridge.LaunchHandoff.NONE
+                    viewModel.suspendForEngineHandoff()
+                    LauncherMemoryCoordinator.onEngineHandoff()
                     viewModel.reload()
                 } else if (!hasNativeFileAccess() && isPermissionLaunchFailure(result.message)) {
                     DevLogger.event("launch permission failure routed to grant dialog: ${result.message}")

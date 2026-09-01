@@ -34,7 +34,9 @@ data class Game @JvmOverloads constructor(
     @JvmField var createdAt: Long = 0L,
     @JvmField var updatedAt: Long = 0L,
     @JvmField var hidden: Boolean = false,
-    @JvmField var favorite: Boolean = false
+    @JvmField var favorite: Boolean = false,
+    /** Stable user-defined position; favorites and regular games keep separate visual groups. */
+    @JvmField var manualOrder: Long = 0L,
 ) {
     init {
         if (engine == null) engine = EngineType.UNKNOWN

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Debug installs sit beside the released com.kireibox.app, so the launcher label
-         has to distinguish them. -->
+    <!-- Debug installs sit beside the released com.kireibox.app, so the launcher
+         label has to distinguish them. -->
     <string name="app_name">KireiBox Debug</string>
 </resources>

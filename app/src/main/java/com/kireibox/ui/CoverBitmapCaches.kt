@@ -50,4 +50,6 @@ internal class CoverToneCache(
         synchronized(lock) { tones[key] = tone }
         return tone
     }
+
+    fun clear() = synchronized(lock) { tones.clear() }
 }

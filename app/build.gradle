@@ -84,6 +84,7 @@ android {
         viewBinding false
         compose true
         buildConfig true
+        aidl true
     }
 
     sourceSets {
@@ -91,6 +92,9 @@ android {
             // KireiBox no longer keeps a second launcher source tree. The only retained
             // asset exclusion is an obsolete MIDI SoundFont from historical checkouts.
             assets.exclude '**/sf.sf2'
+            // ExFAT creates AppleDouble sidecars next to new AIDL files. They are metadata,
+            // not AIDL source, and must never be passed to the platform compiler.
+            aidl.exclude '**/._*'
         }
     }
 
@@ -276,6 +280,8 @@ dependencies {
     implementation libs.compose.foundation
     implementation libs.compose.runtime
     implementation libs.haze
+    implementation libs.shizuku.api
+    implementation libs.shizuku.provider
     debugImplementation libs.compose.ui.tooling
 
     testImplementation libs.junit

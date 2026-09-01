@@ -3,6 +3,23 @@ package com.yuki.yukihub.metadata
 internal object MetadataUtils {
 
     @JvmStatic
+    @JvmName("isTimeout")
+    fun isTimeout(error: Throwable?): Boolean {
+        var current = error
+        val visited = HashSet<Throwable>()
+        while (current != null && visited.add(current)) {
+            if (current is java.net.SocketTimeoutException) return true
+            val message = current.message.orEmpty().lowercase(java.util.Locale.ROOT)
+            if (
+                "timeout" in message || "time out" in message || "timed out" in message ||
+                "time_out" in message
+            ) return true
+            current = current.cause
+        }
+        return false
+    }
+
+    @JvmStatic
     @JvmName("cleanTitle")
     fun cleanTitle(s: String?): String {
         if (s == null) return ""

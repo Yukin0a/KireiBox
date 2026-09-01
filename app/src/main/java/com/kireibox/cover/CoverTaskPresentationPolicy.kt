@@ -81,7 +81,7 @@ internal object CoverTaskPresentationPolicy {
     fun shouldShowTaskButton(tasks: List<CoverTaskUi>): Boolean = tasks.isNotEmpty()
 
     fun shouldDismissCompletedRows(tasks: List<CoverTaskUi>, panelOpen: Boolean): Boolean =
-        !panelOpen && tasks.isNotEmpty() && tasks.all { it.status == CoverTaskStatus.COMPLETED }
+        tasks.isNotEmpty() && tasks.all { it.status == CoverTaskStatus.COMPLETED }
 
     fun rowActionFor(status: CoverTaskStatus): CoverTaskRowAction = when (status) {
         CoverTaskStatus.NEEDS_REVIEW -> CoverTaskRowAction.SELECT

@@ -49,6 +49,29 @@ class UpdateInstallerTest {
         assertTrue((abi as UpdatePackageValidation.Invalid).message.contains("ABI"))
     }
 
+    @Test
+    fun signedBareApkRequiresMatchingTagAndInstalledSigner() {
+        val valid = UpdatePackagePolicy.validateSignedApkFallback(
+            installedVersionCode = 19,
+            currentSignerSha256 = SIGNER,
+            deviceSdk = 35,
+            deviceAbis = listOf("arm64-v8a"),
+            archive = archive(),
+            expectedVersionName = "v0.5.0-alpha.14",
+        )
+        val wrongTag = UpdatePackagePolicy.validateSignedApkFallback(
+            installedVersionCode = 19,
+            currentSignerSha256 = SIGNER,
+            deviceSdk = 35,
+            deviceAbis = listOf("arm64-v8a"),
+            archive = archive(),
+            expectedVersionName = "0.5.0-alpha.15",
+        )
+
+        assertEquals(UpdatePackageValidation.Valid, valid)
+        assertTrue((wrongTag as UpdatePackageValidation.Invalid).message.contains("GitHub Release"))
+    }
+
     private fun validate(
         deviceSdk: Int = 35,
         deviceAbis: List<String> = listOf("arm64-v8a"),
@@ -65,6 +88,7 @@ class UpdateInstallerTest {
     private fun archive() = UpdatePackageMetadata(
         packageName = KIREIBOX_PACKAGE_NAME,
         versionCode = 20,
+        versionName = "0.5.0-alpha.14",
         minSdk = 26,
         abis = listOf("arm64-v8a"),
         signerSha256 = SIGNER,

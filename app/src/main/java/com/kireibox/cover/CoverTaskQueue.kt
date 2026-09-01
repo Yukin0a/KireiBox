@@ -21,6 +21,7 @@ internal data class CoverTaskRequest(
     val gameId: Long,
     val title: String,
     val source: CoverSourceMode,
+    val forceReview: Boolean = false,
 )
 
 internal data class CoverBindingCompletion(
@@ -57,6 +58,7 @@ internal class CoverTaskQueue(
     private val mutableState = MutableStateFlow(CoverQueueUiState(emptyList(), CoverQueueStatus.RUNNING))
     private val mutableBindingCompletions = MutableSharedFlow<CoverBindingCompletion>()
     private var queueStatus = CoverQueueStatus.RUNNING
+    private var gameRunningSuspended = false
     private var ownerClosed = false
 
     val state: StateFlow<CoverQueueUiState> = mutableState.asStateFlow()
@@ -89,6 +91,33 @@ internal class CoverTaskQueue(
             queueStatus = CoverQueueStatus.RUNNING
             publishLocked()
             drainLocked(actions)
+        })
+    }
+
+    fun suspendForGame() {
+        dispatch(mutate { actions ->
+            if (ownerClosed || gameRunningSuspended) return@mutate
+            gameRunningSuspended = true
+            records.values.filter { it.status == CoverTaskStatus.SEARCHING || it.status == CoverTaskStatus.DOWNLOADING }
+                .forEach { record ->
+                    record.generation += 1
+                    record.job?.let { actions += QueueAction.Cancel(it) }
+                    record.job = null
+                    record.status = CoverTaskStatus.QUEUED
+                    record.bytesRead = 0
+                    record.totalBytes = null
+                    record.error = null
+                }
+            publishLocked()
+        })
+    }
+
+    fun resumeAfterGame() {
+        dispatch(mutate { actions ->
+            if (ownerClosed || !gameRunningSuspended) return@mutate
+            gameRunningSuspended = false
+            publishLocked()
+            if (queueStatus == CoverQueueStatus.RUNNING) drainLocked(actions)
         })
     }
 
@@ -126,16 +155,26 @@ internal class CoverTaskQueue(
         })
     }
 
-    /** Records a successful user choice. The cover was already persisted as MANUAL by the caller. */
-    fun resolveReview(gameId: Long) {
-        dispatch(mutate {
+    /** Resolves any stale task after a manual/default cover has been durably persisted. */
+    fun resolvePersistedCover(gameId: Long, keepCompletedRow: Boolean) {
+        dispatch(mutate { actions ->
             val record = records[gameId] ?: return@mutate
-            if (record.status != CoverTaskStatus.NEEDS_REVIEW) return@mutate
-            record.status = CoverTaskStatus.COMPLETED
+            record.generation += 1
+            record.job?.let { actions += QueueAction.Cancel(it) }
+            record.job = null
             record.error = null
+            if (keepCompletedRow) {
+                record.status = CoverTaskStatus.COMPLETED
+            } else {
+                records.remove(gameId)
+            }
             publishLocked()
+            drainLocked(actions)
         })
     }
+
+    /** Backward-compatible helper retained for task-center selection call sites and tests. */
+    fun resolveReview(gameId: Long) = resolvePersistedCover(gameId, keepCompletedRow = true)
 
     fun candidates(gameId: Long): List<RankedCoverCandidate> = synchronized(lock) {
         records[gameId]?.candidates?.toList().orEmpty()
@@ -157,7 +196,7 @@ internal class CoverTaskQueue(
     }
 
     private fun drainLocked(actions: MutableList<QueueAction>) {
-        if (ownerClosed || queueStatus == CoverQueueStatus.PAUSED) return
+        if (ownerClosed || queueStatus == CoverQueueStatus.PAUSED || gameRunningSuspended) return
         while (true) {
             val nextSearch = records.values.firstOrNull {
                 it.status == CoverTaskStatus.QUEUED && it.stage == Stage.SEARCH
@@ -218,7 +257,7 @@ internal class CoverTaskQueue(
             failLocked(record, generation, IllegalStateException("No cover candidates found"), actions)
             return
         }
-        if (!result.automatic) {
+        if (record.request.forceReview || !result.automatic) {
             record.status = CoverTaskStatus.NEEDS_REVIEW
             publishLocked()
             actions += QueueAction.Binding(record, "REVIEW", record.candidates.first().score)
@@ -315,7 +354,7 @@ internal class CoverTaskQueue(
                     error = record.error,
                 )
             },
-            queueStatus = queueStatus,
+            queueStatus = if (gameRunningSuspended) CoverQueueStatus.PAUSED else queueStatus,
         )
     }
 

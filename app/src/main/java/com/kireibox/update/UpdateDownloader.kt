@@ -31,8 +31,12 @@ internal class UpdateDownloader(
         val url = release.apkUrl.toHttpUrl()
         require(isTrustedDownloadUrl(url)) { "更新下载地址不受信任" }
         check(directory.exists() || directory.mkdirs()) { "无法创建更新缓存目录" }
-        val finalFile = File(directory, release.manifest.apkAsset)
-        val partialFile = File(directory, "${release.manifest.apkAsset}.part")
+        val assetName = release.apkAsset
+        require(assetName.endsWith(".apk", ignoreCase = true) && '/' !in assetName && '\\' !in assetName) {
+            "更新 APK 资产名称无效"
+        }
+        val finalFile = File(directory, assetName)
+        val partialFile = File(directory, "$assetName.part")
         partialFile.delete()
         finalFile.delete()
         try {
@@ -74,7 +78,9 @@ internal class UpdateDownloader(
                 }
                 check(totalBytes < 0 || bytesRead == totalBytes) { "更新下载不完整" }
                 val actualSha256 = digest.digest().joinToString("") { "%02x".format(it) }
-                check(actualSha256 == release.manifest.sha256) { "更新包 SHA-256 校验失败" }
+                release.manifest?.let { manifest ->
+                    check(actualSha256 == manifest.sha256) { "更新包 SHA-256 校验失败" }
+                }
             }
             check(partialFile.renameTo(finalFile)) { "无法保存更新包" }
             finalFile

@@ -20,7 +20,10 @@ internal class KireiCoverTaskBackend(
                 limit = 8,
                 maxQueries = 3,
             )
-        }
+        }.fold(
+            onSuccess = { Result.success(it) },
+            onFailure = { Result.failure(CoverTimeoutRetryPolicy.normalizeFinalError(it)) },
+        )
     }
 
     override suspend fun save(
@@ -39,12 +42,7 @@ internal class KireiCoverTaskBackend(
     }
 
     override suspend fun markBinding(gameId: Long, mode: String, score: Double) = withContext(Dispatchers.IO) {
-        repository.findById(gameId)?.let { game ->
-            game.vndbBindingMode = mode
-            game.vndbMatchScore = score.coerceIn(0.0, 100.0)
-            game.updatedAt = System.currentTimeMillis()
-            repository.update(game)
-        }
+        repository.updateCoverBindingIfUnconfigured(gameId, mode, score)
         Unit
     }
 }

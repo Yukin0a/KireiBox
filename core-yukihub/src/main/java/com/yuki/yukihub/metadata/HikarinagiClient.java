@@ -149,7 +149,7 @@ public class HikarinagiClient {
             } catch (Exception e) {
                 last = e;
                 String msg = e.getMessage() == null ? "" : e.getMessage();
-                boolean retryable = msg.contains("HTTP 429") || msg.contains("HTTP 5");
+                boolean retryable = msg.contains("HTTP 429") || msg.contains("HTTP 5") || MetadataUtils.isTimeout(e);
                 if (!retryable || attempt >= MAX_RETRIES) throw e;
                 MetadataUtils.sleepBeforeRetry(RETRY_DELAY_MS * (attempt + 1));
             }

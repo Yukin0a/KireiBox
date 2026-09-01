@@ -15,7 +15,7 @@ class CoverTaskPresentationPolicyTest {
         val completed = task(3, CoverTaskStatus.COMPLETED)
 
         assertTrue(CoverTaskPresentationPolicy.shouldShowTaskButton(listOf(active)))
-        assertFalse(CoverTaskPresentationPolicy.shouldDismissCompletedRows(listOf(completed), panelOpen = true))
+        assertTrue(CoverTaskPresentationPolicy.shouldDismissCompletedRows(listOf(completed), panelOpen = true))
         assertTrue(CoverTaskPresentationPolicy.shouldDismissCompletedRows(listOf(completed), panelOpen = false))
         assertEquals(CoverTaskRowAction.SELECT, CoverTaskPresentationPolicy.rowActionFor(review.status))
         assertEquals(CoverTaskRowAction.CANCEL, CoverTaskPresentationPolicy.rowActionFor(active.status))
@@ -37,7 +37,7 @@ class CoverTaskPresentationPolicyTest {
         assertTrue(CoverTaskPresentationPolicy.shouldShowCompletionCheck(listOf(task(1, CoverTaskStatus.COMPLETED))))
         assertTrue(CoverTaskPresentationPolicy.shouldShowCompletionCheck(listOf(task(1, CoverTaskStatus.CANCELLED))))
         assertTrue(CoverTaskPresentationPolicy.shouldDismissCompletedRows(listOf(task(1, CoverTaskStatus.COMPLETED)), panelOpen = false))
-        assertFalse(CoverTaskPresentationPolicy.shouldDismissCompletedRows(listOf(task(1, CoverTaskStatus.COMPLETED)), panelOpen = true))
+        assertTrue(CoverTaskPresentationPolicy.shouldDismissCompletedRows(listOf(task(1, CoverTaskStatus.COMPLETED)), panelOpen = true))
         assertFalse(CoverTaskPresentationPolicy.shouldDismissCompletedRows(listOf(task(1, CoverTaskStatus.CANCELLED)), panelOpen = false))
         assertFalse(CoverTaskPresentationPolicy.shouldDismissCompletedRows(listOf(task(1, CoverTaskStatus.FAILED)), panelOpen = false))
         assertFalse(CoverTaskPresentationPolicy.shouldDismissCompletedRows(listOf(task(1, CoverTaskStatus.NEEDS_REVIEW)), panelOpen = false))

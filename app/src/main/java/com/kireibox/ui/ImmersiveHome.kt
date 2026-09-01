@@ -1,5 +1,6 @@
 package com.kireibox.ui
 
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
@@ -17,9 +18,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -29,6 +34,7 @@ import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
+import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -168,10 +174,11 @@ internal fun ImmersiveHome(
     renderKind: HomeRenderKind = HomeRenderKind.IMMERSIVE_PORTRAIT,
     safeBounds: ImmersiveSafeBounds = ImmersiveSafeBounds(0f, 0f, Float.MAX_VALUE, Float.MAX_VALUE),
     reducedMotion: Boolean,
+    showPlayTime: Boolean = true,
+    onOpenPlayTime: () -> Unit = {},
     reducedTransparency: Boolean = false,
     adaptiveMetrics: AdaptiveUiMetrics? = null,
     haze: HazeState? = null,
-    onOpenOverview: (() -> Unit)? = null,
     debugFrozenTrackProgress: Float? = null,
     modifier: Modifier = Modifier,
 ) {
@@ -413,12 +420,6 @@ internal fun ImmersiveHome(
                     menuExpanded = false
                     actions.setDarkMode(!colors.isDark)
                 },
-                onOpenOverview = onOpenOverview?.let { open ->
-                    {
-                        menuExpanded = false
-                        open()
-                    }
-                },
             )
         }
 
@@ -579,6 +580,33 @@ internal fun ImmersiveHome(
                 palette,
             ) {
                 currentGame?.let(actions.launchGame)
+            }
+            if (showPlayTime && currentGame != null) {
+                val playTimeSpec = resolveImmersivePlayTimeVisualSpec(
+                    orientation = orientation,
+                    adaptiveScale = metrics.scale,
+                    fontScale = density.fontScale,
+                )
+                val playTimeAnchor = resolveImmersivePlayTimeAnchor(
+                    orientation = orientation,
+                    layout = layout,
+                    safeBounds = opticalBounds,
+                    scale = visualScale,
+                    indicatorHeightPx = with(density) { playTimeSpec.minimumHeightDp.dp.toPx() },
+                    gapPx = with(density) { playTimeSpec.anchorGapDp.dp.toPx() },
+                )
+                playTimeAnchor?.let { anchor ->
+                    ImmersivePlayTimeIndicator(
+                        game = currentGame,
+                        orientation = orientation,
+                        anchor = anchor,
+                        density = density,
+                        visualSpec = playTimeSpec,
+                        palette = palette,
+                        reducedMotion = reducedMotion,
+                        onClick = onOpenPlayTime,
+                    )
+                }
             }
             ImmersivePager(orderedGames, currentIndex, orientation, layout, density, visualScale, palette) { index ->
                 if (debugFrozenTrackProgress == null) snapshot = controller.jumpTo(index)
@@ -881,6 +909,215 @@ private fun ImmersivePlayButton(
     }
 }
 
+internal data class ImmersivePlayTimeAnchor(
+    val xPx: Float,
+    val yPx: Float,
+    val maxWidthPx: Float,
+)
+
+internal data class ImmersivePlayTimeVisualSpec(
+    val fontSizeSp: Float,
+    val lineHeightSp: Float,
+    val iconSizeDp: Float,
+    val horizontalPaddingDp: Float,
+    val verticalPaddingDp: Float,
+    val contentGapDp: Float,
+    val minimumHeightDp: Float,
+    val anchorGapDp: Float,
+)
+
+/**
+ * Keeps the play-time affordance readable in dp/sp instead of shrinking design pixels by the
+ * device density. Compact phones retain a 14sp floor; larger windows grow only slightly so the
+ * control remains secondary to the cover and launch action.
+ */
+internal fun resolveImmersivePlayTimeVisualSpec(
+    orientation: HomeOrientation,
+    adaptiveScale: Float,
+    fontScale: Float = 1f,
+): ImmersivePlayTimeVisualSpec {
+    val sizeScale = adaptiveScale.takeIf(Float::isFinite)?.coerceIn(1f, 1.15f) ?: 1f
+    val accessibilityScale = fontScale.takeIf(Float::isFinite)?.coerceAtLeast(.75f) ?: 1f
+    val portrait = orientation == HomeOrientation.PORTRAIT
+    val fontSize = (if (portrait) 14.5f else 14f) * sizeScale
+    val lineHeight = fontSize * 1.25f
+    val verticalPadding = (if (portrait) 8f else 6f) * sizeScale
+    val contentHeight = lineHeight * accessibilityScale + verticalPadding * 2f
+    val iconSize = (if (portrait) 18f else 16f) * sizeScale
+    val baseHeight = (if (portrait) 44f else 36f) * sizeScale
+    return ImmersivePlayTimeVisualSpec(
+        fontSizeSp = fontSize,
+        lineHeightSp = lineHeight,
+        iconSizeDp = iconSize,
+        horizontalPaddingDp = (if (portrait) 14f else 2f) * sizeScale,
+        verticalPaddingDp = verticalPadding,
+        contentGapDp = (if (portrait) 8f else 6f) * sizeScale,
+        minimumHeightDp = maxOf(baseHeight, contentHeight, iconSize + verticalPadding * 2f),
+        anchorGapDp = (if (portrait) 12f else 6f) * sizeScale,
+    )
+}
+
+internal fun resolveImmersivePlayTimeAnchor(
+    orientation: HomeOrientation,
+    layout: ImmersiveHomeLayout,
+    safeBounds: ImmersiveSafeBounds,
+    scale: Float,
+    indicatorHeightPx: Float = 42f * scale.coerceAtLeast(.01f),
+    gapPx: Float = 12f * scale.coerceAtLeast(.01f),
+): ImmersivePlayTimeAnchor? {
+    val pagerY = layout.pagerCenters.firstOrNull()?.y ?: return null
+    val safeIndicatorHeight = indicatorHeightPx.takeIf(Float::isFinite)?.coerceAtLeast(1f)
+        ?: return null
+    val safeGap = gapPx.takeIf(Float::isFinite)?.coerceAtLeast(0f) ?: return null
+    val horizontalPadding = safeGap.coerceAtLeast(1f)
+    val maxWidth = (safeBounds.rightPx - safeBounds.leftPx - horizontalPadding * 2f)
+        .coerceAtLeast(1f)
+    return if (orientation == HomeOrientation.PORTRAIT) {
+        val center = layout.cardSlots[ImmersiveSlot.CENTER]?.rect ?: return null
+        val earliestTop = center.y + center.h + safeGap
+        val latestTop = pagerY - safeIndicatorHeight - safeGap
+        if (latestTop < earliestTop) return null
+        ImmersivePlayTimeAnchor(
+            xPx = (safeBounds.leftPx + safeBounds.rightPx) / 2f,
+            yPx = earliestTop + (latestTop - earliestTop) * .48f,
+            maxWidthPx = maxWidth,
+        )
+    } else {
+        val preferredTop = layout.play.y + layout.play.h + safeGap
+        val latestTop = pagerY - safeIndicatorHeight - safeGap
+        val top = if (preferredTop <= latestTop) {
+            preferredTop
+        } else {
+            (layout.play.y - safeIndicatorHeight - safeGap)
+                .coerceAtLeast(safeBounds.topPx)
+        }
+        ImmersivePlayTimeAnchor(
+            xPx = layout.play.x,
+            yPx = top,
+            maxWidthPx = minOf(layout.play.w, maxWidth),
+        )
+    }
+}
+
+@Composable
+private fun ImmersivePlayTimeIndicator(
+    game: Game,
+    orientation: HomeOrientation,
+    anchor: ImmersivePlayTimeAnchor,
+    density: Density,
+    visualSpec: ImmersivePlayTimeVisualSpec,
+    palette: ImmersivePalette,
+    reducedMotion: Boolean,
+    onClick: () -> Unit,
+) {
+    val target = game.id to LibraryOverviewPolicy.immersivePlayTime(game.totalPlayTime)
+    if (orientation == HomeOrientation.PORTRAIT) {
+        Box(
+            Modifier.offset(
+                pxDp(anchor.xPx - anchor.maxWidthPx / 2f, density),
+                pxDp(anchor.yPx, density),
+            ).width(pxDp(anchor.maxWidthPx, density))
+                .height(visualSpec.minimumHeightDp.dp)
+                .zIndex(9f),
+            contentAlignment = Alignment.Center,
+        ) {
+            Crossfade(
+                targetState = target,
+                animationSpec = tween(if (reducedMotion) 0 else 150),
+                label = "immersivePlayTime",
+            ) { (_, label) ->
+                Row(
+                    Modifier.clip(CircleShape)
+                        .background(palette.glass)
+                        .border(
+                            1.dp,
+                            immersivePlayTimeBorderColor(palette, orientation, game.totalPlayTime),
+                            CircleShape,
+                        )
+                        .clickable(onClick = onClick)
+                        .heightIn(min = visualSpec.minimumHeightDp.dp)
+                        .widthIn(max = pxDp(anchor.maxWidthPx, density))
+                        .padding(
+                            horizontal = visualSpec.horizontalPaddingDp.dp,
+                            vertical = visualSpec.verticalPaddingDp.dp,
+                        )
+                        .testTag("immersive-play-time")
+                        .semantics {
+                            contentDescription = "查看${game.title.orEmpty()}游玩记录，$label"
+                        },
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(visualSpec.contentGapDp.dp),
+                ) {
+                    Icon(
+                        Icons.Rounded.Schedule,
+                        null,
+                        tint = palette.accentBright,
+                        modifier = Modifier.size(visualSpec.iconSizeDp.dp),
+                    )
+                    Text(
+                        label,
+                        color = palette.secondary,
+                        fontSize = visualSpec.fontSizeSp.sp,
+                        lineHeight = visualSpec.lineHeightSp.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+    } else {
+        Crossfade(
+            targetState = target,
+            animationSpec = tween(if (reducedMotion) 0 else 150),
+            label = "immersivePlayTime",
+            modifier = Modifier.offset(pxDp(anchor.xPx, density), pxDp(anchor.yPx, density))
+                .width(pxDp(anchor.maxWidthPx, density))
+                .height(visualSpec.minimumHeightDp.dp)
+                .zIndex(9f),
+        ) { (_, label) ->
+            Row(
+                Modifier.fillMaxSize(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(visualSpec.contentGapDp.dp),
+            ) {
+                Icon(
+                    Icons.Rounded.Schedule,
+                    null,
+                    tint = palette.accentBright,
+                    modifier = Modifier.size(visualSpec.iconSizeDp.dp),
+                )
+                Text(
+                    label,
+                    color = palette.secondary,
+                    fontSize = visualSpec.fontSizeSp.sp,
+                    lineHeight = visualSpec.lineHeightSp.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.clickable(onClick = onClick)
+                        .padding(
+                            horizontal = visualSpec.horizontalPaddingDp.dp,
+                            vertical = visualSpec.verticalPaddingDp.dp,
+                        )
+                        .testTag("immersive-play-time")
+                        .semantics {
+                            contentDescription = "查看${game.title.orEmpty()}游玩记录，$label"
+                        },
+                )
+            }
+        }
+    }
+}
+
+internal fun immersivePlayTimeBorderColor(
+    palette: ImmersivePalette,
+    orientation: HomeOrientation,
+    totalPlayTime: Long,
+): Color = if (!palette.isDark && orientation == HomeOrientation.PORTRAIT && totalPlayTime <= 0L) {
+    palette.secondary.copy(alpha = .38f)
+} else {
+    palette.glassBorder
+}
+
 @Composable
 private fun ImmersivePager(games: List<Game>, currentIndex: Int, orientation: HomeOrientation, layout: ImmersiveHomeLayout, density: Density, scale: Float, palette: ImmersivePalette, onSelect: (Int) -> Unit) {
     val indexes = ImmersivePagerPolicy.visibleIndexes(games.size, currentIndex)
@@ -1028,7 +1265,7 @@ private fun ImmersiveGalleryConfigSheet(
 internal fun HomePresentationModeRow(value: com.yuki.yukihub.settings.HomePresentationMode, colors: KireiColors, onChange: (com.yuki.yukihub.settings.HomePresentationMode) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     Row(Modifier.fillMaxSize().testTag("home-mode-current").clickable { expanded = true }.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f)) { Text("首页模式", color = colors.text); Text("沉浸式画廊或组件网格", color = colors.secondary) }
+        Column(Modifier.weight(1f)) { Text("首页模式", color = colors.text); Text("选择沉浸式或组件首页", color = colors.secondary) }
         Text(value.displayName, color = colors.accent)
     }
     if (expanded) {
@@ -1045,9 +1282,9 @@ internal fun HomePresentationModeRow(value: com.yuki.yukihub.settings.HomePresen
                         Text(option.displayName, color = colors.text)
                         Text(
                             if (option == com.yuki.yukihub.settings.HomePresentationMode.IMMERSIVE) {
-                                "封面优先的沉浸式画廊"
+                                "以封面画廊展示游戏"
                             } else {
-                                "可编辑的组件网格首页"
+                                "使用可编辑组件布局"
                             },
                             color = colors.secondary,
                         )
