@@ -48,6 +48,7 @@ import com.yuki.yukihub.data.GameRepository
 import com.yuki.yukihub.engine.EngineStorageProbe
 import com.yuki.yukihub.util.DevLogger
 import com.yuki.yukihub.launcher.EmulatorLauncher
+import com.yuki.yukihub.launcherbridge.ExternalPlaySessionTimer
 import com.yuki.yukihub.launcherbridge.LauncherGameLaunchBridge
 import com.yuki.yukihub.model.EngineType
 import com.yuki.yukihub.model.Game
@@ -66,6 +67,8 @@ class LauncherActivity : AppCompatActivity() {
     private var engineWasOpened = false
     private var runningSessionJournaled = false
     private var launcherHandoffActive = false
+    private var externalPlayActive = false
+    private var externalPlayTimer: ExternalPlaySessionTimer? = null
     private var pendingNativeLaunch: Game? = null
     private val coverAlbumPicker = registerForActivityResult(
         ActivityResultContracts.PickVisualMedia(),
@@ -217,6 +220,8 @@ class LauncherActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        externalPlayTimer?.cleanup()
+        externalPlayTimer = null
         Shizuku.removeRequestPermissionResultListener(shizukuPermissionListener)
         Shizuku.removeBinderReceivedListener(shizukuBinderReceivedListener)
         Shizuku.removeBinderDeadListener(shizukuBinderDeadListener)
@@ -237,7 +242,16 @@ class LauncherActivity : AppCompatActivity() {
             launcherHandoffActive = false
             viewModel.resumeAfterEngineHandoff()
         }
-        if (engineWasOpened && runningSessionId > 0) {
+        if (externalPlayActive && runningSessionId > 0) {
+            val sessionId = runningSessionId
+            val effectiveDuration = externalPlayTimer?.finish() ?: 0L
+            externalPlayTimer = null
+            runningSessionId = -1L
+            externalPlayActive = false
+            // Monotonic, screen-off-aware duration measured while the launcher was
+            // in background; the persisted gate is released after settlement.
+            LauncherGameLaunchBridge.finishExternalSessionAsync(this, sessionId, effectiveDuration, viewModel::reload)
+        } else if (engineWasOpened && runningSessionId > 0) {
             val sessionId = runningSessionId
             val journaled = runningSessionJournaled
             runningSessionId = -1L
@@ -246,11 +260,12 @@ class LauncherActivity : AppCompatActivity() {
             if (journaled) {
                 LauncherGameLaunchBridge.reconcilePlaySessionsAsync(this, viewModel::reload)
             } else {
-                // Android-app cards deliberately record a real launch count only;
-                // KireiBox does not request Usage Access or guess foreground time.
-                LauncherGameLaunchBridge.finishExternalSessionAsync(this, sessionId, viewModel::reload)
+                LauncherGameLaunchBridge.finishExternalSessionAsync(this, sessionId, 0L, viewModel::reload)
             }
         } else {
+            // Launcher process death during an external session is silently recovered;
+            // reconcilePlaySessionsAsync always fires its callback, so it owns the UI reload.
+            LauncherGameLaunchBridge.recoverStaleExternalSessionAsync(this)
             LauncherGameLaunchBridge.reconcilePlaySessionsAsync(this, viewModel::reload)
         }
         val pending = pendingNativeLaunch
@@ -415,9 +430,18 @@ class LauncherActivity : AppCompatActivity() {
         LauncherGameLaunchBridge.launchAsync(this, game, object : LauncherGameLaunchBridge.LaunchCallback {
             override fun onResult(result: LauncherGameLaunchBridge.LaunchResult) {
                 if (result.success) {
-                    runningSessionId = if (result.handoff == LauncherGameLaunchBridge.LaunchHandoff.INTERNAL_ENGINE) result.sessionId else -1L
+                    val externalHandoff = result.handoff == LauncherGameLaunchBridge.LaunchHandoff.EXTERNAL_APP ||
+                        result.handoff == LauncherGameLaunchBridge.LaunchHandoff.SHORTCUT
+                    runningSessionId = result.sessionId
                     engineWasOpened = result.handoff == LauncherGameLaunchBridge.LaunchHandoff.INTERNAL_ENGINE
                     runningSessionJournaled = engineWasOpened
+                    externalPlayActive = externalHandoff
+                    externalPlayTimer = if (externalHandoff) {
+                        ExternalPlaySessionTimer(applicationContext).also { it.start() }
+                    } else {
+                        externalPlayTimer?.cleanup()
+                        null
+                    }
                     launcherHandoffActive = result.handoff != LauncherGameLaunchBridge.LaunchHandoff.NONE
                     viewModel.suspendForEngineHandoff()
                     LauncherMemoryCoordinator.onEngineHandoff()

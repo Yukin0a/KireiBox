@@ -31,6 +31,12 @@ object LauncherGameLaunchBridge {
     private const val MIN_RECORDED_PLAY_MS = 3_000L
     private const val MAX_RECORDED_PLAY_MS = 12L * 60L * 60L * 1000L
     private const val UNATTACHED_SESSION_GRACE_MS = 2L * 60L * 1000L
+    private const val EXTERNAL_GATE_PREFS = "launcher_external_game_gate"
+    private const val KEY_EXT_SESSION_ID = "external_session_id"
+    private const val KEY_EXT_GAME_ID = "external_game_id"
+    private const val KEY_EXT_GAME_TITLE = "external_game_title"
+    private const val KEY_EXT_PROCESS_PACKAGE = "external_process_package"
+    private const val KEY_EXT_STARTED_AT = "external_started_at"
 
     interface LaunchCallback {
         fun onResult(result: LaunchResult)
@@ -70,6 +76,15 @@ object LauncherGameLaunchBridge {
             return LaunchResult.failure(prepared.message)
         }
         DevLogger.event("launch start engine=${launchGame.engine} root=${launchGame.rootUri} target=${launchGame.launchTarget}")
+        val previousGate = readExternalGate(appContext)
+        if (previousGate != null) {
+            val withinSpawnGrace = System.currentTimeMillis() - previousGate.startedAtWallMs <
+                ExternalSessionRecoveryPolicy.PROCESS_SPAWN_GRACE_MS
+            if (isProcessRunning(appContext, previousGate.processPackage) || withinSpawnGrace) {
+                return LaunchResult.failure("已有游戏正在运行：${previousGate.gameTitle}")
+            }
+            recoverExternalGate(appContext, repository, previousGate)
+        }
         val externalShortcut = ExternalShortcutIdentity.fromGame(launchGame)
         if (externalShortcut != null) {
             val sessionId = repository.startPlaySession(launchGame.id, System.currentTimeMillis(), "external.shortcut")
@@ -84,8 +99,18 @@ object LauncherGameLaunchBridge {
             }
             return if (launched.isSuccess) {
                 repository.markPlaySessionLaunched(sessionId, System.currentTimeMillis())
-                repository.finishPlaySessionWithDuration(sessionId, System.currentTimeMillis(), 0L, MIN_RECORDED_PLAY_MS, MAX_RECORDED_PLAY_MS)
-                LaunchResult.success(0L, LaunchHandoff.SHORTCUT)
+                val gate = ExternalGameGate(
+                    sessionId = sessionId,
+                    gameId = launchGame.id,
+                    gameTitle = launchGame.title?.ifBlank { "未命名游戏" } ?: "未命名游戏",
+                    processPackage = externalShortcut.packageName,
+                    startedAtWallMs = System.currentTimeMillis(),
+                )
+                if (!writeExternalGate(appContext, gate)) {
+                    repository.cancelPlaySession(sessionId)
+                    return LaunchResult.failure("无法记录本次快捷方式游玩会话")
+                }
+                LaunchResult.success(sessionId, LaunchHandoff.SHORTCUT)
             } else {
                 repository.cancelPlaySession(sessionId)
                 LaunchResult.failure(launched.exceptionOrNull()?.message ?: "快捷方式已失效，请重新扫描。")
@@ -110,8 +135,18 @@ object LauncherGameLaunchBridge {
             DevLogger.event("launch started session=$sessionId engine=$emulatorPackage")
             repository.markPlaySessionLaunched(sessionId, System.currentTimeMillis())
             if (launchGame.engine == EngineType.ANDROID_APP) {
-                repository.finishPlaySessionWithDuration(sessionId, System.currentTimeMillis(), 0L, MIN_RECORDED_PLAY_MS, MAX_RECORDED_PLAY_MS)
-                return LaunchResult.success(0L, LaunchHandoff.EXTERNAL_APP)
+                val gate = ExternalGameGate(
+                    sessionId = sessionId,
+                    gameId = launchGame.id,
+                    gameTitle = launchGame.title?.ifBlank { "未命名游戏" } ?: "未命名游戏",
+                    processPackage = emulatorPackage,
+                    startedAtWallMs = System.currentTimeMillis(),
+                )
+                if (!writeExternalGate(appContext, gate)) {
+                    repository.cancelPlaySession(sessionId)
+                    return LaunchResult.failure("无法记录本次 Android 应用游玩会话")
+                }
+                return LaunchResult.success(sessionId, LaunchHandoff.EXTERNAL_APP)
             }
             return LaunchResult.success(sessionId, LaunchHandoff.INTERNAL_ENGINE)
         }
@@ -121,17 +156,57 @@ object LauncherGameLaunchBridge {
     }
 
     @JvmStatic
-    fun finishExternalSessionAsync(context: Context?, sessionId: Long, onComplete: (() -> Unit)? = null) {
+    fun finishExternalSessionAsync(
+        context: Context?,
+        sessionId: Long,
+        effectiveDuration: Long,
+        onComplete: (() -> Unit)? = null,
+    ) {
         if (context == null || sessionId <= 0L) return
         val app = context.applicationContext
         AppExecutors.runOnIo {
             GameRepository(app).finishPlaySessionWithDuration(
                 sessionId = sessionId,
                 end = System.currentTimeMillis(),
-                recordedDuration = 0L,
+                recordedDuration = effectiveDuration,
                 minDuration = MIN_RECORDED_PLAY_MS,
                 maxDuration = MAX_RECORDED_PLAY_MS,
             )
+            releaseExternalGateIfMatches(app, sessionId)
+            RxMainScheduler.post { onComplete?.invoke() }
+        }
+    }
+
+    /**
+     * Silently settles an external session whose launcher process died while the
+     * game was open. Wall-clock recovery is capped per [ExternalSessionRecoveryPolicy]
+     * and never prompts the user.
+     */
+    @JvmStatic
+    fun recoverStaleExternalSession(context: Context?): Boolean {
+        val app = context?.applicationContext ?: return false
+        val gate = readExternalGate(app) ?: return false
+        val duration = ExternalSessionRecoveryPolicy.recoveredDurationMs(
+            processAlive = isProcessRunning(app, gate.processPackage),
+            startedAtWallMs = gate.startedAtWallMs,
+            nowWallMs = System.currentTimeMillis(),
+        ) ?: return false
+        GameRepository(app).finishPlaySessionWithDuration(
+            sessionId = gate.sessionId,
+            end = System.currentTimeMillis(),
+            recordedDuration = duration,
+            minDuration = MIN_RECORDED_PLAY_MS,
+            maxDuration = MAX_RECORDED_PLAY_MS,
+        )
+        clearExternalGate(app)
+        return true
+    }
+
+    @JvmStatic
+    fun recoverStaleExternalSessionAsync(context: Context?, onComplete: (() -> Unit)? = null) {
+        val app = context?.applicationContext ?: return
+        AppExecutors.runOnIo {
+            recoverStaleExternalSession(app)
             RxMainScheduler.post { onComplete?.invoke() }
         }
     }
@@ -197,6 +272,76 @@ object LauncherGameLaunchBridge {
                     maxDuration = MAX_RECORDED_PLAY_MS,
                 )
             }
+    }
+
+    private data class ExternalGameGate(
+        val sessionId: Long,
+        val gameId: Long,
+        val gameTitle: String,
+        val processPackage: String,
+        val startedAtWallMs: Long,
+    )
+
+    private fun readExternalGate(context: Context): ExternalGameGate? {
+        val prefs = context.getSharedPreferences(EXTERNAL_GATE_PREFS, Context.MODE_PRIVATE)
+        val sessionId = prefs.getLong(KEY_EXT_SESSION_ID, -1L)
+        if (sessionId <= 0L) return null
+        return ExternalGameGate(
+            sessionId = sessionId,
+            gameId = prefs.getLong(KEY_EXT_GAME_ID, -1L),
+            gameTitle = prefs.getString(KEY_EXT_GAME_TITLE, "当前游戏") ?: "当前游戏",
+            processPackage = prefs.getString(KEY_EXT_PROCESS_PACKAGE, "") ?: "",
+            startedAtWallMs = prefs.getLong(KEY_EXT_STARTED_AT, 0L),
+        )
+    }
+
+    private fun writeExternalGate(context: Context, gate: ExternalGameGate): Boolean {
+        val prefs = context.getSharedPreferences(EXTERNAL_GATE_PREFS, Context.MODE_PRIVATE)
+        return prefs.edit()
+            .putLong(KEY_EXT_SESSION_ID, gate.sessionId)
+            .putLong(KEY_EXT_GAME_ID, gate.gameId)
+            .putString(KEY_EXT_GAME_TITLE, gate.gameTitle)
+            .putString(KEY_EXT_PROCESS_PACKAGE, gate.processPackage)
+            .putLong(KEY_EXT_STARTED_AT, gate.startedAtWallMs)
+            .commit()
+    }
+
+    private fun clearExternalGate(context: Context) {
+        context.getSharedPreferences(EXTERNAL_GATE_PREFS, Context.MODE_PRIVATE).edit().clear().commit()
+    }
+
+    private fun releaseExternalGateIfMatches(context: Context, sessionId: Long) {
+        val gate = readExternalGate(context) ?: return
+        if (gate.sessionId == sessionId) clearExternalGate(context)
+    }
+
+    private fun recoverExternalGate(context: Context, repository: GameRepository, gate: ExternalGameGate) {
+        val duration = ExternalSessionRecoveryPolicy.recoveredDurationMs(
+            processAlive = isProcessRunning(context, gate.processPackage),
+            startedAtWallMs = gate.startedAtWallMs,
+            nowWallMs = System.currentTimeMillis(),
+        ) ?: return
+        repository.finishPlaySessionWithDuration(
+            sessionId = gate.sessionId,
+            end = System.currentTimeMillis(),
+            recordedDuration = duration,
+            minDuration = MIN_RECORDED_PLAY_MS,
+            maxDuration = MAX_RECORDED_PLAY_MS,
+        )
+        clearExternalGate(context)
+    }
+
+    private fun isProcessRunning(context: Context, processPackage: String): Boolean {
+        if (processPackage.isBlank()) return false
+        return try {
+            val manager = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager ?: return false
+            manager.runningAppProcesses.orEmpty().any { process ->
+                process.processName == processPackage || process.pkgList?.any { it == processPackage } == true
+            }
+        } catch (_: Exception) {
+            // Keep the gate when the platform refuses process visibility.
+            true
+        }
     }
 
     private fun validate(game: Game, emulatorPackage: String): String? {
