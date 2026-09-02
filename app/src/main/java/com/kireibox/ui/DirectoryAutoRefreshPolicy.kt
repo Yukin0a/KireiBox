@@ -6,10 +6,9 @@ internal object DirectoryAutoRefreshPolicy {
     fun enabledRoots(roots: List<String>, enabled: List<Boolean>): List<String> =
         roots.filterIndexed { index, _ -> enabled.getOrElse(index) { true } }
 
-    fun notice(summary: ScanImportSummary, failedDirectoryCount: Int, prunedCount: Int = 0): String? {
+    fun notice(summary: ScanImportSummary, failedDirectoryCount: Int, prunedCount: Int = 0): String {
         val added = summary.addedCount
-        if (added == 0 && failedDirectoryCount == 0 && prunedCount == 0) return null
-        val parts = ArrayList<String>(3)
+        val parts = ArrayList<String>(4)
         when {
             added == 1 -> {
                 val title = summary.addedGames.first().title?.takeIf { it.isNotBlank() } ?: "未命名游戏"
@@ -19,19 +18,17 @@ internal object DirectoryAutoRefreshPolicy {
         }
         if (prunedCount > 0) parts += "已清理 $prunedCount 张失效卡片"
         if (failedDirectoryCount > 0) parts += "$failedDirectoryCount 个目录扫描失败"
+        if (parts.isEmpty()) parts += "未发现新游戏"
         return "自动更新：" + parts.joinToString("，")
     }
 }
 
-internal class ForegroundRefreshGate(private val minIntervalMs: Long = 1_500L) {
+internal class ForegroundRefreshGate {
     private var running = false
-    private var lastStartMs = 0L
 
-    fun tryStart(nowMs: Long): Boolean {
+    fun tryStart(): Boolean {
         if (running) return false
-        if (lastStartMs != 0L && nowMs - lastStartMs < minIntervalMs) return false
         running = true
-        lastStartMs = nowMs
         return true
     }
 

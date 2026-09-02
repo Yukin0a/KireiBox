@@ -4,7 +4,6 @@ import com.yuki.yukihub.data.ScanImportSummary
 import com.yuki.yukihub.model.Game
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -21,9 +20,15 @@ class DirectoryAutoRefreshPolicyTest {
     }
 
     @Test
-    fun noChangesAndNoFailuresStaySilent() {
-        assertNull(DirectoryAutoRefreshPolicy.notice(ScanImportSummary(), 0))
-        assertNull(DirectoryAutoRefreshPolicy.notice(ScanImportSummary(), 0, 0))
+    fun noChangesStillGivesVisibleFeedback() {
+        assertEquals(
+            "自动更新：未发现新游戏",
+            DirectoryAutoRefreshPolicy.notice(ScanImportSummary(), 0),
+        )
+        assertEquals(
+            "自动更新：未发现新游戏",
+            DirectoryAutoRefreshPolicy.notice(ScanImportSummary(), 0, 0),
+        )
     }
 
     @Test
@@ -73,12 +78,12 @@ class DirectoryAutoRefreshPolicyTest {
     }
 
     @Test
-    fun foregroundGateRejectsOverlapAndDebounceThenAllowsLaterRefresh() {
-        val gate = ForegroundRefreshGate(minIntervalMs = 1_500L)
-        assertTrue(gate.tryStart(1_000L))
-        assertFalse(gate.tryStart(1_100L))
+    fun foregroundGateRejectsOverlapThenAllowsImmediateRestart() {
+        val gate = ForegroundRefreshGate()
+        assertTrue(gate.tryStart())
+        assertFalse(gate.tryStart())
         gate.finish()
-        assertFalse(gate.tryStart(2_000L))
-        assertTrue(gate.tryStart(2_500L))
+        assertTrue(gate.tryStart())
+        gate.finish()
     }
 }

@@ -1475,9 +1475,10 @@ internal constructor(
         viewModelScope.launch(Dispatchers.IO) {
             val snapshot = core.settings.snapshot()
             if (!snapshot.autoScanOnStartup) return@launch
-            if (!foregroundRefreshGate.tryStart(System.currentTimeMillis())) return@launch
+            if (!foregroundRefreshGate.tryStart()) return@launch
             try {
                 val roots = DirectoryAutoRefreshPolicy.enabledRoots(snapshot.scanRoots, snapshot.scanRootEnabled)
+                if (roots.isEmpty()) return@launch
                 var failed = 0
                 var pruned = 0
                 var total = ScanImportSummary()
