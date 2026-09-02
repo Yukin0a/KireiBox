@@ -1247,9 +1247,11 @@ internal constructor(
         viewModelScope.launch(Dispatchers.IO) {
             _state.value = _state.value.copy(busy = true)
             val change = core.settings.addOrReplaceScanRoot(uri.toString(), previousRoot)
+            var foundGames = 0
             val result = runCatching {
                 check(change != null) { "目录路径无效" }
                 val report = core.scan(uri)
+                foundGames = report.results.size
                 core.importScan(
                     report,
                     keepRemovedHidden = core.settings.snapshot().keepRemovedGamesHiddenOnRefresh,
@@ -1260,9 +1262,9 @@ internal constructor(
                     _state.value.copy(
                         busy = false,
                         notice = if (change?.replaced == true) {
-                            "目录已更新：发现 ${result.getOrDefault(ScanImportSummary()).size} 个游戏"
+                            "目录已更新：发现 $foundGames 个游戏"
                         } else {
-                            "扫描完成：发现 ${result.getOrDefault(ScanImportSummary()).size} 个游戏"
+                            "扫描完成：发现 $foundGames 个游戏"
                         },
                     )
                 } else {
