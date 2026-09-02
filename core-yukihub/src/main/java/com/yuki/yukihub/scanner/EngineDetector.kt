@@ -57,7 +57,7 @@ object EngineDetector {
 
         when {
             features.hasIndex && tyranoRuntime -> score(result, EngineType.TYRANO, 96, "[游戏目录]")
-            features.hasAppAsar && electronWrapper -> score(result, EngineType.TYRANO, 82, "[游戏目录]")
+            features.hasAppAsar -> score(result, EngineType.TYRANO, 82, "[游戏目录]")
             features.hasIndex && !electronWrapper -> score(result, EngineType.TYRANO, 70, "[游戏目录]")
             artemisRuntime -> score(
                 result,

@@ -27,4 +27,21 @@ class FileStorageEngineDetectorTest {
         val result = EngineDetector.detect(StorageNodes.fromFile(root), 2)
         assertEquals(EngineType.TYRANO, result.engine)
     }
+
+    @Test fun appAsarWithoutResourcesIsDetectedAsTyrano() {
+        val root = temporaryFolder.newFolder("AsarGame")
+        root.resolve("app.asar").writeBytes(byteArrayOf(0x01, 0x02, 0x03))
+        val result = EngineDetector.detect(StorageNodes.fromFile(root), 2)
+        assertEquals(EngineType.TYRANO, result.engine)
+        assertEquals("[游戏目录]", result.launchTarget)
+    }
+
+    @Test fun resourcesAppAsarIsDetectedAsTyrano() {
+        val root = temporaryFolder.newFolder("AsarWrapped")
+        root.resolve("resources").mkdirs()
+        root.resolve("resources/app.asar").writeBytes(byteArrayOf(0x01, 0x02, 0x03))
+        val result = EngineDetector.detect(StorageNodes.fromFile(root), 2)
+        assertEquals(EngineType.TYRANO, result.engine)
+        assertEquals("[游戏目录]", result.launchTarget)
+    }
 }
