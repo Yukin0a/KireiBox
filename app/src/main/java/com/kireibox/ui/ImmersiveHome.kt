@@ -646,14 +646,16 @@ private fun adaptiveMetricsFor(layout: ImmersiveHomeLayout, widthPx: Float, heig
 private fun rememberHeroCover(game: Game?, widthPx: Int, heightPx: Int): HeroCoverVisual? {
     if (game == null) return null
     val uri = game.coverUri
-    val cacheKey = remember(uri, widthPx, heightPx) {
-        coverCacheKey(uri, CoverImageRole.IMMERSIVE_BACKDROP, widthPx, heightPx)
+    val blurred = game.nsfw && LocalNsfwBlurEnabled.current
+    val cacheKey = remember(uri, widthPx, heightPx, blurred) {
+        coverCacheKey(uri, CoverImageRole.IMMERSIVE_BACKDROP, widthPx, heightPx, blurred)
     }
     val bitmap = rememberCover(
         uri = uri,
         role = CoverImageRole.IMMERSIVE_BACKDROP,
         componentWidthPx = widthPx,
         componentHeightPx = heightPx,
+        blurred = blurred,
     )
     val toneCacheKey = cacheKey ?: "immersive-backdrop-fallback"
     val tone by produceState(

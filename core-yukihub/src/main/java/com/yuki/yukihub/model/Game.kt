@@ -35,6 +35,8 @@ data class Game @JvmOverloads constructor(
     @JvmField var updatedAt: Long = 0L,
     @JvmField var hidden: Boolean = false,
     @JvmField var favorite: Boolean = false,
+    /** Whether persisted covers for this game are sensitive and should be blurred in-app. */
+    @JvmField var nsfw: Boolean = false,
     /** Stable user-defined position; favorites and regular games keep separate visual groups. */
     @JvmField var manualOrder: Long = 0L,
 ) {

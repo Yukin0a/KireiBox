@@ -807,6 +807,7 @@ class GameRepository(context: Context) {
                 o.put("updated_at", it.getLong(it.getColumnIndexOrThrow("updated_at")))
                 o.put("hidden", it.getInt(it.getColumnIndexOrThrow("hidden")) == 1)
                 o.put("favorite", it.getInt(it.getColumnIndexOrThrow("favorite")) == 1)
+                o.put("nsfw", getIntOrDefault(it, "nsfw", 0) == 1)
                 o.put("manual_order", getLongOrDefault(it, "manual_order", 0L))
                 arr.put(o)
             }
@@ -882,6 +883,7 @@ class GameRepository(context: Context) {
                 g.playStatus = normalizePlayStatus(o.optString("play_status", g.playStatus))
                 g.hidden = o.optBoolean("hidden", g.hidden)
                 g.favorite = o.optBoolean("favorite", g.favorite)
+                g.nsfw = o.optBoolean("nsfw", g.nsfw)
                 g.manualOrder = Math.max(0L, o.optLong("manual_order", g.manualOrder))
             } else {
                 // Older card metadata must not overwrite newer local edits, but it may
@@ -1147,6 +1149,7 @@ class GameRepository(context: Context) {
         v.put("updated_at", g.updatedAt)
         v.put("hidden", if (g.hidden) 1 else 0)
         v.put("favorite", if (g.favorite) 1 else 0)
+        v.put("nsfw", if (g.nsfw) 1 else 0)
         v.put("manual_order", g.manualOrder)
         return v
     }
@@ -1178,6 +1181,7 @@ class GameRepository(context: Context) {
         g.hidden = c.getInt(c.getColumnIndexOrThrow("hidden")) == 1
         val favoriteIndex = c.getColumnIndex("favorite")
         g.favorite = favoriteIndex >= 0 && !c.isNull(favoriteIndex) && c.getInt(favoriteIndex) == 1
+        g.nsfw = getIntOrDefault(c, "nsfw", 0) == 1
         g.manualOrder = getLongOrDefault(c, "manual_order", 0L)
         return g
     }

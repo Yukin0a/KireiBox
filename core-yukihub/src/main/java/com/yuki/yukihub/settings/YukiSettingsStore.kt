@@ -68,6 +68,8 @@ class YukiSettingsStore internal constructor(
         val updateReleaseCache: String = "",
         /** Keeps user-removed cards hidden when a scan sees the same game again. */
         val keepRemovedGamesHiddenOnRefresh: Boolean = true,
+        /** Global display policy; individual games still retain their own NSFW marker. */
+        val nsfwBlurEnabled: Boolean = true,
     ) {
         val immersiveGallerySettings: ImmersiveGallerySettings
             get() = ImmersiveGallerySettings(
@@ -205,6 +207,7 @@ class YukiSettingsStore internal constructor(
                 KEY_KEEP_REMOVED_GAMES_HIDDEN_ON_REFRESH,
                 true,
             ),
+            nsfwBlurEnabled = prefs.getBoolean(KEY_NSFW_BLUR, true),
         )
     }
 
@@ -325,6 +328,12 @@ class YukiSettingsStore internal constructor(
     fun putString(key: String, value: String) { prefs.edit().putString(key, value).apply() }
     fun isCoverQueuePaused(): Boolean = prefs.getBoolean(KEY_COVER_QUEUE_PAUSED, false)
     fun setCoverQueuePaused(paused: Boolean) { prefs.edit().putBoolean(KEY_COVER_QUEUE_PAUSED, paused).apply() }
+    fun setNsfwBlurEnabled(enabled: Boolean) { prefs.edit().putBoolean(KEY_NSFW_BLUR, enabled).apply() }
+    fun wasNsfwDetected(gameId: Long): Boolean =
+        gameId > 0L && prefs.getBoolean(nsfwDetectionKey(gameId), false)
+    fun markNsfwDetected(gameId: Long) {
+        if (gameId > 0L) prefs.edit().putBoolean(nsfwDetectionKey(gameId), true).apply()
+    }
     fun setMotionMode(mode: MotionMode) {
         prefs.edit()
             .putString(KEY_MOTION_MODE, mode.name)
@@ -497,6 +506,7 @@ class YukiSettingsStore internal constructor(
         const val KEY_DASHBOARD_COMPACT = "kireibox_dashboard_compact_v1"
         const val KEY_DASHBOARD_WIDE = "kireibox_dashboard_wide_v1"
         const val KEY_COVER_QUEUE_PAUSED = "kireibox_cover_queue_paused"
+        const val KEY_NSFW_BLUR = "nsfw_blur_enabled"
         const val KEY_HOME_PRESENTATION_MODE = "kireibox_home_presentation_mode"
         const val KEY_IMMERSIVE_PLAY_TIME_VISIBLE = "kireibox_immersive_play_time_visible"
         const val KEY_ORIENTATION_MODE = "kireibox_orientation_mode"
@@ -514,6 +524,8 @@ class YukiSettingsStore internal constructor(
         const val KEY_IMMERSIVE_GALLERY_MANUAL_IDS = KEY_IMMERSIVE_GALLERY_IDS
         const val KEY_IMMERSIVE_GALLERY_MAX_COUNT = KEY_IMMERSIVE_GALLERY_COUNT
         const val KEY_MIGRATION_V18 = "single_core_migration_v18"
+
+        fun nsfwDetectionKey(gameId: Long): String = "nsfw_detected_$gameId"
 
         const val SORT_RECENT = "recent"
         const val SORT_NEWEST = "newest"

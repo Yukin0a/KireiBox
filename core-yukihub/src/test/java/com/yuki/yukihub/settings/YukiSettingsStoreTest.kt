@@ -2,6 +2,8 @@
 
 import android.content.SharedPreferences
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class YukiSettingsStoreTest {
@@ -57,6 +59,31 @@ class YukiSettingsStoreTest {
     }
 
     // --- Snapshot data class default-value tests ---
+
+    @Test
+    fun `nsfw blur defaults on and persists global changes`() {
+        val prefs = fakePrefs()
+        val store = YukiSettingsStore(prefs)
+
+        assertTrue(store.snapshot().nsfwBlurEnabled)
+        store.setNsfwBlurEnabled(false)
+        assertFalse(YukiSettingsStore(prefs).snapshot().nsfwBlurEnabled)
+        store.setNsfwBlurEnabled(true)
+        assertTrue(YukiSettingsStore(prefs).snapshot().nsfwBlurEnabled)
+    }
+
+    @Test
+    fun `nsfw detection marker is isolated per game and survives recreation`() {
+        val prefs = fakePrefs()
+        val store = YukiSettingsStore(prefs)
+
+        assertFalse(store.wasNsfwDetected(41L))
+        store.markNsfwDetected(41L)
+
+        assertTrue(YukiSettingsStore(prefs).wasNsfwDetected(41L))
+        assertFalse(YukiSettingsStore(prefs).wasNsfwDetected(42L))
+        assertEquals("nsfw_detected_41", YukiSettingsStore.nsfwDetectionKey(41L))
+    }
 
     @Test
     fun `snapshot homePresentationMode defaults to immersive`() {

@@ -4,6 +4,7 @@ import android.content.ContentValues
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import com.yuki.yukihub.metadata.VnMetadata
+import com.yuki.yukihub.metadata.CoverSourceMode
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -35,6 +36,8 @@ class MetadataRepository(context: Context) {
     fun saveYmgal(gameId: Long, data: VnMetadata?) = saveMetadata(gameId, "ymgal", data)
 
     fun getHikarinagi(gameId: Long): VnMetadata? = getMetadata(gameId, "hikarinagi")
+
+    fun get(gameId: Long, source: CoverSourceMode): VnMetadata? = getMetadata(gameId, source.key)
 
     fun saveHikarinagi(gameId: Long, data: VnMetadata?) = saveMetadata(gameId, "hikarinagi", data)
 

@@ -5,8 +5,10 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import com.yuki.yukihub.data.GameRepository
 import com.yuki.yukihub.metadata.CoverSourceMode
+import com.yuki.yukihub.metadata.NsfwCoverPolicy
 import com.yuki.yukihub.metadata.VnMetadata
 import com.yuki.yukihub.metadata.YukiMetadataService
+import com.yuki.yukihub.settings.YukiSettingsStore
 import okhttp3.OkHttpClient
 import java.io.File
 import java.io.FileOutputStream
@@ -21,6 +23,7 @@ class KireiCoverStore(context: Context) {
     private val app = context.applicationContext
     private val repository = GameRepository(app)
     private val metadata = YukiMetadataService(app)
+    private val settings = YukiSettingsStore(app)
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
@@ -59,6 +62,13 @@ class KireiCoverStore(context: Context) {
             game.coverSourceType = 1
             game.vndbBindingMode = bindingMode
             game.vndbMatchScore = matchScore.coerceIn(0.0, 100.0)
+            val autoMarkedNsfw = NsfwCoverPolicy.shouldAutoMark(
+                source = source,
+                coverSexual = candidate.coverSexual,
+                alreadyNsfw = game.nsfw,
+                detectionHandled = settings.wasNsfwDetected(gameId),
+            )
+            if (autoMarkedNsfw) game.nsfw = true
             game.updatedAt = System.currentTimeMillis()
             try {
                 check(repository.update(game) == 1) { "Cover record commit failed" }
@@ -68,6 +78,7 @@ class KireiCoverStore(context: Context) {
                 final.delete()
                 throw error
             }
+            if (autoMarkedNsfw) settings.markNsfwDetected(gameId)
             cleanup(directory, final, previous.coverUri)
             uri
         } finally {

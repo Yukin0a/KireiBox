@@ -8,6 +8,7 @@ import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,6 +23,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.ViewModelProvider
 import com.apps.theme.AppleDesignTheme
+import com.yuki.yukihub.settings.SpotlightSource
 
 class ImmersiveFixtureActivity : ComponentActivity() {
     private fun applyFixtureSystemBars() {
@@ -61,9 +63,18 @@ class ImmersiveFixtureActivity : ComponentActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
         applyFixtureSystemBars()
         val viewModel = ViewModelProvider(this)[KireiViewModel::class.java]
-        val fixtureGames = ImmersiveVisualFixture.games(this)
+        val fixtureGames = ImmersiveVisualFixture.games(
+            this,
+            nsfwCovers = intent.getBooleanExtra(ImmersiveVisualFixture.EXTRA_NSFW_COVERS, false),
+        )
         setContent {
             AppleDesignTheme(darkTheme = true) {
+                CompositionLocalProvider(
+                    LocalNsfwBlurEnabled provides intent.getBooleanExtra(
+                        ImmersiveVisualFixture.EXTRA_NSFW_GLOBAL_ENABLED,
+                        true,
+                    ),
+                ) {
                 val colors = remember {
                     KireiColors(
                         background = Color(0xFF05070D),
@@ -92,6 +103,7 @@ class ImmersiveFixtureActivity : ComponentActivity() {
                     val frozenTrackProgress = ImmersiveVisualFixture.frozenTrackProgress(intent)
                 ImmersiveHome(
                     games = fixtureGames,
+                    source = SpotlightSource.ALL,
                     colors = colors,
                     actions = KireiActions(
                         chooseDirectory = {},
@@ -129,6 +141,7 @@ class ImmersiveFixtureActivity : ComponentActivity() {
                     debugFrozenTrackProgress = frozenTrackProgress,
                 )
                 }
+            }
             }
         }
     }

@@ -16,7 +16,7 @@ class YukiDatabaseHelper(context: Context) :
         // Keep this monotonic for the production package.  The launcher now uses the
         // same applicationId as existing installs; lowering this value makes SQLite
         // reject those installs before the launcher can load any data.
-        const val DB_VERSION = 20
+        const val DB_VERSION = 21
     }
 
     override fun onConfigure(db: SQLiteDatabase) {
@@ -52,6 +52,7 @@ class YukiDatabaseHelper(context: Context) :
                 "updated_at INTEGER NOT NULL," +
                 "hidden INTEGER DEFAULT 0," +
                 "favorite INTEGER DEFAULT 0," +
+                "nsfw INTEGER NOT NULL DEFAULT 0," +
                 "manual_order INTEGER NOT NULL DEFAULT 0" +
                 ",location_verified_at INTEGER NOT NULL DEFAULT 0" +
                 ")")
@@ -78,6 +79,10 @@ class YukiDatabaseHelper(context: Context) :
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        // Add this before identity migrations so duplicate rows can merge the flag.
+        if (oldVersion < 21) {
+            safeAlter(db, "ALTER TABLE games ADD COLUMN nsfw INTEGER NOT NULL DEFAULT 0")
+        }
         if (oldVersion < 2) {
             safeAlter(db, "ALTER TABLE games ADD COLUMN cover_persist_uri TEXT")
             safeAlter(db, "ALTER TABLE games ADD COLUMN cover_source_type INTEGER DEFAULT 0")
@@ -137,7 +142,8 @@ class YukiDatabaseHelper(context: Context) :
         if (
             (oldVersion == 15 && newVersion == 14) ||
             (oldVersion == 19 && newVersion == 18) ||
-            (oldVersion == 20 && newVersion == 19)
+            (oldVersion == 20 && newVersion == 19) ||
+            (oldVersion == 21 && newVersion == 20)
         ) {
             return
         }
@@ -295,6 +301,7 @@ class YukiDatabaseHelper(context: Context) :
                 "updated_at=MAX(IFNULL(updated_at,0),(SELECT IFNULL(updated_at,0) FROM games WHERE id=?)), " +
                 "hidden=MIN(IFNULL(hidden,0),(SELECT IFNULL(hidden,0) FROM games WHERE id=?)), " +
                 "favorite=MAX(IFNULL(favorite,0),(SELECT IFNULL(favorite,0) FROM games WHERE id=?)), " +
+                "nsfw=MAX(IFNULL(nsfw,0),(SELECT IFNULL(nsfw,0) FROM games WHERE id=?)), " +
                 "manual_order=CASE WHEN IFNULL(manual_order,0)<=0 THEN " +
                     "(SELECT IFNULL(manual_order,0) FROM games WHERE id=?) " +
                     "WHEN (SELECT IFNULL(manual_order,0) FROM games WHERE id=?)<=0 THEN manual_order " +
@@ -314,6 +321,7 @@ class YukiDatabaseHelper(context: Context) :
                 "WHERE id=?",
                 arrayOf<Any>(
                     duplicateId, duplicateId, duplicateId, duplicateId, duplicateId, duplicateId,
+                    duplicateId,
                     duplicateId, duplicateId, duplicateId, duplicateId, duplicateId, duplicateId,
                     duplicateId, duplicateId, duplicateId, canonicalId,
                 ))

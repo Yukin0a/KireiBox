@@ -423,6 +423,7 @@ private fun ResponsiveWindowClass.legacyLayoutMode(): KireiLayoutMode = when (ho
 }
 
 private val LocalResolvedMotionMode = staticCompositionLocalOf { MotionMode.REDUCED }
+internal val LocalNsfwBlurEnabled = staticCompositionLocalOf { true }
 
 /**
  * True when system-bar icons must be light (white) for the currently composed page:
@@ -476,7 +477,10 @@ fun KireiBoxApp(
             resolveMotionMode(context, settings?.motionMode ?: MotionMode.AUTO)
         }
         val reducedMotion = resolvedMotion == MotionMode.REDUCED
-        CompositionLocalProvider(LocalResolvedMotionMode provides resolvedMotion) {
+        CompositionLocalProvider(
+            LocalResolvedMotionMode provides resolvedMotion,
+            LocalNsfwBlurEnabled provides (settings?.nsfwBlurEnabled != false),
+        ) {
         CompositionLocalProvider(
             LocalSystemBarIconTone provides SystemBarVisibilityPolicy.statusBarIconsLight(dark, immersiveHome),
         ) {
@@ -3298,6 +3302,7 @@ internal fun GameCoverArtwork(
             role = role,
             componentWidthPx = with(density) { maxWidth.roundToPx() },
             componentHeightPx = with(density) { maxHeight.roundToPx() },
+            blurred = game.nsfw && LocalNsfwBlurEnabled.current,
         )
         if (bitmap == null) {
             EngineDefaultCover(
@@ -3387,6 +3392,7 @@ private fun FocusCoverArtwork(
             role = role,
             componentWidthPx = with(density) { maxWidth.roundToPx() },
             componentHeightPx = with(density) { maxHeight.roundToPx() },
+            blurred = game.nsfw && LocalNsfwBlurEnabled.current,
         )
         if (bitmap == null) {
             EngineDefaultCover(game.engine, Modifier.fillMaxSize())
@@ -7032,6 +7038,12 @@ private fun GameActionSheet(
                 onDismiss()
                 viewModel.searchCover(game, game.title.orEmpty(), CoverSourceMode.fromStored(state.settings?.metadataSource))
             }
+            SheetActionRow(
+                Icons.Rounded.AutoFixHigh,
+                "NSFW 封面模糊：${if (game.nsfw) "开启" else "关闭"}",
+                "仅影响 KireiBox 内的封面显示",
+                colors,
+            ) { viewModel.toggleNsfwCover(game) }
             Spacer(Modifier.height(6.dp))
             SheetActionRow(
                 Icons.Rounded.Home,
@@ -7148,6 +7160,12 @@ private fun CoverSettings(state: KireiUiState, colors: KireiColors, haze: HazeSt
         if (!tokenVisible) showTokenEditor = false
     }
     SettingsSection("封面数据来源", colors) {
+        SwitchRow(
+            "NSFW 封面模糊",
+            state.settings?.nsfwBlurEnabled != false,
+            colors,
+            viewModel::setNsfwBlurEnabled,
+        )
         CoverSourceChoiceRow("默认来源", source, colors) { viewModel.setMetadataSource(it) }
         Text(
             coverSourceDescription(source),
@@ -8454,23 +8472,26 @@ internal fun rememberCover(
     role: CoverImageRole = CoverImageRole.THUMBNAIL,
     componentWidthPx: Int = CoverImagePolicy.TARGET_WIDTH_PX,
     componentHeightPx: Int = CoverImagePolicy.TARGET_HEIGHT_PX,
+    blurred: Boolean = false,
 ): ImageBitmap? {
     val context = LocalContext.current.applicationContext
-    val request = remember(uri, role, componentWidthPx, componentHeightPx) {
+    val request = remember(uri, role, componentWidthPx, componentHeightPx, blurred) {
         uri?.takeIf { it.isNotBlank() }?.let {
-            CoverImagePolicy.request(it, role, componentWidthPx, componentHeightPx)
+            CoverImagePolicy.request(it, role, componentWidthPx, componentHeightPx, blurred)
         }
     }
-    return produceState<ImageBitmap?>(null, request?.cacheKey) {
+    data class LoadedCover(val displayKey: CoverDisplayKey, val bitmap: ImageBitmap)
+    val loaded = produceState<LoadedCover?>(null, request?.cacheKey) {
+        if (value?.displayKey != request?.displayKey) value = null
         value = withContext(Dispatchers.IO) {
             if (request == null) return@withContext null
             val decoded = CoverLoads.load(request) {
                 CoverDecodeSemaphore.withPermit { decodeSampledCover(context, request) }
             } ?: return@withContext null
-            val imageBitmap = decoded.asImageBitmap()
-            imageBitmap
+            LoadedCover(request.displayKey, decoded.asImageBitmap())
         }
     }.value
+    return loaded?.takeIf { it.displayKey == request?.displayKey }?.bitmap
 }
 
 internal fun coverCacheKey(
@@ -8478,8 +8499,9 @@ internal fun coverCacheKey(
     role: CoverImageRole,
     componentWidthPx: Int,
     componentHeightPx: Int,
+    blurred: Boolean = false,
 ): String? = uri?.takeIf { it.isNotBlank() }?.let {
-    CoverImagePolicy.request(it, role, componentWidthPx, componentHeightPx).cacheKey
+    CoverImagePolicy.request(it, role, componentWidthPx, componentHeightPx, blurred).cacheKey
 }
 
 @Composable
@@ -8490,7 +8512,8 @@ private fun HeroCoverPrefetch(
     componentHeightPx: Int,
 ) {
     val context = LocalContext.current.applicationContext
-    LaunchedEffect(pages, currentPage, componentWidthPx, componentHeightPx) {
+    val nsfwBlurEnabled = LocalNsfwBlurEnabled.current
+    LaunchedEffect(pages, currentPage, componentWidthPx, componentHeightPx, nsfwBlurEnabled) {
         withContext(Dispatchers.IO) {
             SpotlightCarouselPolicy.prefetchIndexes(currentPage, pages.size).drop(1).forEach { index ->
                 val source = pages[index].coverUri ?: return@forEach
@@ -8499,6 +8522,7 @@ private fun HeroCoverPrefetch(
                     role = CoverImageRole.HERO,
                     componentWidthPx = componentWidthPx,
                     componentHeightPx = componentHeightPx,
+                    blurred = pages[index].nsfw && nsfwBlurEnabled,
                 )
                 CoverLoads.load(request) {
                     CoverDecodeSemaphore.withPermit { decodeSampledCover(context, request) }
@@ -8541,6 +8565,11 @@ private fun constrainDecodedCover(bitmap: Bitmap?, request: CoverImageRequest): 
     return scaled
 }
 
+private fun finishDecodedCover(context: Context, bitmap: Bitmap?, request: CoverImageRequest): Bitmap? {
+    val constrained = constrainDecodedCover(bitmap, request) ?: return null
+    return if (request.blurred) NsfwCoverBlur.apply(context, constrained) else constrained
+}
+
 private suspend fun decodeSampledCover(context: Context, request: CoverImageRequest): Bitmap? {
     return try {
     currentCoroutineContext().ensureActive()
@@ -8566,7 +8595,7 @@ private suspend fun decodeSampledCover(context: Context, request: CoverImageRequ
         BitmapFactory.decodeFile(uri.path ?: request.uri, options)
     }
     currentCoroutineContext().ensureActive()
-    constrainDecodedCover(bitmap, request)
+    finishDecodedCover(context, bitmap, request)
     } catch (cancelled: CancellationException) {
         throw cancelled
     } catch (_: Throwable) {
@@ -8591,7 +8620,7 @@ private suspend fun decodeNetworkCover(context: Context, coverRequest: CoverImag
             inPreferredConfig = Bitmap.Config.ARGB_8888
         })
         currentCoroutineContext().ensureActive()
-        constrainDecodedCover(bitmap, coverRequest)
+        finishDecodedCover(context, bitmap, coverRequest)
     } finally {
         temporary.delete()
     }

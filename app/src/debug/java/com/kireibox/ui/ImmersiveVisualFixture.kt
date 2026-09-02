@@ -9,6 +9,8 @@ import com.yuki.yukihub.model.Game
 internal object ImmersiveVisualFixture {
     const val EXTRA_IMMERSIVE_FIXTURE = "com.kireibox.debug.IMMERSIVE_FIXTURE"
     const val EXTRA_IMMERSIVE_PROGRESS = "com.kireibox.debug.IMMERSIVE_PROGRESS"
+    const val EXTRA_NSFW_COVERS = "com.kireibox.debug.NSFW_COVERS"
+    const val EXTRA_NSFW_GLOBAL_ENABLED = "com.kireibox.debug.NSFW_GLOBAL_ENABLED"
 
     /**
      * Exact percent values accepted by [EXTRA_IMMERSIVE_PROGRESS]. Anything else is
@@ -40,7 +42,7 @@ internal object ImmersiveVisualFixture {
     fun immersiveProgress(percent: Int?): Float? =
         if (percent != null && percent in SUPPORTED_FROZEN_PROGRESS_PERCENT) percent / 100f else null
 
-    fun games(context: Context): List<Game> = List(5) { index ->
+    fun games(context: Context, nsfwCovers: Boolean = false): List<Game> = List(5) { index ->
         val resourceName = "fixture_cover_${index + 1}"
         val resourceId = context.resources.getIdentifier(resourceName, "drawable", context.packageName)
         Game(
@@ -55,6 +57,7 @@ internal object ImmersiveVisualFixture {
             )[index],
             coverUri = "android.resource://${context.packageName}/$resourceId",
             rootUri = "debug-fixture://$index",
+            nsfw = nsfwCovers,
         )
     }
 }

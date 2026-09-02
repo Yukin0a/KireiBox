@@ -30,8 +30,11 @@ class ImmersiveVisualFixtureContractTest {
         assertTrue("debug fixture source missing", source.isFile)
         val text = source.readText()
         assertTrue(text.contains("EXTRA_IMMERSIVE_FIXTURE"))
+        assertTrue(text.contains("EXTRA_NSFW_COVERS"))
+        assertTrue(text.contains("EXTRA_NSFW_GLOBAL_ENABLED"))
         assertTrue(text.contains("List(5)"))
         assertTrue(text.contains("9nine新章"))
+        assertTrue(text.contains("nsfw = nsfwCovers"))
     }
 
     @Test
@@ -101,6 +104,7 @@ class ImmersiveVisualFixtureContractTest {
             "activity must pass debugFrozenTrackProgress to ImmersiveHome",
             text.contains("debugFrozenTrackProgress"),
         )
+        assertTrue("fixture must always expose its five games", text.contains("source = SpotlightSource.ALL"))
         assertTrue(
             "progress must come from the gated fixture reader",
             text.contains("ImmersiveVisualFixture.frozenTrackProgress(intent)"),
@@ -108,6 +112,7 @@ class ImmersiveVisualFixtureContractTest {
         assertTrue("exact_canvas must be preserved", text.contains("\"exact_canvas\""))
         assertTrue("reduced_motion must be preserved", text.contains("\"reduced_motion\""))
         assertTrue("reduced_transparency must be preserved", text.contains("\"reduced_transparency\""))
+        assertTrue(text.contains("LocalNsfwBlurEnabled provides"))
     }
 
     @Test

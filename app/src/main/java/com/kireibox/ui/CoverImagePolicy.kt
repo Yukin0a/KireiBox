@@ -6,11 +6,15 @@ internal enum class CoverImageRole { THUMBNAIL, LIBRARY_CARD, HERO, IMMERSIVE_BA
 
 internal data class CoverPixelSize(val widthPx: Int, val heightPx: Int)
 
+internal data class CoverDisplayKey(val uri: String, val blurred: Boolean)
+
 internal data class CoverImageRequest(
     val uri: String,
     val role: CoverImageRole,
     val targetWidthPx: Int,
     val targetHeightPx: Int,
+    val blurred: Boolean,
+    val displayKey: CoverDisplayKey,
     val cacheKey: String,
 )
 
@@ -37,6 +41,7 @@ internal object CoverImagePolicy {
         role: CoverImageRole,
         componentWidthPx: Int,
         componentHeightPx: Int,
+        blurred: Boolean = false,
     ): CoverImageRequest {
         val targetWidth = when (role) {
             CoverImageRole.THUMBNAIL -> TARGET_WIDTH_PX
@@ -55,10 +60,12 @@ internal object CoverImagePolicy {
             role = role,
             targetWidthPx = targetWidth,
             targetHeightPx = targetHeight,
+            blurred = blurred,
+            displayKey = CoverDisplayKey(uri, blurred),
             // The key must identify the exact clamped target: sampleSize() decides
             // from these same dims, so a coarser bucket would let one slot serve
             // bitmaps decoded at a different resolution (review regression).
-            cacheKey = "$uri|$role|${targetWidth}x${targetHeight}",
+            cacheKey = "$uri|$role|${targetWidth}x${targetHeight}|blur=${if (blurred) 1 else 0}",
         )
     }
 

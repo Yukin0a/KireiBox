@@ -23,7 +23,7 @@ class CoverImagePolicyTest {
         val measured = CoverImagePolicy.request("cover", CoverImageRole.LIBRARY_CARD, 489, 573)
         assertEquals(489, measured.targetWidthPx)
         assertEquals(573, measured.targetHeightPx)
-        assertEquals("cover|LIBRARY_CARD|489x573", measured.cacheKey)
+        assertEquals("cover|LIBRARY_CARD|489x573|blur=0", measured.cacheKey)
 
         val capped = CoverImagePolicy.request("cover", CoverImageRole.LIBRARY_CARD, 2_400, 3_600)
         assertEquals(1_080, capped.targetWidthPx)
@@ -239,13 +239,13 @@ class CoverImagePolicyTest {
     @Test
     fun cacheKeyUsesExactClampedTargetDims() {
         val hero = CoverImagePolicy.request("cover", CoverImageRole.HERO, 800, 1_200)
-        assertEquals("cover|HERO|800x1200", hero.cacheKey)
+        assertEquals("cover|HERO|800x1200|blur=0", hero.cacheKey)
 
         val thumbnail = CoverImagePolicy.request("cover", CoverImageRole.THUMBNAIL, 256, 384)
-        assertEquals("cover|THUMBNAIL|256x384", thumbnail.cacheKey)
+        assertEquals("cover|THUMBNAIL|256x384|blur=0", thumbnail.cacheKey)
 
         val backdrop = CoverImagePolicy.request("cover", CoverImageRole.IMMERSIVE_BACKDROP, 2_340, 1_080)
-        assertEquals("cover|IMMERSIVE_BACKDROP|720x720", backdrop.cacheKey)
+        assertEquals("cover|IMMERSIVE_BACKDROP|720x720|blur=0", backdrop.cacheKey)
     }
 
     @Test
@@ -265,13 +265,41 @@ class CoverImagePolicyTest {
         val huge = CoverImagePolicy.request("cover", CoverImageRole.HERO, Int.MAX_VALUE, Int.MAX_VALUE)
         assertEquals(1_080, huge.targetWidthPx)
         assertEquals(1_620, huge.targetHeightPx)
-        assertEquals("cover|HERO|1080x1620", huge.cacheKey)
+        assertEquals("cover|HERO|1080x1620|blur=0", huge.cacheKey)
 
         val zero = CoverImagePolicy.request("cover", CoverImageRole.HERO, 0, 0)
-        assertEquals("cover|HERO|1x1", zero.cacheKey)
+        assertEquals("cover|HERO|1x1|blur=0", zero.cacheKey)
 
         val hugeBackdrop =
             CoverImagePolicy.request("cover", CoverImageRole.IMMERSIVE_BACKDROP, Int.MAX_VALUE, Int.MAX_VALUE)
-        assertEquals("cover|IMMERSIVE_BACKDROP|720x720", hugeBackdrop.cacheKey)
+        assertEquals("cover|IMMERSIVE_BACKDROP|720x720|blur=0", hugeBackdrop.cacheKey)
+    }
+
+    @Test
+    fun blurredAndClearRequestsUseDistinctStableCacheKeys() {
+        val clear = CoverImagePolicy.request("cover", CoverImageRole.HERO, 800, 1_200)
+        val blurred = CoverImagePolicy.request("cover", CoverImageRole.HERO, 800, 1_200, blurred = true)
+
+        assertFalse(clear.blurred)
+        assertTrue(blurred.blurred)
+        assertFalse(clear.cacheKey == blurred.cacheKey)
+        assertEquals("cover|HERO|800x1200|blur=1", blurred.cacheKey)
+        assertEquals(
+            blurred.cacheKey,
+            CoverImagePolicy.request("cover", CoverImageRole.HERO, 800, 1_200, blurred = true).cacheKey,
+        )
+    }
+
+    @Test
+    fun displayKeyStaysStableAcrossAnimatedSizeChangesOnly() {
+        val initial = CoverImagePolicy.request("cover", CoverImageRole.HERO, 800, 1_200, blurred = true)
+        val resized = CoverImagePolicy.request("cover", CoverImageRole.HERO, 900, 1_350, blurred = true)
+        val clear = CoverImagePolicy.request("cover", CoverImageRole.HERO, 900, 1_350)
+        val differentCover = CoverImagePolicy.request("other", CoverImageRole.HERO, 900, 1_350, blurred = true)
+
+        assertEquals(initial.displayKey, resized.displayKey)
+        assertFalse(initial.cacheKey == resized.cacheKey)
+        assertFalse(initial.displayKey == clear.displayKey)
+        assertFalse(initial.displayKey == differentCover.displayKey)
     }
 }

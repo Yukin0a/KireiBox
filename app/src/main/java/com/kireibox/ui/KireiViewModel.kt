@@ -13,6 +13,7 @@ import com.kireibox.cover.CoverTaskSchedulingPolicy
 import com.kireibox.cover.CoverTaskStatus
 import com.kireibox.cover.KireiCoverStore
 import com.kireibox.cover.KireiCoverTaskBackend
+import com.kireibox.cover.NsfwCoverBackfill
 import com.kireibox.external.shortcut.ExternalShortcutDescriptor
 import com.kireibox.external.shortcut.ExternalShortcutDirectLaunch
 import com.kireibox.external.shortcut.ExternalShortcutIdentity
@@ -328,6 +329,7 @@ internal constructor(
     private val metadata by lazy { YukiMetadataService(application) }
     private val metadataController by lazy { YukiMetadataController(application) }
     private val coverStore by lazy { KireiCoverStore(application) }
+    private val nsfwCoverBackfill by lazy { NsfwCoverBackfill(application) }
     private val krkrStore by lazy { KrkrGameSettingsStore(application) }
     private val shortcutGateway by lazy { ShizukuShortcutGateway(application) }
     private val coverSearchSemaphore = Semaphore(3)
@@ -375,6 +377,7 @@ internal constructor(
                 if (paused) coverQueue.pause()
             }
             val migration = SingleCoreMigration.run(application)
+            nsfwCoverBackfill.run()
             withContext(Dispatchers.Main) {
                 _state.value = _state.value.copy(migrationMessage = migration.message)
                 reloadInternal()
@@ -1456,6 +1459,35 @@ internal constructor(
         core.settings.putString(com.yuki.yukihub.settings.YukiSettingsStore.KEY_METADATA_SOURCE, source.key)
         reload()
     }
+    fun setNsfwBlurEnabled(value: Boolean) {
+        core.settings.setNsfwBlurEnabled(value)
+        reload()
+    }
+
+    fun toggleNsfwCover(game: Game) {
+        if (game.id <= 0L) return
+        viewModelScope.launch(Dispatchers.IO) {
+            val updated = game.copy(nsfw = !game.nsfw, updatedAt = System.currentTimeMillis())
+            val result = runCatching {
+                check(repository.update(updated) == 1) { "保存 NSFW 封面设置失败" }
+                // Any explicit user choice is authoritative over later metadata refreshes.
+                core.settings.markNsfwDetected(game.id)
+            }
+            withContext(Dispatchers.Main) {
+                _state.value = if (result.isSuccess) {
+                    _state.value.copy(
+                        games = _state.value.games.map { if (it.id == updated.id) updated else it },
+                        selectedGame = _state.value.selectedGame?.let {
+                            if (it.id == updated.id) updated else it
+                        },
+                        notice = if (updated.nsfw) "NSFW 封面模糊已开启" else "NSFW 封面模糊已关闭",
+                    )
+                } else {
+                    _state.value.copy(notice = result.exceptionOrNull()?.message ?: "保存 NSFW 封面设置失败")
+                }
+            }
+        }
+    }
     fun setBangumiToken(token: String) { core.settings.putString(com.yuki.yukihub.settings.YukiSettingsStore.KEY_BANGUMI_TOKEN, token); reload() }
     fun setSortMode(mode: String) { core.settings.putString(com.yuki.yukihub.settings.YukiSettingsStore.KEY_SORT_MODE, mode); reload() }
     fun setUseBuiltinFileChooser(value: Boolean) {
@@ -1735,6 +1767,7 @@ internal constructor(
         _state.value = _state.value.copy(coverSearch = search.copy(saving = true, error = null))
         viewModelScope.launch(Dispatchers.IO) {
             val result = coverStore.confirm(game.id, candidate.source, candidate.metadata, "MANUAL", candidate.score)
+            val persistedGame = if (result.isSuccess) repository.findById(game.id) else null
             withContext(Dispatchers.Main) {
                 _state.value = if (result.isSuccess) {
                     resolvePersistedCoverImmediately(
@@ -1742,6 +1775,7 @@ internal constructor(
                         mode = "MANUAL",
                         persistedCoverUri = result.getOrNull(),
                         keepCompletedRow = CoverPickerNavigationPolicy.shouldRestoreTaskCenter(search.origin),
+                        nsfw = persistedGame?.nsfw,
                     ).copy(
                         coverSearch = null,
                         taskCenterOpen = CoverPickerNavigationPolicy.shouldRestoreTaskCenter(search.origin),
@@ -1821,6 +1855,7 @@ internal constructor(
         mode: String,
         persistedCoverUri: String?,
         keepCompletedRow: Boolean,
+        nsfw: Boolean? = null,
     ): KireiUiState {
         coverQueue.resolvePersistedCover(gameId, keepCompletedRow)
         val queue = coverQueue.state.value
@@ -1831,6 +1866,7 @@ internal constructor(
                     coverPersistUri = persistedCoverUri,
                     coverSourceType = if (persistedCoverUri == null) 0 else 1,
                     vndbBindingMode = mode,
+                    nsfw = nsfw ?: game.nsfw,
                 )
             } else game
         }
