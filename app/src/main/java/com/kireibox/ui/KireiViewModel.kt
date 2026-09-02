@@ -1250,7 +1250,7 @@ internal constructor(
             var foundGames = 0
             val result = runCatching {
                 check(change != null) { "目录路径无效" }
-                val report = core.scan(uri)
+                val report = core.scanUntilMatch(uri)
                 foundGames = report.results.size
                 core.importScan(
                     report,
@@ -1487,7 +1487,7 @@ internal constructor(
                 roots.forEach { root ->
                     val parsed = runCatching { Uri.parse(root) }.getOrNull()
                     if (parsed == null) { failed += 1; return@forEach }
-                    val report = runCatching { core.scan(parsed) }.getOrElse { failed += 1; return@forEach }
+                    val report = runCatching { core.scanUntilMatch(parsed) }.getOrElse { failed += 1; return@forEach }
                     total += core.importScan(report, snapshot.keepRemovedGamesHiddenOnRefresh)
                     pruned += core.pruneMissingGames(parsed, report)
                 }

@@ -4,6 +4,7 @@ import com.yuki.yukihub.data.ScanImportSummary
 import com.yuki.yukihub.model.Game
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -20,15 +21,9 @@ class DirectoryAutoRefreshPolicyTest {
     }
 
     @Test
-    fun noChangesStillGivesVisibleFeedback() {
-        assertEquals(
-            "自动更新：未发现新游戏",
-            DirectoryAutoRefreshPolicy.notice(ScanImportSummary(), 0),
-        )
-        assertEquals(
-            "自动更新：未发现新游戏",
-            DirectoryAutoRefreshPolicy.notice(ScanImportSummary(), 0, 0),
-        )
+    fun noChangesStaySilent() {
+        assertNull(DirectoryAutoRefreshPolicy.notice(ScanImportSummary(), 0))
+        assertNull(DirectoryAutoRefreshPolicy.notice(ScanImportSummary(), 0, 0))
     }
 
     @Test

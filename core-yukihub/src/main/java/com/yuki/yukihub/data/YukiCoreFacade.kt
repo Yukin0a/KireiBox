@@ -43,8 +43,16 @@ class YukiCoreFacade(context: Context) {
         GameLibraryOrdering.orderByClause(settings.snapshot().sortMode)
     )
 
-    fun scan(root: Uri, depth: Int = settings.snapshot().startupScanDepth): ScanReport =
-        GameScanner.scan(app, root, ScanRequest.defaults(depth.coerceIn(1, 4)))
+    fun scan(root: Uri, depth: Int = settings.snapshot().startupScanDepth): ScanReport {
+        val resolvedDepth = when (depth) {
+            GameScanner.SCAN_ALL_LEVELS, GameScanner.SCAN_UNTIL_GAME_MATCH -> depth
+            else -> depth.coerceIn(1, 4)
+        }
+        return GameScanner.scan(app, root, ScanRequest.defaults(resolvedDepth))
+    }
+
+    /** Scans to any depth until each branch reaches a matched game directory. */
+    fun scanUntilMatch(root: Uri): ScanReport = scan(root, GameScanner.SCAN_UNTIL_GAME_MATCH)
 
     fun importScan(
         report: ScanReport,
@@ -79,8 +87,9 @@ class YukiCoreFacade(context: Context) {
                 if (game.hidden) keptHidden += 1
                 game.id
             } else {
+                val existingId = game.id
                 val insertedId = games.insertIfNotExists(game)
-                ScanImportClassification.addedIdFor(existingId = game.id, insertedId = insertedId)
+                ScanImportClassification.addedIdFor(existingId = existingId, insertedId = insertedId)
                     ?.let { newId -> games.findById(newId)?.let(added::add) }
                 insertedId
             }
