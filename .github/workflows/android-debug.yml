@@ -47,4 +47,10 @@ jobs:
             "cmake;3.22.1"
 
       - name: Run Debug build gates
-        run: ./gradlew test :app:lintDebug :app:assembleDebug --no-daemon --stacktrace
+        run: >-
+          ./gradlew test
+          :core-yukihub:verifyFileSize :app:verifyFileSize
+          :core-yukihub:detekt :app:detekt
+          :core-yukihub:ktlintCheck :app:ktlintCheck
+          :app:lintDebug :app:assembleDebug
+          --no-daemon --stacktrace

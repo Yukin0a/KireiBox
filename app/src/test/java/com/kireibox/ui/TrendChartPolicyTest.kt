@@ -10,18 +10,20 @@ import org.junit.Test
 
 class TrendChartPolicyTest {
     @Test fun playTimeUsesMinutesBelowTwoHoursAndHoursAtOrAboveIt() {
-        val minuteModel = TrendChartPolicy.chart(
-            points = listOf(point(duration = 90 * MINUTE)),
-            metric = TrendMetric.PLAY_TIME,
-            range = TrendRange.DAYS_7,
-            compact = true,
-        )
-        val hourModel = TrendChartPolicy.chart(
-            points = listOf(point(duration = 2 * HOUR)),
-            metric = TrendMetric.PLAY_TIME,
-            range = TrendRange.DAYS_7,
-            compact = false,
-        )
+        val minuteModel =
+            TrendChartPolicy.chart(
+                points = listOf(point(duration = 90 * MINUTE)),
+                metric = TrendMetric.PLAY_TIME,
+                range = TrendRange.DAYS_7,
+                compact = true,
+            )
+        val hourModel =
+            TrendChartPolicy.chart(
+                points = listOf(point(duration = 2 * HOUR)),
+                metric = TrendMetric.PLAY_TIME,
+                range = TrendRange.DAYS_7,
+                compact = false,
+            )
 
         assertEquals("分钟", minuteModel.unit)
         assertEquals("小时", hourModel.unit)
@@ -58,12 +60,13 @@ class TrendChartPolicyTest {
     }
 
     @Test fun gameOpensUsesWholeGameUnitAndNearestIndexClampsSafely() {
-        val model = TrendChartPolicy.chart(
-            listOf(point(opens = 1), point(opens = 3)),
-            TrendMetric.GAME_OPENS,
-            TrendRange.DAYS_7,
-            compact = false,
-        )
+        val model =
+            TrendChartPolicy.chart(
+                listOf(point(opens = 1), point(opens = 3)),
+                TrendMetric.GAME_OPENS,
+                TrendRange.DAYS_7,
+                compact = false,
+            )
 
         assertEquals("款", model.unit)
         assertTrue(model.axis.ticks.all { it % 1f == 0f })
@@ -81,8 +84,11 @@ class TrendChartPolicyTest {
         assertTrue(TrendChartPolicy.shouldHaptic(previousIndex = 1, nextIndex = 2))
     }
 
-    private fun point(day: Long = 0, duration: Long = 0, opens: Int = 0) =
-        PlayTrendPoint(dayStart = day * 86_400_000L, duration = duration, distinctGamesLaunched = opens)
+    private fun point(
+        day: Long = 0,
+        duration: Long = 0,
+        opens: Int = 0
+    ) = PlayTrendPoint(dayStart = day * 86_400_000L, duration = duration, distinctGamesLaunched = opens)
 
     private companion object {
         const val MINUTE = 60_000L

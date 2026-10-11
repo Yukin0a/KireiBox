@@ -25,16 +25,20 @@ object GameHubShortcutDumpParser {
             if (!isExpectedComponent(component)) return@forEach
             if (NAV_TARGET.find(line)?.groupValues?.getOrNull(1)?.trim() !=
                 ExternalShortcutDirectLaunch.NAV_TARGET_LOCAL_GAME
-            ) return@forEach
-            val recipe = ExternalShortcutDirectLaunch.create(
-                GAME_ID.find(line)?.groupValues?.getOrNull(1)?.trim(),
-            ) ?: return@forEach
+            ) {
+                return@forEach
+            }
+            val recipe =
+                ExternalShortcutDirectLaunch.create(
+                    GAME_ID.find(line)?.groupValues?.getOrNull(1)?.trim(),
+                ) ?: return@forEach
             result[shortcutId] = recipe
         }
         return result
     }
 
-    private fun isExpectedComponent(component: String): Boolean = component ==
-        "${ExternalShortcutDirectLaunch.GAME_HUB_PACKAGE}/.DeepLinkActivity" || component ==
-        "${ExternalShortcutDirectLaunch.GAME_HUB_PACKAGE}/${ExternalShortcutDirectLaunch.GAME_HUB_ACTIVITY}"
+    private fun isExpectedComponent(component: String): Boolean =
+        component ==
+            "${ExternalShortcutDirectLaunch.GAME_HUB_PACKAGE}/.DeepLinkActivity" || component ==
+            "${ExternalShortcutDirectLaunch.GAME_HUB_PACKAGE}/${ExternalShortcutDirectLaunch.GAME_HUB_ACTIVITY}"
 }

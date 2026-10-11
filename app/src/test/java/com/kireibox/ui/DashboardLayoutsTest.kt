@@ -3,10 +3,10 @@ package com.kireibox.ui
 import com.yuki.yukihub.settings.DashboardLayout
 import com.yuki.yukihub.settings.DashboardLayouts
 import com.yuki.yukihub.settings.DashboardProfile
+import com.yuki.yukihub.settings.DashboardStyles
 import com.yuki.yukihub.settings.DashboardWidgetSize
 import com.yuki.yukihub.settings.DashboardWidgetSpec
 import com.yuki.yukihub.settings.DashboardWidgetType
-import com.yuki.yukihub.settings.DashboardStyles
 import com.yuki.yukihub.settings.SpotlightSelectionMode
 import com.yuki.yukihub.settings.SpotlightSource
 import com.yuki.yukihub.settings.SpotlightStrategy
@@ -21,10 +21,14 @@ import org.junit.Test
 
 class DashboardLayoutsTest {
     @Test fun jsonRoundTripPreservesNormalizedCompactLayout() {
-        val original = DashboardLayout(widgets = listOf(
-            DashboardWidgetSpec("game-7", DashboardWidgetType.GAME_SPOTLIGHT, DashboardWidgetSize(1, 2), 7),
-            DashboardWidgetSpec("overview", DashboardWidgetType.LIBRARY_OVERVIEW, DashboardWidgetSize(2, 1))
-        ))
+        val original =
+            DashboardLayout(
+                widgets =
+                    listOf(
+                        DashboardWidgetSpec("game-7", DashboardWidgetType.GAME_SPOTLIGHT, DashboardWidgetSize(1, 2), 7),
+                        DashboardWidgetSpec("overview", DashboardWidgetType.LIBRARY_OVERVIEW, DashboardWidgetSize(2, 1))
+                    )
+            )
         assertEquals(
             DashboardLayouts.normalize(original, DashboardProfile.COMPACT),
             DashboardLayouts.decode(DashboardLayouts.encode(original, DashboardProfile.COMPACT), DashboardProfile.COMPACT)
@@ -33,11 +37,12 @@ class DashboardLayoutsTest {
 
     @Test fun addingWidgetKeepsExistingLegalCompactSizes() {
         val original = DashboardLayouts.default(DashboardProfile.COMPACT)
-        val added = DashboardLayouts.add(
-            original,
-            DashboardProfile.COMPACT,
-            DashboardWidgetType.FAVORITES
-        )
+        val added =
+            DashboardLayouts.add(
+                original,
+                DashboardProfile.COMPACT,
+                DashboardWidgetType.FAVORITES
+            )
         assertEquals(original.widgets.map { it.size }, added.widgets.take(original.widgets.size).map { it.size })
         assertEquals(DashboardWidgetSize(2, 1), added.widgets[1].size)
         assertEquals(DashboardWidgetSize(2, 1), added.widgets[2].size)
@@ -48,13 +53,14 @@ class DashboardLayoutsTest {
     }
 
     @Test fun normalizationDropsDuplicateUniqueAndGameWidgetsAndCapsCount() {
-        val many = buildList {
-            add(DashboardWidgetSpec("overview-1", DashboardWidgetType.LIBRARY_OVERVIEW, DashboardWidgetSize(2, 1)))
-            add(DashboardWidgetSpec("overview-2", DashboardWidgetType.LIBRARY_OVERVIEW, DashboardWidgetSize(2, 1)))
-            add(DashboardWidgetSpec("game-1", DashboardWidgetType.GAME_SPOTLIGHT, DashboardWidgetSize(2, 2), 5))
-            add(DashboardWidgetSpec("game-2", DashboardWidgetType.GAME_SPOTLIGHT, DashboardWidgetSize(2, 2), 5))
-            repeat(20) { add(DashboardWidgetSpec("library-$it", DashboardWidgetType.LIBRARY_SHORTCUT, DashboardWidgetSize(1, 1))) }
-        }
+        val many =
+            buildList {
+                add(DashboardWidgetSpec("overview-1", DashboardWidgetType.LIBRARY_OVERVIEW, DashboardWidgetSize(2, 1)))
+                add(DashboardWidgetSpec("overview-2", DashboardWidgetType.LIBRARY_OVERVIEW, DashboardWidgetSize(2, 1)))
+                add(DashboardWidgetSpec("game-1", DashboardWidgetType.GAME_SPOTLIGHT, DashboardWidgetSize(2, 2), 5))
+                add(DashboardWidgetSpec("game-2", DashboardWidgetType.GAME_SPOTLIGHT, DashboardWidgetSize(2, 2), 5))
+                repeat(20) { add(DashboardWidgetSpec("library-$it", DashboardWidgetType.LIBRARY_SHORTCUT, DashboardWidgetSize(1, 1))) }
+            }
         val normalized = DashboardLayouts.normalize(DashboardLayout(widgets = many), DashboardProfile.COMPACT)
         assertEquals(1, normalized.widgets.count { it.type == DashboardWidgetType.LIBRARY_OVERVIEW })
         assertEquals(
@@ -112,9 +118,13 @@ class DashboardLayoutsTest {
 
     @Test fun everyWidgetHeightClampsToItsDocumentedRange() {
         DashboardWidgetType.entries.forEach { type ->
-            var layout = DashboardLayout(widgets = listOf(
-                DashboardWidgetSpec(type.name, type, DashboardLayouts.allowedSizes(type, DashboardProfile.COMPACT).first())
-            ))
+            var layout =
+                DashboardLayout(
+                    widgets =
+                        listOf(
+                            DashboardWidgetSpec(type.name, type, DashboardLayouts.allowedSizes(type, DashboardProfile.COMPACT).first())
+                        )
+                )
             layout = DashboardLayouts.resizeHeight(layout, DashboardProfile.COMPACT, type.name, -20)
             assertEquals(DashboardLayouts.heightRange(type).first, layout.widgets.single().heightSteps)
             layout = DashboardLayouts.resizeHeight(layout, DashboardProfile.COMPACT, type.name, 999)
@@ -124,45 +134,60 @@ class DashboardLayoutsTest {
     }
 
     @Test fun manualPlacementPreservesHolesAfterRemoval() {
-        val initial = DashboardLayouts.setAutoFill(
-            DashboardLayouts.default(DashboardProfile.COMPACT), DashboardProfile.COMPACT, false
-        )
+        val initial =
+            DashboardLayouts.setAutoFill(
+                DashboardLayouts.default(DashboardProfile.COMPACT),
+                DashboardProfile.COMPACT,
+                false
+            )
         val overview = initial.widgets.first { it.type == DashboardWidgetType.LIBRARY_OVERVIEW }
         val moved = DashboardLayouts.placeAt(initial, DashboardProfile.COMPACT, overview.instanceId, 0, 6)
-        val withoutGame = DashboardLayouts.remove(
-            moved, DashboardProfile.COMPACT,
-            moved.widgets.first { it.type == DashboardWidgetType.GAME_SPOTLIGHT }.instanceId
-        )
+        val withoutGame =
+            DashboardLayouts.remove(
+                moved,
+                DashboardProfile.COMPACT,
+                moved.widgets.first { it.type == DashboardWidgetType.GAME_SPOTLIGHT }.instanceId
+            )
         assertFalse(withoutGame.autoFill)
         assertEquals(6, withoutGame.widgets.first { it.instanceId == overview.instanceId }.row)
     }
 
     @Test fun draggedWidgetWinsManualCollisionAndLayoutRemainsNonOverlapping() {
-        var layout = DashboardLayouts.setAutoFill(
-            DashboardLayouts.default(DashboardProfile.COMPACT), DashboardProfile.COMPACT, false
-        )
+        var layout =
+            DashboardLayouts.setAutoFill(
+                DashboardLayouts.default(DashboardProfile.COMPACT),
+                DashboardProfile.COMPACT,
+                false
+            )
         val recent = layout.widgets.first { it.type == DashboardWidgetType.RECENT_GAMES }
         layout = DashboardLayouts.placeAt(layout, DashboardProfile.COMPACT, recent.instanceId, 0, 0)
         val placements = DashboardLayouts.pack(layout, DashboardProfile.COMPACT)
         assertEquals(0, placements.first { it.spec.instanceId == recent.instanceId }.row)
         val cells = HashSet<Pair<Int, Int>>()
         placements.forEach { placement ->
-            repeat(placement.spec.heightSteps + DashboardLayouts.GAP_STEPS) { dy -> repeat(placement.spec.size.columns) { dx ->
-                assertTrue(cells.add((placement.column + dx) to (placement.row + dy)))
-            } }
+            repeat(placement.spec.heightSteps + DashboardLayouts.GAP_STEPS) { dy ->
+                repeat(placement.spec.size.columns) { dx ->
+                    assertTrue(cells.add((placement.column + dx) to (placement.row + dy)))
+                }
+            }
         }
     }
 
     @Test fun multipleTrendInstancesRoundTripWithIndependentConfigurations() {
-        val original = DashboardLayout(widgets = listOf(
-            trend("time", TrendMetric.PLAY_TIME, TrendRange.DAYS_7, TrendVisualStyle.LINE),
-            trend("opens", TrendMetric.GAME_OPENS, TrendRange.DAYS_30, TrendVisualStyle.AREA),
-        ))
+        val original =
+            DashboardLayout(
+                widgets =
+                    listOf(
+                        trend("time", TrendMetric.PLAY_TIME, TrendRange.DAYS_7, TrendVisualStyle.LINE),
+                        trend("opens", TrendMetric.GAME_OPENS, TrendRange.DAYS_30, TrendVisualStyle.AREA),
+                    )
+            )
 
-        val restored = DashboardLayouts.decode(
-            DashboardLayouts.encode(original, DashboardProfile.COMPACT),
-            DashboardProfile.COMPACT,
-        )
+        val restored =
+            DashboardLayouts.decode(
+                DashboardLayouts.encode(original, DashboardProfile.COMPACT),
+                DashboardProfile.COMPACT,
+            )
 
         assertEquals(2, restored.widgets.count { it.type == DashboardWidgetType.PLAY_TREND })
         assertEquals(TrendMetric.PLAY_TIME, restored.widgets.first { it.instanceId == "time" }.trendMetric)
@@ -171,18 +196,20 @@ class DashboardLayoutsTest {
     }
 
     @Test fun versionFourTrendStylesMigrateToTheirV5Configurations() {
-        val cases = listOf(
-            DashboardStyles.TREND_7_DAY to Triple(TrendMetric.PLAY_TIME, TrendRange.DAYS_7, TrendVisualStyle.LINE),
-            DashboardStyles.TREND_30_DAY to Triple(TrendMetric.PLAY_TIME, TrendRange.DAYS_30, TrendVisualStyle.AREA),
-            DashboardStyles.TREND_LAUNCH_7_DAY to Triple(TrendMetric.GAME_OPENS, TrendRange.DAYS_7, TrendVisualStyle.LINE),
-            DashboardStyles.TREND_LAUNCH_30_DAY to Triple(TrendMetric.GAME_OPENS, TrendRange.DAYS_30, TrendVisualStyle.AREA),
-        )
+        val cases =
+            listOf(
+                DashboardStyles.TREND_7_DAY to Triple(TrendMetric.PLAY_TIME, TrendRange.DAYS_7, TrendVisualStyle.LINE),
+                DashboardStyles.TREND_30_DAY to Triple(TrendMetric.PLAY_TIME, TrendRange.DAYS_30, TrendVisualStyle.AREA),
+                DashboardStyles.TREND_LAUNCH_7_DAY to Triple(TrendMetric.GAME_OPENS, TrendRange.DAYS_7, TrendVisualStyle.LINE),
+                DashboardStyles.TREND_LAUNCH_30_DAY to Triple(TrendMetric.GAME_OPENS, TrendRange.DAYS_30, TrendVisualStyle.AREA),
+            )
 
         cases.forEachIndexed { index, (style, expected) ->
-            val restored = DashboardLayouts.decode(
-                """{"version":4,"widgets":[{"id":"trend-$index","type":"PLAY_TREND","columns":2,"rows":1,"heightSteps":17,"style":"$style"}]}""",
-                DashboardProfile.WIDE,
-            ).widgets.single()
+            val restored =
+                DashboardLayouts.decode(
+                    """{"version":4,"widgets":[{"id":"trend-$index","type":"PLAY_TREND","columns":2,"rows":1,"heightSteps":17,"style":"$style"}]}""",
+                    DashboardProfile.WIDE,
+                ).widgets.single()
 
             assertEquals(expected.first, restored.trendMetric)
             assertEquals(expected.second, restored.trendRange)
@@ -191,10 +218,12 @@ class DashboardLayoutsTest {
     }
 
     @Test fun unknownV5TrendFieldsFallBackWithoutResettingPlacementHeightAutoFillOrStyle() {
-        val restored = DashboardLayouts.decode(
-            """{"version":5,"autoFill":false,"widgets":[{"id":"trend","type":"PLAY_TREND","columns":3,"rows":1,"heightSteps":31,"style":"trend_30_day","column":1,"row":9,"trendMetric":"unknown","trendRange":"unknown","trendVisualStyle":"unknown"}]}""",
-            DashboardProfile.WIDE,
-        )
+        val restored =
+            DashboardLayouts.decode(
+                """{"version":5,"autoFill":false,"widgets":[{"id":"trend","type":"PLAY_TREND","columns":3,"rows":1,"heightSteps":31,"style":"trend_30_day","column":1,"row":9,""" +
+                    """"trendMetric":"unknown","trendRange":"unknown","trendVisualStyle":"unknown"}]}""",
+                DashboardProfile.WIDE,
+            )
         val trend = restored.widgets.single()
 
         assertFalse(restored.autoFill)
@@ -214,19 +243,24 @@ class DashboardLayoutsTest {
     }
 
     @Test fun setTrendConfigOnlyUpdatesTheTargetTrendInstance() {
-        val original = DashboardLayout(widgets = listOf(
-            trend("first", TrendMetric.PLAY_TIME, TrendRange.DAYS_7, TrendVisualStyle.LINE),
-            trend("second", TrendMetric.PLAY_TIME, TrendRange.DAYS_7, TrendVisualStyle.LINE),
-        ))
+        val original =
+            DashboardLayout(
+                widgets =
+                    listOf(
+                        trend("first", TrendMetric.PLAY_TIME, TrendRange.DAYS_7, TrendVisualStyle.LINE),
+                        trend("second", TrendMetric.PLAY_TIME, TrendRange.DAYS_7, TrendVisualStyle.LINE),
+                    )
+            )
 
-        val updated = DashboardLayouts.setTrendConfig(
-            original,
-            DashboardProfile.COMPACT,
-            "second",
-            TrendMetric.GAME_OPENS,
-            TrendRange.DAYS_30,
-            TrendVisualStyle.AREA,
-        )
+        val updated =
+            DashboardLayouts.setTrendConfig(
+                original,
+                DashboardProfile.COMPACT,
+                "second",
+                TrendMetric.GAME_OPENS,
+                TrendRange.DAYS_30,
+                TrendVisualStyle.AREA,
+            )
 
         assertEquals(TrendMetric.PLAY_TIME, updated.widgets.first { it.instanceId == "first" }.trendMetric)
         assertEquals(TrendRange.DAYS_7, updated.widgets.first { it.instanceId == "first" }.trendRange)
@@ -236,24 +270,31 @@ class DashboardLayoutsTest {
     }
 
     @Test fun multipleTrendsPackAndManualPlacementWithoutOverlap() {
-        val automatic = DashboardLayout(widgets = listOf(
-            trend("first", TrendMetric.PLAY_TIME, TrendRange.DAYS_7, TrendVisualStyle.LINE),
-            trend("second", TrendMetric.GAME_OPENS, TrendRange.DAYS_30, TrendVisualStyle.AREA),
-        ))
-        val manual = DashboardLayouts.placeAt(
-            DashboardLayouts.placeAt(automatic, DashboardProfile.COMPACT, "first", 0, 0),
-            DashboardProfile.COMPACT,
-            "second",
-            0,
-            0,
-        )
+        val automatic =
+            DashboardLayout(
+                widgets =
+                    listOf(
+                        trend("first", TrendMetric.PLAY_TIME, TrendRange.DAYS_7, TrendVisualStyle.LINE),
+                        trend("second", TrendMetric.GAME_OPENS, TrendRange.DAYS_30, TrendVisualStyle.AREA),
+                    )
+            )
+        val manual =
+            DashboardLayouts.placeAt(
+                DashboardLayouts.placeAt(automatic, DashboardProfile.COMPACT, "first", 0, 0),
+                DashboardProfile.COMPACT,
+                "second",
+                0,
+                0,
+            )
 
         assertEquals(2, DashboardLayouts.pack(automatic, DashboardProfile.COMPACT).size)
         val cells = HashSet<Pair<Int, Int>>()
         DashboardLayouts.pack(manual, DashboardProfile.COMPACT).forEach { placement ->
-            repeat(placement.spec.heightSteps + DashboardLayouts.GAP_STEPS) { dy -> repeat(placement.spec.size.columns) { dx ->
-                assertTrue(cells.add((placement.column + dx) to (placement.row + dy)))
-            } }
+            repeat(placement.spec.heightSteps + DashboardLayouts.GAP_STEPS) { dy ->
+                repeat(placement.spec.size.columns) { dx ->
+                    assertTrue(cells.add((placement.column + dx) to (placement.row + dy)))
+                }
+            }
         }
     }
 
@@ -282,21 +323,26 @@ class DashboardLayoutsTest {
 
     @Test
     fun v6ManualRoundTripPreservesOrderMaxPagesAndMode() {
-        val original = DashboardLayout(widgets = listOf(
-            DashboardWidgetSpec(
-                "hero",
-                DashboardWidgetType.GAME_SPOTLIGHT,
-                DashboardWidgetSize(2, 2),
-                spotlightSelectionMode = SpotlightSelectionMode.MANUAL,
-                spotlightGameIds = listOf(3L, 1L, 2L),
-                spotlightMaxPages = 3,
-            ),
-        ))
+        val original =
+            DashboardLayout(
+                widgets =
+                    listOf(
+                        DashboardWidgetSpec(
+                            "hero",
+                            DashboardWidgetType.GAME_SPOTLIGHT,
+                            DashboardWidgetSize(2, 2),
+                            spotlightSelectionMode = SpotlightSelectionMode.MANUAL,
+                            spotlightGameIds = listOf(3L, 1L, 2L),
+                            spotlightMaxPages = 3,
+                        ),
+                    )
+            )
 
-        val restored = DashboardLayouts.decode(
-            DashboardLayouts.encode(original, DashboardProfile.WIDE),
-            DashboardProfile.WIDE,
-        ).widgets.single()
+        val restored =
+            DashboardLayouts.decode(
+                DashboardLayouts.encode(original, DashboardProfile.WIDE),
+                DashboardProfile.WIDE,
+            ).widgets.single()
 
         assertEquals(SpotlightSelectionMode.MANUAL, restored.spotlightSelectionMode)
         assertEquals(listOf(3L, 1L, 2L), restored.spotlightGameIds)
@@ -306,19 +352,23 @@ class DashboardLayoutsTest {
 
     @Test
     fun manualListIsDeduplicatedClampedToFiveAndMaxPagesCoerced() {
-        val normalized = DashboardLayouts.normalize(
-            DashboardLayout(widgets = listOf(
-                DashboardWidgetSpec(
-                    "hero",
-                    DashboardWidgetType.GAME_SPOTLIGHT,
-                    DashboardWidgetSize(2, 2),
-                    spotlightSelectionMode = SpotlightSelectionMode.MANUAL,
-                    spotlightGameIds = listOf(1L, 1L, 2L, 3L, 4L, 5L, 6L),
-                    spotlightMaxPages = 9,
+        val normalized =
+            DashboardLayouts.normalize(
+                DashboardLayout(
+                    widgets =
+                        listOf(
+                            DashboardWidgetSpec(
+                                "hero",
+                                DashboardWidgetType.GAME_SPOTLIGHT,
+                                DashboardWidgetSize(2, 2),
+                                spotlightSelectionMode = SpotlightSelectionMode.MANUAL,
+                                spotlightGameIds = listOf(1L, 1L, 2L, 3L, 4L, 5L, 6L),
+                                spotlightMaxPages = 9,
+                            ),
+                        )
                 ),
-            )),
-            DashboardProfile.WIDE,
-        ).widgets.single()
+                DashboardProfile.WIDE,
+            ).widgets.single()
 
         assertEquals(listOf(1L, 2L, 3L, 4L, 5L), normalized.spotlightGameIds)
         assertEquals(DashboardLayouts.MAX_SPOTLIGHT_PAGES, normalized.spotlightMaxPages)
@@ -326,9 +376,13 @@ class DashboardLayoutsTest {
 
     @Test
     fun setSpotlightManualAndAutomaticKeepCanonicalInvariant() {
-        val layout = DashboardLayout(widgets = listOf(
-            DashboardWidgetSpec("hero", DashboardWidgetType.GAME_SPOTLIGHT, DashboardWidgetSize(2, 2)),
-        ))
+        val layout =
+            DashboardLayout(
+                widgets =
+                    listOf(
+                        DashboardWidgetSpec("hero", DashboardWidgetType.GAME_SPOTLIGHT, DashboardWidgetSize(2, 2)),
+                    )
+            )
         val manual = DashboardLayouts.setSpotlightManual(layout, DashboardProfile.WIDE, "hero", listOf(4L, 2L), 2)
         assertEquals(SpotlightSelectionMode.MANUAL, manual.widgets.single().spotlightSelectionMode)
         assertEquals(listOf(4L, 2L), manual.widgets.single().spotlightGameIds)

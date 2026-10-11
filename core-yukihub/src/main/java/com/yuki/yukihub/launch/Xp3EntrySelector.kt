@@ -13,18 +13,18 @@ import java.util.Locale
  * mode and let the engine locate startup.tjs inside the archives itself.
  */
 object Xp3EntrySelector {
-
     data class Entry(
         @JvmField val name: String,
         @JvmField val size: Long,
     )
 
     /** Pure asset packs that can never be the game entry archive. */
-    val ASSET_STEMS: Set<String> = setOf(
-        "bgimage", "bgm", "evimage", "stimage", "fgimage", "voice", "video", "movie",
-        "op", "opmv", "op_movie", "ed", "char", "system", "title", "image", "sound",
-        "se", "sysvoice", "cm", "icon", "logo", "fan", "pkg", "backimage", "background",
-    )
+    val ASSET_STEMS: Set<String> =
+        setOf(
+            "bgimage", "bgm", "evimage", "stimage", "fgimage", "voice", "video", "movie",
+            "op", "opmv", "op_movie", "ed", "char", "system", "title", "image", "sound",
+            "se", "sysvoice", "cm", "icon", "logo", "fan", "pkg", "backimage", "background",
+        )
 
     /**
      * Returns the best entry file name, or null when there is no reliable
@@ -75,13 +75,17 @@ object Xp3EntrySelector {
     private fun Entry.stem(): String = name.substringBeforeLast('.')
 
     private fun stemOf(value: String?): String? {
-        val base = value?.substringAfterLast('/')?.substringAfterLast('\\')
-            ?.substringBeforeLast('.')?.trim()?.takeIf(String::isNotEmpty) ?: return null
+        val base =
+            value?.substringAfterLast('/')?.substringAfterLast('\\')
+                ?.substringBeforeLast('.')?.trim()?.takeIf(String::isNotEmpty) ?: return null
         val normalized = normalize(base)
         return normalized.takeIf(String::isNotEmpty)
     }
 
-    private fun matchesContains(stem: String, reference: String?): Boolean {
+    private fun matchesContains(
+        stem: String,
+        reference: String?,
+    ): Boolean {
         if (reference.isNullOrEmpty() || reference.length < 2) return false
         val a = normalize(stem)
         if (a.isEmpty()) return false

@@ -3,7 +3,6 @@ package com.kireibox.ui
 import com.yuki.yukihub.model.Game
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class KireiBackPolicyTest {
@@ -20,6 +19,7 @@ class KireiBackPolicyTest {
             ),
         )
     }
+
     @Test
     fun settingsSubPageReturnsToItsParent() {
         assertEquals(
@@ -30,28 +30,64 @@ class KireiBackPolicyTest {
 
     @Test
     fun settingsPagesHaveAStableSingleFocusParentHierarchy() {
-        val expectedParents = mapOf(
-            KireiSettingsPage.ROOT to null,
-            KireiSettingsPage.LIBRARY_HUB to KireiSettingsPage.ROOT,
-            KireiSettingsPage.LIBRARY to KireiSettingsPage.LIBRARY_HUB,
-            KireiSettingsPage.COVERS to KireiSettingsPage.ROOT,
-            KireiSettingsPage.KRKR to KireiSettingsPage.ROOT,
-            KireiSettingsPage.INTERFACE to KireiSettingsPage.ROOT,
-            KireiSettingsPage.PERMISSIONS to KireiSettingsPage.ROOT,
-            KireiSettingsPage.DIAGNOSTICS to KireiSettingsPage.ROOT,
-            KireiSettingsPage.ABOUT to KireiSettingsPage.ROOT,
-        )
+        val expectedParents =
+            mapOf(
+                KireiSettingsPage.ROOT to null,
+                KireiSettingsPage.APPEARANCE to KireiSettingsPage.ROOT,
+                KireiSettingsPage.LIBRARY_HUB to KireiSettingsPage.ROOT,
+                KireiSettingsPage.LIBRARY to KireiSettingsPage.LIBRARY_HUB,
+                KireiSettingsPage.COVERS to KireiSettingsPage.ROOT,
+                // P3: 来源账号 is a sub-page of 封面与元数据, so back returns to the cover page (a root
+                // shortcut opens it with the root as its back target instead, see below).
+                KireiSettingsPage.COVER_ACCOUNTS to KireiSettingsPage.COVERS,
+                // 同步游玩时长 hangs off the NextMoe card; the overview opens it as a root shortcut.
+                KireiSettingsPage.PLAYTIME_SYNC to KireiSettingsPage.COVER_ACCOUNTS,
+                KireiSettingsPage.ENGINES to KireiSettingsPage.ROOT,
+                KireiSettingsPage.KRKR to KireiSettingsPage.ENGINES,
+                KireiSettingsPage.ONS to KireiSettingsPage.ENGINES,
+                KireiSettingsPage.ARTEMIS to KireiSettingsPage.ENGINES,
+                KireiSettingsPage.TYRANO to KireiSettingsPage.ENGINES,
+                KireiSettingsPage.WINLATOR to KireiSettingsPage.ENGINES,
+                KireiSettingsPage.INTERFACE to KireiSettingsPage.ROOT,
+                KireiSettingsPage.PERMISSIONS to KireiSettingsPage.ROOT,
+                KireiSettingsPage.DIAGNOSTICS to KireiSettingsPage.ROOT,
+                KireiSettingsPage.ABOUT to KireiSettingsPage.ROOT,
+            )
 
         assertEquals(expectedParents, KireiSettingsPage.entries.associateWith(KireiBackPolicy::settingsParent))
     }
 
     @Test
+    fun aShortcutPageReturnsStraightToTheRoot() {
+        // r4 · S2: 添加扫描目录 / Bangumi results open second-level pages the user never walked through;
+        // back must not land on 游戏库 / 封面与元数据 first. r5: the root's 来源账号 row and the cover
+        // picker's login action open 来源账号 the same way.
+        assertEquals(KireiSettingsPage.ROOT, KireiBackPolicy.settingsBackTarget(KireiSettingsPage.LIBRARY, KireiSettingsPage.LIBRARY))
+        assertEquals(KireiSettingsPage.ROOT, KireiBackPolicy.settingsBackTarget(KireiSettingsPage.COVER_ACCOUNTS, KireiSettingsPage.COVER_ACCOUNTS))
+        // Pages reached normally (or below the result's page) keep their parent.
+        assertEquals(KireiSettingsPage.LIBRARY_HUB, KireiBackPolicy.settingsBackTarget(KireiSettingsPage.LIBRARY, null))
+        assertEquals(KireiSettingsPage.COVERS, KireiBackPolicy.settingsBackTarget(KireiSettingsPage.COVER_ACCOUNTS, KireiSettingsPage.COVERS))
+        assertEquals(KireiSettingsPage.ROOT, KireiBackPolicy.settingsBackTarget(KireiSettingsPage.ROOT, null))
+    }
+
+    @Test
     fun settingsDepthMakesLibraryLeavesOneLevelDeeperThanTheirHub() {
         assertEquals(0, KireiBackPolicy.settingsDepth(KireiSettingsPage.ROOT))
+        assertEquals(1, KireiBackPolicy.settingsDepth(KireiSettingsPage.APPEARANCE))
         assertEquals(1, KireiBackPolicy.settingsDepth(KireiSettingsPage.LIBRARY_HUB))
         assertEquals(2, KireiBackPolicy.settingsDepth(KireiSettingsPage.LIBRARY))
         assertEquals(1, KireiBackPolicy.settingsDepth(KireiSettingsPage.COVERS))
+        assertEquals("来源账号 slides in one level deeper than 封面与元数据", 2, KireiBackPolicy.settingsDepth(KireiSettingsPage.COVER_ACCOUNTS))
         assertEquals(1, KireiBackPolicy.settingsDepth(KireiSettingsPage.DIAGNOSTICS))
+    }
+
+    @Test
+    fun appearancePageIsATopLevelSettingsPageThatReturnsToRoot() {
+        assertEquals(
+            KireiBackDestination.SETTINGS_PARENT,
+            KireiBackPolicy.resolveRoot(KireiTab.SETTINGS, KireiSettingsPage.APPEARANCE),
+        )
+        assertEquals(KireiSettingsPage.ROOT, KireiBackPolicy.settingsParent(KireiSettingsPage.APPEARANCE))
     }
 
     @Test
@@ -79,18 +115,6 @@ class KireiBackPolicyTest {
 
         assertEquals(game, closed.selectedGame)
         assertNull(closed.krkrEditorGame)
-    }
-
-    @Test
-    fun expandedLibrarySearchConsumesBackBeforeLeavingLibrary() {
-        assertTrue(
-            KireiBackPolicy.shouldCloseLibrarySearch(
-                editMode = false,
-                searchFocused = false,
-                query = "",
-                revealPhase = SearchRevealPhase.SHOWN,
-            )
-        )
     }
 
     @Test

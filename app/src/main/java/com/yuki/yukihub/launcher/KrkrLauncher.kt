@@ -10,8 +10,9 @@ import androidx.documentfile.provider.DocumentFile
 import com.akira.tyranoemu.remote.Kirikiroid126
 import com.akira.tyranoemu.remote.Kirikiroid134
 import com.akira.tyranoemu.remote.Kirikiroid139
-import com.apps.LauncherActivity
+import com.kireibox.app.LauncherActivity
 import com.yuki.yukihub.launch.Xp3EntrySelector
+import com.yuki.yukihub.launcherbridge.LauncherEngineOptions
 import com.yuki.yukihub.launcherbridge.LauncherKrkrBridge
 import org.tvp.kirikiri2.KR2Activity
 import java.io.File
@@ -49,15 +50,19 @@ internal object KrkrLauncher {
         safFileFallback: Boolean = false,
     ): Intent {
         val resolvedPath = if (originMode) null else resolvePath(context, gamePath, launchTarget)
-        val rawRootPath = ScriptEngineLaunchers.stripFileScheme(
-            ScriptEngineLaunchers.uriToFilePath(gamePath),
-        )
+        val rawRootPath =
+            ScriptEngineLaunchers.stripFileScheme(
+                ScriptEngineLaunchers.uriToFilePath(gamePath),
+            )
         val path = ScriptEngineLaunchers.stripFileScheme(resolvedPath)
         val rootPath = rootForPath(rawRootPath, path)
         val compatMode = LauncherKrkrBridge.isCompatMode(context)
-        val savePreparation = if (originMode) null else {
-            prepareGameSaveDirectory(context, gamePath, launchTarget)
-        }
+        val savePreparation =
+            if (originMode) {
+                null
+            } else {
+                prepareGameSaveDirectory(context, gamePath, launchTarget)
+            }
         if (!originMode && savePreparation?.available != true) {
             throw IllegalStateException(savePreparation?.description ?: "无法准备游戏目录 savedata")
         }
@@ -74,12 +79,13 @@ internal object KrkrLauncher {
         val resolvedVersion = if (originMode) "auto" else normalizeEngineVersion(engineVersion)
         val use126 = !originMode && resolvedVersion == "1.2.6"
         val use134 = !originMode && resolvedVersion == "1.3.4"
-        val activityClass = when {
-            originMode -> KR2Activity::class.java
-            use126 -> Kirikiroid126::class.java
-            use134 -> Kirikiroid134::class.java
-            else -> Kirikiroid139::class.java
-        }
+        val activityClass =
+            when {
+                originMode -> KR2Activity::class.java
+                use126 -> Kirikiroid126::class.java
+                use134 -> Kirikiroid134::class.java
+                else -> Kirikiroid139::class.java
+            }
         logInfo(
             "internal KRKR originMode=$originMode engineVersion=$resolvedVersion use126=$use126 " +
                 "use134=$use134 root=$gamePath target=$launchTarget resolved=$resolvedPath " +
@@ -100,8 +106,15 @@ internal object KrkrLauncher {
             putExtra("launchStartedElapsed", SystemClock.elapsedRealtime())
             putExtra("krStartupDialogPolicy", LauncherKrkrBridge.getStartupDialogPolicy(context))
             putExtra("originMode", originMode)
-            putExtra("krEngineVersion", when { use126 -> "1.2.6"; use134 -> "1.3.4"; else -> "1.3.9" })
-            putExtra("orientation", 6)
+            putExtra(
+                "krEngineVersion",
+                when {
+                    use126 -> "1.2.6"
+                    use134 -> "1.3.4"
+                    else -> "1.3.9"
+                }
+            )
+            putExtra("orientation", LauncherEngineOptions.orientation(context))
             putExtra("launchMode", if (originMode) "internal.krkr.origin" else "internal.krkr")
             putExtra("terminateKrProcessOnDestroy", false)
             putExtra("safFileFallback", false)
@@ -121,9 +134,10 @@ internal object KrkrLauncher {
         if (context == null) return SaveLocation(null, "应用上下文不可用", false)
         return try {
             val resolved = resolvePath(context, rootUri, launchTarget)
-            val rawRoot = ScriptEngineLaunchers.stripFileScheme(
-                ScriptEngineLaunchers.uriToFilePath(rootUri),
-            )
+            val rawRoot =
+                ScriptEngineLaunchers.stripFileScheme(
+                    ScriptEngineLaunchers.uriToFilePath(rootUri),
+                )
             val root = rootForPath(rawRoot, ScriptEngineLaunchers.stripFileScheme(resolved))
             if (root.isNullOrBlank() || root.startsWith("content://")) {
                 return SaveLocation(null, "无法解析 KRKR 实际游戏目录", false)
@@ -136,10 +150,15 @@ internal object KrkrLauncher {
     }
 
     @JvmStatic
-    fun resolvePath(context: Context?, rootUri: String?, launchTarget: String?): String? {
-        val rootPath = ScriptEngineLaunchers.stripFileScheme(
-            ScriptEngineLaunchers.uriToFilePath(rootUri),
-        )
+    fun resolvePath(
+        context: Context?,
+        rootUri: String?,
+        launchTarget: String?
+    ): String? {
+        val rootPath =
+            ScriptEngineLaunchers.stripFileScheme(
+                ScriptEngineLaunchers.uriToFilePath(rootUri),
+            )
         if (rootPath.isNullOrEmpty()) return rootUri
         val target = launchTarget?.trim().orEmpty()
         if (target.isEmpty() || target == "[游戏目录]" || target.equals("DIR", ignoreCase = true)) {
@@ -163,25 +182,33 @@ internal object KrkrLauncher {
         return if (
             target.endsWith(".xp3") || target.endsWith(".tjs") ||
             target.endsWith(".exe") || target.endsWith(".dll")
-        ) targetFile.absolutePath else rootPath
+        ) {
+            targetFile.absolutePath
+        } else {
+            rootPath
+        }
     }
 
     @JvmStatic
-    fun rootForPath(rawRootPath: String?, launchPath: String?): String? = try {
-        rawRootPath?.takeIf(String::isNotBlank)?.let { rawPath ->
-            val raw = File(rawPath)
-            if (raw.isDirectory) return raw.absolutePath
-            raw.parentFile?.let { return it.absolutePath }
+    fun rootForPath(
+        rawRootPath: String?,
+        launchPath: String?
+    ): String? =
+        try {
+            rawRootPath?.takeIf(String::isNotBlank)?.let { rawPath ->
+                val raw = File(rawPath)
+                if (raw.isDirectory) return raw.absolutePath
+                raw.parentFile?.let { return it.absolutePath }
+            }
+            launchPath?.takeIf(String::isNotBlank)?.let { path ->
+                val launch = File(path)
+                if (launch.isDirectory) return launch.absolutePath
+                launch.parentFile?.let { return it.absolutePath }
+            }
+            rawRootPath
+        } catch (_: Throwable) {
+            rawRootPath
         }
-        launchPath?.takeIf(String::isNotBlank)?.let { path ->
-            val launch = File(path)
-            if (launch.isDirectory) return launch.absolutePath
-            launch.parentFile?.let { return it.absolutePath }
-        }
-        rawRootPath
-    } catch (_: Throwable) {
-        rawRootPath
-    }
 
     @JvmStatic
     fun normalizeEngineVersion(engineVersion: String?): String {
@@ -197,23 +224,31 @@ internal object KrkrLauncher {
         val root = File(rootPath)
         if (!root.isDirectory) return null
         val files = root.listFiles() ?: return null
-        val entries = files.asSequence()
-            .filter { it.isFile && it.name.endsWith(".xp3", ignoreCase = true) }
-            .map { Xp3EntrySelector.Entry(it.name, it.length()) }
-            .toList()
+        val entries =
+            files.asSequence()
+                .filter { it.isFile && it.name.endsWith(".xp3", ignoreCase = true) }
+                .map { Xp3EntrySelector.Entry(it.name, it.length()) }
+                .toList()
         if (entries.isEmpty()) return null
         val picked = Xp3EntrySelector.select(entries, root.name, null) ?: return null
         return File(root, picked).absolutePath
     }
 
-    private fun findPreferredEntryFromTree(context: Context?, rootUri: String?, rootPath: String): String? {
+    private fun findPreferredEntryFromTree(
+        context: Context?,
+        rootUri: String?,
+        rootPath: String
+    ): String? {
         arrayOf("data.xp3", "startup.tjs", "patch.xp3").forEach { name ->
             findTargetFromTree(context, rootUri, rootPath, name)?.let { return it }
         }
         return try {
-            val directory = if (context == null || rootUri == null) null else {
-                DocumentFile.fromTreeUri(context, Uri.parse(rootUri))
-            }
+            val directory =
+                if (context == null || rootUri == null) {
+                    null
+                } else {
+                    DocumentFile.fromTreeUri(context, Uri.parse(rootUri))
+                }
             directory?.takeIf(DocumentFile::isDirectory)?.listFiles()?.firstOrNull { file ->
                 file?.isFile == true && file.name?.lowercase(Locale.ROOT)?.endsWith(".xp3") == true
             }?.name?.let { name -> if (rootPath.endsWith('/')) rootPath + name else "$rootPath/$name" }
@@ -239,12 +274,13 @@ internal object KrkrLauncher {
             if (current?.exists() == true && current?.isFile == true) {
                 val cleanTarget = target.trimStart('/')
                 if (rootPath.endsWith('/')) rootPath + cleanTarget else "$rootPath/$cleanTarget"
-            } else null
+            } else {
+                null
+            }
         } catch (_: Throwable) {
             null
         }
     }
-
 
     @JvmStatic
     fun prepareGameSaveDirectory(
@@ -254,10 +290,12 @@ internal object KrkrLauncher {
     ): SavePreparation {
         if (context == null) return SavePreparation(false, "应用上下文不可用")
         val location = resolveSaveLocation(context, rootUri, launchTarget)
-        val saveDirectory = location.directory
-            ?: return SavePreparation(false, location.description)
-        val gameRoot = saveDirectory.parentFile
-            ?: return SavePreparation(false, "无法解析 KRKR 游戏根目录")
+        val saveDirectory =
+            location.directory
+                ?: return SavePreparation(false, location.description)
+        val gameRoot =
+            saveDirectory.parentFile
+                ?: return SavePreparation(false, "无法解析 KRKR 游戏根目录")
         return try {
             if (!gameRoot.isDirectory) {
                 return SavePreparation(
@@ -286,11 +324,12 @@ internal object KrkrLauncher {
             val migration = migrateLegacySaves(context, gameRoot, saveDirectory)
             SavePreparation(
                 available = true,
-                description = if (migration.conflicts > 0) {
-                    "游戏目录 savedata 可写；旧存档有 ${migration.conflicts} 个同名文件未覆盖"
-                } else {
-                    "游戏目录 savedata 可写"
-                },
+                description =
+                    if (migration.conflicts > 0) {
+                        "游戏目录 savedata 可写；旧存档有 ${migration.conflicts} 个同名文件未覆盖"
+                    } else {
+                        "游戏目录 savedata 可写"
+                    },
                 migratedFiles = migration.copied,
                 conflicts = migration.conflicts,
             )
@@ -301,8 +340,7 @@ internal object KrkrLauncher {
     }
 
     internal data class MigrationResult(val copied: Int = 0, val conflicts: Int = 0) {
-        operator fun plus(other: MigrationResult) =
-            MigrationResult(copied + other.copied, conflicts + other.conflicts)
+        operator fun plus(other: MigrationResult) = MigrationResult(copied + other.copied, conflicts + other.conflicts)
     }
 
     private fun migrateLegacySaves(
@@ -314,15 +352,16 @@ internal object KrkrLauncher {
         val marker = SAVE_MIGRATION_PREFIX + Integer.toHexString(gameRoot.canonicalPath.hashCode())
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         if (prefs.getBoolean(marker, false)) return MigrationResult()
-        val sources = buildList {
-            context.filesDir?.let { internal ->
-                add(File(File(File(internal, "krkr_mirror"), saveName), "savedata"))
-                add(File(File(internal, "save"), saveName))
+        val sources =
+            buildList {
+                context.filesDir?.let { internal ->
+                    add(File(File(File(internal, "krkr_mirror"), saveName), "savedata"))
+                    add(File(File(internal, "save"), saveName))
+                }
+                context.getExternalFilesDir(null)?.let { external ->
+                    add(File(File(external, "save"), saveName))
+                }
             }
-            context.getExternalFilesDir(null)?.let { external ->
-                add(File(File(external, "save"), saveName))
-            }
-        }
         var result = MigrationResult()
         for (source in sources) {
             if (sameCanonicalDirectory(source, saveDirectory)) continue
@@ -349,34 +388,39 @@ internal object KrkrLauncher {
         for (child in fromDirectory.listFiles().orEmpty()) {
             if (isSymlink(child)) continue
             val target = File(toDirectory, child.name)
-            result += when {
-                child.isDirectory && target.exists() && !target.isDirectory ->
-                    MigrationResult(conflicts = 1)
-                child.isDirectory ->
-                    copyMissingFilesRecursively(child, target)
-                child.isFile && target.exists() ->
-                    MigrationResult(conflicts = 1)
-                child.isFile && copyFile(child, target) ->
-                    MigrationResult(copied = 1)
-                else -> MigrationResult()
-            }
+            result +=
+                when {
+                    child.isDirectory && target.exists() && !target.isDirectory ->
+                        MigrationResult(conflicts = 1)
+                    child.isDirectory ->
+                        copyMissingFilesRecursively(child, target)
+                    child.isFile && target.exists() ->
+                        MigrationResult(conflicts = 1)
+                    child.isFile && copyFile(child, target) ->
+                        MigrationResult(copied = 1)
+                    else -> MigrationResult()
+                }
         }
         return result
     }
 
-    private fun copyFile(source: File, destination: File): Boolean = try {
-        destination.parentFile?.let { parent ->
-            if (!parent.isDirectory && !parent.mkdirs()) return false
+    private fun copyFile(
+        source: File,
+        destination: File
+    ): Boolean =
+        try {
+            destination.parentFile?.let { parent ->
+                if (!parent.isDirectory && !parent.mkdirs()) return false
+            }
+            FileInputStream(source).use { input ->
+                FileOutputStream(destination, false).use { output -> input.copyTo(output, 64 * 1024) }
+            }
+            destination.setLastModified(source.lastModified())
+            true
+        } catch (error: Throwable) {
+            logWarn("copy file failed $source -> $destination", error)
+            false
         }
-        FileInputStream(source).use { input ->
-            FileOutputStream(destination, false).use { output -> input.copyTo(output, 64 * 1024) }
-        }
-        destination.setLastModified(source.lastModified())
-        true
-    } catch (error: Throwable) {
-        logWarn("copy file failed $source -> $destination", error)
-        false
-    }
 
     private fun probeWritable(directory: File): String? {
         val suffix = "${android.os.Process.myPid()}-${System.nanoTime()}"
@@ -399,18 +443,20 @@ internal object KrkrLauncher {
         }
     }
 
-    private fun sameCanonicalDirectory(first: File, second: File): Boolean =
-        runCatching { first.canonicalFile == second.canonicalFile }.getOrDefault(false)
+    private fun sameCanonicalDirectory(
+        first: File,
+        second: File
+    ): Boolean = runCatching { first.canonicalFile == second.canonicalFile }.getOrDefault(false)
 
-    private fun gameLocalWriteHelp(reason: String): String =
-        "$reason。请授予“所有文件访问权限”；若游戏位于 SD 卡、Android/data 或只读目录，请移动到内部存储后重试。"
+    private fun gameLocalWriteHelp(reason: String): String = "$reason。请授予“所有文件访问权限”；若游戏位于 SD 卡、Android/data 或只读目录，请移动到内部存储后重试。"
 
-    private fun isSymlink(file: File): Boolean = try {
-        Os.readlink(file.absolutePath)
-        true
-    } catch (_: Throwable) {
-        false
-    }
+    private fun isSymlink(file: File): Boolean =
+        try {
+            Os.readlink(file.absolutePath)
+            true
+        } catch (_: Throwable) {
+            false
+        }
 
     private fun safeSaveName(rootPath: String?): String {
         if (rootPath.isNullOrBlank()) return "default"
@@ -423,7 +469,10 @@ internal object KrkrLauncher {
         }
     }
 
-    private fun appendThemeColors(intent: Intent, context: Context) {
+    private fun appendThemeColors(
+        intent: Intent,
+        context: Context
+    ) {
         try {
             val primary = KireiEngineTheme.primary(context)
             intent.putExtra("primaryColor", primary)
@@ -439,15 +488,19 @@ internal object KrkrLauncher {
         }
     }
 
-    private fun engineIntentFlags(): Int = Intent.FLAG_ACTIVITY_NEW_TASK or
-        Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION or
-        Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION or Intent.FLAG_GRANT_PREFIX_URI_PERMISSION
+    private fun engineIntentFlags(): Int =
+        Intent.FLAG_ACTIVITY_NEW_TASK or
+            Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION or
+            Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION or Intent.FLAG_GRANT_PREFIX_URI_PERMISSION
 
     private fun logInfo(message: String) {
         runCatching { Log.i(TAG, message) }
     }
 
-    private fun logWarn(message: String, error: Throwable? = null) {
+    private fun logWarn(
+        message: String,
+        error: Throwable? = null
+    ) {
         runCatching { if (error == null) Log.w(TAG, message) else Log.w(TAG, message, error) }
     }
 }

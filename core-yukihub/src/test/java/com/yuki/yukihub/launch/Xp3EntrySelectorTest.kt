@@ -7,16 +7,20 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class Xp3EntrySelectorTest {
-
-    private fun entries(vararg names: String): List<Xp3EntrySelector.Entry> =
-        names.mapIndexed { index, name -> Xp3EntrySelector.Entry(name, 1024L * (index + 1)) }
+    private fun entries(vararg names: String): List<Xp3EntrySelector.Entry> = names.mapIndexed { index, name -> Xp3EntrySelector.Entry(name, 1024L * (index + 1)) }
 
     @Test
     fun `title-named archive wins over alphabetical asset packs`() {
-        val list = entries(
-            "bgimage.xp3", "bgm.xp3", "evimage.xp3", "patch.xp3",
-            "stimage.xp3", "voice.xp3", "恋爱，我就借走了.xp3",
-        )
+        val list =
+            entries(
+                "bgimage.xp3",
+                "bgm.xp3",
+                "evimage.xp3",
+                "patch.xp3",
+                "stimage.xp3",
+                "voice.xp3",
+                "恋爱，我就借走了.xp3",
+            )
         assertEquals(
             "恋爱，我就借走了.xp3",
             Xp3EntrySelector.select(list, folderName = "恋爱，我就借走了"),

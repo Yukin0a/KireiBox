@@ -1,9 +1,9 @@
 package com.kireibox.ui
 
-import androidx.compose.ui.graphics.colorspace.ColorSpace
-import androidx.compose.ui.graphics.colorspace.ColorSpaces
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.ImageBitmapConfig
+import androidx.compose.ui.graphics.colorspace.ColorSpace
+import androidx.compose.ui.graphics.colorspace.ColorSpaces
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -18,28 +18,30 @@ import kotlin.concurrent.thread
 
 class CoverToneExtractorTest {
     @Test
-    fun emptyOrInvalidPixelsUseColdDefaultFallback() {
-        val tone = CoverToneExtractor.fromArgbPixels(
-            intArrayOf(),
-            fallbackArgb = 0xFF5B5AC8.toInt(),
-        )
+    fun emptyOrInvalidPixelsUseTheMutedDefaultFallback() {
+        val tone = CoverToneExtractor.fromArgbPixels(intArrayOf())
         assertTrue(tone.usedFallback)
-        assertEquals(0xFF5B5AC8.toInt(), tone.argb)
+        assertEquals(CoverToneExtractor.DEFAULT_FALLBACK_ARGB, tone.argb)
+        // The default is the muted graphite-rose token, no longer the old #5B5AC8 purple.
+        assertEquals(0xFF6A5560.toInt(), CoverToneExtractor.DEFAULT_FALLBACK_ARGB)
+        assertTrue("default fallback stays a muted neutral", tone.saturation < .25f)
     }
 
     @Test
     fun nullBitmapFallbackIsNeverCachedByBitmapCacheKey() {
         val cacheKey = "null-fallback-must-not-stick|HERO|1024x2048"
-        val first = CoverToneExtractor.toneFor(
-            cacheKey = cacheKey,
-            bitmap = null,
-            fallbackArgb = 0xFF112233.toInt(),
-        )
-        val second = CoverToneExtractor.toneFor(
-            cacheKey = cacheKey,
-            bitmap = null,
-            fallbackArgb = 0xFF445566.toInt(),
-        )
+        val first =
+            CoverToneExtractor.toneFor(
+                cacheKey = cacheKey,
+                bitmap = null,
+                fallbackArgb = 0xFF112233.toInt(),
+            )
+        val second =
+            CoverToneExtractor.toneFor(
+                cacheKey = cacheKey,
+                bitmap = null,
+                fallbackArgb = 0xFF445566.toInt(),
+            )
 
         assertTrue(first.usedFallback)
         assertEquals(0xFF112233.toInt(), first.argb)
@@ -48,105 +50,130 @@ class CoverToneExtractorTest {
     }
 
     @Test
-    fun warmCoverToneIsMixedTowardColdPurpleAndClamped() {
-        val tone = CoverToneExtractor.fromArgbPixels(
-            IntArray(24 * 24) { 0xFFFF4B20.toInt() },
-        )
+    fun warmCoverTonePreservesItsHueAndIsClamped() {
+        val tone =
+            CoverToneExtractor.fromArgbPixels(
+                IntArray(24 * 24) { 0xFFFF4B20.toInt() },
+            )
         assertTrue(!tone.usedFallback)
-        val red = tone.argb ushr 16 and 0xFF
-        val blue = tone.argb and 0xFF
-        assertTrue(red < 220)
-        assertTrue(blue > 80)
+        assertEquals(12f, hueOf(tone.argb), 1.5f)
+        assertTrue(tone.saturation in .28f..0.48f)
+        assertTrue(tone.value in .22f..0.38f)
+        // The packed color itself is clamped (not only the reported fields): a regression that
+        // packed the unclamped value/saturation would show here. ±.01 covers 8-bit rounding.
+        assertTrue("packed value ${valueOf(tone.argb)}", valueOf(tone.argb) in .21f..0.39f)
+        assertTrue("packed saturation ${saturationOf(tone.argb)}", saturationOf(tone.argb) in .27f..0.49f)
     }
 
     @Test
     fun neutralCoverToneStaysWithinRequiredSaturationAndValueRange() {
-        val tone = CoverToneExtractor.fromArgbPixels(
-            IntArray(24 * 24) { 0xFF777777.toInt() },
-        )
-        assertTrue(!tone.usedFallback)
-        assertTrue(tone.saturation >= .28f && tone.saturation <= .48f)
-        assertTrue(tone.value >= .22f && tone.value <= .38f)
+        // Monochrome art has no hue of its own: it must not be boosted into an invented red/maroon
+        // (hue 0°), but take the fallback's graphite-rose hue at a low, bounded saturation.
+        listOf(0xFF777777.toInt(), 0xFF101010.toInt(), 0xFFF0F0F0.toInt(), 0xFF7A7777.toInt()).forEach { grey ->
+            val tone = CoverToneExtractor.fromArgbPixels(IntArray(24 * 24) { grey })
+            assertTrue(!tone.usedFallback)
+            assertEquals(CoverToneExtractor.NEUTRAL_SATURATION, tone.saturation, .0001f)
+            assertTrue("neutral saturation stays below the chromatic clamp", tone.saturation < .28f)
+            assertTrue(tone.value >= .22f && tone.value <= .38f)
+            assertTrue("packed grey stays low-chroma", saturationOf(tone.argb) < .2f)
+            assertTrue("packed value is clamped", valueOf(tone.argb) in .21f..0.39f)
+            assertEquals(hueOf(CoverToneExtractor.DEFAULT_FALLBACK_ARGB), hueOf(tone.argb), 3f)
+        }
+        assertEquals(328.6f, CoverToneExtractor.fallbackHue, .5f)
     }
 
     @Test
-    fun greenHueIsNotJudgedWarmAndKeepsItsHue() {
-        val tone = CoverToneExtractor.fromArgbPixels(
-            IntArray(24 * 24) { 0xFF00C800.toInt() },
-        )
+    fun greenHueKeepsItsHue() {
+        val tone =
+            CoverToneExtractor.fromArgbPixels(
+                IntArray(24 * 24) { 0xFF00C800.toInt() },
+            )
         assertTrue(!tone.usedFallback)
         assertEquals(120f, hueOf(tone.argb), 0.6f)
     }
 
     @Test
-    fun yellowGreenHueIsNotJudgedWarmAndKeepsItsHue() {
-        val tone = CoverToneExtractor.fromArgbPixels(
-            IntArray(24 * 24) { 0xFF80FF00.toInt() }, // hue ≈ 89.9
-        )
+    fun yellowGreenHueKeepsItsHue() {
+        val tone =
+            CoverToneExtractor.fromArgbPixels(
+                // hue ≈ 89.9
+                IntArray(24 * 24) { 0xFF80FF00.toInt() },
+            )
         assertTrue(!tone.usedFallback)
         assertEquals(90f, hueOf(tone.argb), 1.0f)
     }
 
     @Test
-    fun cyanHueIsNotJudgedWarmAndKeepsItsHue() {
-        val tone = CoverToneExtractor.fromArgbPixels(
-            IntArray(24 * 24) { 0xFF00C8C8.toInt() },
-        )
+    fun cyanHueKeepsItsHue() {
+        val tone =
+            CoverToneExtractor.fromArgbPixels(
+                IntArray(24 * 24) { 0xFF00C8C8.toInt() },
+            )
         assertTrue(!tone.usedFallback)
         assertEquals(180f, hueOf(tone.argb), 0.6f)
     }
 
     @Test
-    fun yellowHueIsWarmAndMixedTowardColdPurple() {
-        val tone = CoverToneExtractor.fromArgbPixels(
-            IntArray(24 * 24) { 0xFFFFC800.toInt() },
-        )
+    fun yellowHuePreservesItsHue() {
+        val tone =
+            CoverToneExtractor.fromArgbPixels(
+                IntArray(24 * 24) { 0xFFFFC800.toInt() },
+            )
         assertTrue(!tone.usedFallback)
-        assertTrue(hueOf(tone.argb) in 240f..300f)
-        assertTrue(blueOf(tone.argb) > redOf(tone.argb))
+        assertEquals(47f, hueOf(tone.argb), 1.5f)
     }
 
     @Test
-    fun redHueAtTheZeroDegreeSeamIsWarm() {
-        val tone = CoverToneExtractor.fromArgbPixels(
-            IntArray(24 * 24) { 0xFFFF003F.toInt() }, // hue ≈ 345.2
-        )
+    fun redHueAtTheZeroDegreeSeamIsPreserved() {
+        val tone =
+            CoverToneExtractor.fromArgbPixels(
+                // hue ≈ 345.2
+                IntArray(24 * 24) { 0xFFFF003F.toInt() },
+            )
         assertTrue(!tone.usedFallback)
-        assertTrue(blueOf(tone.argb) > redOf(tone.argb))
+        assertEquals(345f, hueOf(tone.argb), 1.5f)
     }
 
     @Test
-    fun magentaBelowTheWrapCutoffIsNotWarm() {
-        val tone = CoverToneExtractor.fromArgbPixels(
-            IntArray(24 * 24) { 0xFFFF0080.toInt() }, // hue ≈ 329.9
-        )
+    fun magentaHueIsPreserved() {
+        val tone =
+            CoverToneExtractor.fromArgbPixels(
+                // hue ≈ 329.9
+                IntArray(24 * 24) { 0xFFFF0080.toInt() },
+            )
         assertTrue(!tone.usedFallback)
         assertEquals(330f, hueOf(tone.argb), 1.0f)
     }
 
     @Test
-    fun hueJustBelowSeventyIsWarmAndMixed() {
-        val tone = CoverToneExtractor.fromArgbPixels(
-            IntArray(24 * 24) { 0xFFD6FF00.toInt() }, // hue ≈ 69.65
-        )
+    fun hueJustBelowSeventyIsPreserved() {
+        val tone =
+            CoverToneExtractor.fromArgbPixels(
+                // hue ≈ 69.65
+                IntArray(24 * 24) { 0xFFD6FF00.toInt() },
+            )
         assertTrue(!tone.usedFallback)
-        assertTrue(blueOf(tone.argb) > greenOf(tone.argb))
+        assertEquals(70f, hueOf(tone.argb), 1.5f)
     }
 
     @Test
-    fun hueAtOrAboveSeventyIsNotWarm() {
-        val tone = CoverToneExtractor.fromArgbPixels(
-            IntArray(24 * 24) { 0xFFD4FF00.toInt() }, // hue ≈ 70.1
-        )
+    fun hueJustAboveSeventyIsPreserved() {
+        val tone =
+            CoverToneExtractor.fromArgbPixels(
+                // hue ≈ 70.1
+                IntArray(24 * 24) { 0xFFD4FF00.toInt() },
+            )
         assertTrue(!tone.usedFallback)
         assertEquals(70f, hueOf(tone.argb), 1.0f)
     }
 
     @Test
-    fun hueJustBelowTheWrapCutoffIsNotWarm() {
-        val tone = CoverToneExtractor.fromArgbPixels(
-            IntArray(24 * 24) { 0xFFFF0041.toInt() }, // hue ≈ 344.7
-        )
+    fun redMagentaHueNearTheSeamIsPreserved() {
+        val tone =
+            CoverToneExtractor.fromArgbPixels(
+                // hue ≈ 344.7
+                IntArray(24 * 24) { 0xFFFF0041.toInt() },
+            )
         assertTrue(!tone.usedFallback)
         assertEquals(345f, hueOf(tone.argb), 1.0f)
     }
@@ -176,9 +203,10 @@ class CoverToneExtractorTest {
 
     @Test
     fun samplingCoversEveryPixelForImagesNoLargerThan64() {
-        val pixels = CoverToneExtractor.sampleArgbPixels(8, 8) { x, y ->
-            if (x == 7 && y == 7) 0xFFFF0000.toInt() else 0xFF000000.toInt()
-        }
+        val pixels =
+            CoverToneExtractor.sampleArgbPixels(8, 8) { x, y ->
+                if (x == 7 && y == 7) 0xFFFF0000.toInt() else 0xFF000000.toInt()
+            }
         assertEquals(64, pixels.size)
         assertEquals(0xFFFF0000.toInt(), pixels.last())
     }
@@ -186,15 +214,17 @@ class CoverToneExtractorTest {
     @Test
     fun samplingUsesAStableStrideLatticeForLargeImages() {
         val stride = 12
-        val onLattice = CoverToneExtractor.sampleArgbPixels(512, 768) { x, y ->
-            if (x % stride == 0 && y % stride == 0) 0xFFFF0000.toInt() else 0xFF000000.toInt()
-        }
+        val onLattice =
+            CoverToneExtractor.sampleArgbPixels(512, 768) { x, y ->
+                if (x % stride == 0 && y % stride == 0) 0xFFFF0000.toInt() else 0xFF000000.toInt()
+            }
         assertEquals(2_752, onLattice.size)
         assertTrue(onLattice.all { it == 0xFFFF0000.toInt() })
 
-        val offLattice = CoverToneExtractor.sampleArgbPixels(512, 768) { x, y ->
-            if (x == 5 && y == 5) 0xFFFF0000.toInt() else 0xFF000000.toInt()
-        }
+        val offLattice =
+            CoverToneExtractor.sampleArgbPixels(512, 768) { x, y ->
+                if (x == 5 && y == 5) 0xFFFF0000.toInt() else 0xFF000000.toInt()
+            }
         assertTrue(offLattice.none { it == 0xFFFF0000.toInt() })
     }
 
@@ -205,25 +235,27 @@ class CoverToneExtractorTest {
             reads += PixelRead(x, y, width, height)
             0xFF000000.toInt() or (x and 0xFFFF)
         }
-        val sampler = CoverToneExtractor::class.java.declaredMethods.firstOrNull { method ->
-            method.name.startsWith("sampleArgbPixels") &&
-                method.parameterTypes.size == 3 &&
-                method.parameterTypes[0] == Int::class.javaPrimitiveType &&
-                method.parameterTypes[1] == Int::class.javaPrimitiveType &&
-                method.parameterTypes[2].isInstance(reader)
-        }
+        val sampler =
+            CoverToneExtractor::class.java.declaredMethods.firstOrNull { method ->
+                method.name.startsWith("sampleArgbPixels") &&
+                    method.parameterTypes.size == 3 &&
+                    method.parameterTypes[0] == Int::class.javaPrimitiveType &&
+                    method.parameterTypes[1] == Int::class.javaPrimitiveType &&
+                    method.parameterTypes[2].isInstance(reader)
+            }
 
         assertNotNull(
             "CoverToneExtractor must expose sampleArgbPixels(width, height, 1x1 pixel reader)",
             sampler,
         )
         sampler!!.isAccessible = true
-        val samples = sampler.invoke(
-            CoverToneExtractor,
-            1_000_000,
-            2_000_000,
-            reader,
-        ) as IntArray
+        val samples =
+            sampler.invoke(
+                CoverToneExtractor,
+                1_000_000,
+                2_000_000,
+                reader,
+            ) as IntArray
 
         assertEquals(reads.size, samples.size)
         assertTrue(reads.size <= 4_096)
@@ -245,25 +277,29 @@ class CoverToneExtractorTest {
         val secondReadStarted = CountDownLatch(1)
         val firstFailure = AtomicReference<Throwable?>()
         val secondFailure = AtomicReference<Throwable?>()
-        val firstBitmap = TestImageBitmap(argb = 0xFF336699.toInt()) { readCount ->
-            if (readCount == 1) {
-                firstReadStarted.countDown()
-                check(releaseFirstRead.await(3, TimeUnit.SECONDS))
+        val firstBitmap =
+            TestImageBitmap(argb = 0xFF336699.toInt()) { readCount ->
+                if (readCount == 1) {
+                    firstReadStarted.countDown()
+                    check(releaseFirstRead.await(3, TimeUnit.SECONDS))
+                }
             }
-        }
-        val secondBitmap = TestImageBitmap(argb = 0xFF669933.toInt()) { readCount ->
-            if (readCount == 1) secondReadStarted.countDown()
-        }
-        val firstThread = thread(start = false, name = "tone-cache-first") {
-            runCatching {
-                CoverToneExtractor.toneFor("lock-granularity-first", firstBitmap)
-            }.exceptionOrNull()?.let(firstFailure::set)
-        }
-        val secondThread = thread(start = false, name = "tone-cache-second") {
-            runCatching {
-                CoverToneExtractor.toneFor("lock-granularity-second", secondBitmap)
-            }.exceptionOrNull()?.let(secondFailure::set)
-        }
+        val secondBitmap =
+            TestImageBitmap(argb = 0xFF669933.toInt()) { readCount ->
+                if (readCount == 1) secondReadStarted.countDown()
+            }
+        val firstThread =
+            thread(start = false, name = "tone-cache-first") {
+                runCatching {
+                    CoverToneExtractor.toneFor("lock-granularity-first", firstBitmap)
+                }.exceptionOrNull()?.let(firstFailure::set)
+            }
+        val secondThread =
+            thread(start = false, name = "tone-cache-second") {
+                runCatching {
+                    CoverToneExtractor.toneFor("lock-granularity-second", secondBitmap)
+                }.exceptionOrNull()?.let(secondFailure::set)
+            }
 
         firstThread.start()
         try {
@@ -288,35 +324,40 @@ class CoverToneExtractorTest {
     @Test
     fun toneCacheDoesNotInsertFallbackOrFailedComputations() {
         val fallbackKey = "uncached-computation-fallback"
-        val fallback = CoverToneExtractor.toneFor(
-            cacheKey = fallbackKey,
-            bitmap = TestImageBitmap(argb = 0x00000000),
-            fallbackArgb = 0xFF112233.toInt(),
-        )
-        val afterFallback = CoverToneExtractor.toneFor(
-            cacheKey = fallbackKey,
-            bitmap = TestImageBitmap(argb = 0xFF336699.toInt()),
-            fallbackArgb = 0xFF445566.toInt(),
-        )
+        val fallback =
+            CoverToneExtractor.toneFor(
+                cacheKey = fallbackKey,
+                bitmap = TestImageBitmap(argb = 0x00000000),
+                fallbackArgb = 0xFF112233.toInt(),
+            )
+        val afterFallback =
+            CoverToneExtractor.toneFor(
+                cacheKey = fallbackKey,
+                bitmap = TestImageBitmap(argb = 0xFF336699.toInt()),
+                fallbackArgb = 0xFF445566.toInt(),
+            )
 
         assertTrue(fallback.usedFallback)
         assertEquals(0xFF112233.toInt(), fallback.argb)
         assertFalse(afterFallback.usedFallback)
 
         val failedKey = "uncached-computation-error"
-        val failure = runCatching {
+        val failure =
+            runCatching {
+                CoverToneExtractor.toneFor(
+                    cacheKey = failedKey,
+                    bitmap =
+                        TestImageBitmap(
+                            argb = 0xFF000000.toInt(),
+                            failure = IllegalStateException("pixel read failed"),
+                        ),
+                )
+            }.exceptionOrNull()
+        val afterFailure =
             CoverToneExtractor.toneFor(
                 cacheKey = failedKey,
-                bitmap = TestImageBitmap(
-                    argb = 0xFF000000.toInt(),
-                    failure = IllegalStateException("pixel read failed"),
-                ),
+                bitmap = TestImageBitmap(argb = 0xFF663399.toInt()),
             )
-        }.exceptionOrNull()
-        val afterFailure = CoverToneExtractor.toneFor(
-            cacheKey = failedKey,
-            bitmap = TestImageBitmap(argb = 0xFF663399.toInt()),
-        )
 
         assertNotNull(failure)
         assertFalse(afterFailure.usedFallback)
@@ -348,15 +389,16 @@ class CoverToneExtractorTest {
         val key = "same-key-concurrent|HERO|128x128"
         val failures = java.util.Collections.synchronizedList(mutableListOf<Throwable>())
         val tones = java.util.Collections.synchronizedList(mutableListOf<CoverTone>())
-        val workers = (1..8).map { index ->
-            thread(name = "tone-same-key-$index") {
-                try {
-                    tones += CoverToneExtractor.toneFor(key, bitmap)
-                } catch (failure: Throwable) {
-                    failures += failure
+        val workers =
+            (1..8).map { index ->
+                thread(name = "tone-same-key-$index") {
+                    try {
+                        tones += CoverToneExtractor.toneFor(key, bitmap)
+                    } catch (failure: Throwable) {
+                        failures += failure
+                    }
                 }
             }
-        }
         workers.forEach { it.join(5_000L) }
 
         assertTrue("no worker may fail while computing the same key", failures.isEmpty())
@@ -373,9 +415,10 @@ class CoverToneExtractorTest {
     @Test
     fun toneCacheEvictsOldestEntryAndKeepsRecentEntryCached() {
         val reads = AtomicInteger(0)
-        val bitmaps = (1..65).map { index ->
-            TestImageBitmap(argb = 0xFF112233.toInt() + index) { reads.incrementAndGet() }
-        }
+        val bitmaps =
+            (1..65).map { index ->
+                TestImageBitmap(argb = 0xFF112233.toInt() + index) { reads.incrementAndGet() }
+            }
         bitmaps.forEachIndexed { index, bitmap ->
             val tone = CoverToneExtractor.toneFor("lru-key-$index", bitmap)
             assertFalse(tone.usedFallback)
@@ -434,6 +477,14 @@ class CoverToneExtractorTest {
     private fun greenOf(argb: Int): Int = (argb ushr 8) and 0xFF
 
     private fun blueOf(argb: Int): Int = argb and 0xFF
+
+    private fun valueOf(argb: Int): Float = maxOf(redOf(argb), greenOf(argb), blueOf(argb)) / 255f
+
+    private fun saturationOf(argb: Int): Float {
+        val max = maxOf(redOf(argb), greenOf(argb), blueOf(argb))
+        val min = minOf(redOf(argb), greenOf(argb), blueOf(argb))
+        return if (max == 0) 0f else (max - min).toFloat() / max
+    }
 
     private fun hueOf(argb: Int): Float {
         val r = redOf(argb) / 255f

@@ -11,21 +11,25 @@ internal object TyranoStorage {
     private val validKey = Regex("[A-Za-z0-9._-]+")
 
     @JvmStatic
-    fun read(directory: File?, key: String?): String {
+    fun read(
+        directory: File?,
+        key: String?
+    ): String {
         return try {
             val file = resolveFile(directory, key) ?: return ""
             if (!file.isFile || file.length() !in 0..MAX_SAVE_BYTES) return ""
-            val bytes = file.inputStream().buffered().use { input ->
-                val output = java.io.ByteArrayOutputStream(file.length().toInt())
-                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-                while (true) {
-                    val count = input.read(buffer)
-                    if (count < 0) break
-                    if (output.size() + count > MAX_SAVE_BYTES) return ""
-                    output.write(buffer, 0, count)
+            val bytes =
+                file.inputStream().buffered().use { input ->
+                    val output = java.io.ByteArrayOutputStream(file.length().toInt())
+                    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                    while (true) {
+                        val count = input.read(buffer)
+                        if (count < 0) break
+                        if (output.size() + count > MAX_SAVE_BYTES) return ""
+                        output.write(buffer, 0, count)
+                    }
+                    output.toByteArray()
                 }
-                output.toByteArray()
-            }
             String(bytes, StandardCharsets.UTF_8)
         } catch (error: Throwable) {
             Log.w(TAG, "getStorage failed key=$key", error)
@@ -34,7 +38,11 @@ internal object TyranoStorage {
     }
 
     @JvmStatic
-    fun write(directory: File?, key: String?, value: String?) {
+    fun write(
+        directory: File?,
+        key: String?,
+        value: String?
+    ) {
         try {
             val file = resolveFile(directory, key) ?: return
             val bytes = value.orEmpty().toByteArray(StandardCharsets.UTF_8)
@@ -46,7 +54,10 @@ internal object TyranoStorage {
     }
 
     @JvmStatic
-    fun resolveFile(directory: File?, key: String?): File? {
+    fun resolveFile(
+        directory: File?,
+        key: String?
+    ): File? {
         if (directory == null || key == null) return null
         val clean = key.trim()
         if (clean.isEmpty() || clean.length > 128 || ".." in clean || !validKey.matches(clean)) {

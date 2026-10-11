@@ -17,18 +17,24 @@ class EmulatorLauncher {
 
     companion object {
         @JvmStatic
-        fun launchAndroidApp(context: Context?, packageName: String?, activityName: String?): Boolean {
+        fun launchAndroidApp(
+            context: Context?,
+            packageName: String?,
+            activityName: String?
+        ): Boolean {
             if (context == null || packageName.isNullOrBlank()) return false
             return runCatching {
-                val explicit = activityName?.trim()?.takeIf(String::isNotEmpty)?.let { activity ->
-                    val resolved = if (activity.startsWith('.')) packageName + activity else activity
-                    Intent(Intent.ACTION_MAIN).apply {
-                        component = ComponentName(packageName, resolved)
-                        addCategory(Intent.CATEGORY_LAUNCHER)
+                val explicit =
+                    activityName?.trim()?.takeIf(String::isNotEmpty)?.let { activity ->
+                        val resolved = if (activity.startsWith('.')) packageName + activity else activity
+                        Intent(Intent.ACTION_MAIN).apply {
+                            component = ComponentName(packageName, resolved)
+                            addCategory(Intent.CATEGORY_LAUNCHER)
+                        }
                     }
-                }
-                val intent = explicit ?: context.packageManager.getLaunchIntentForPackage(packageName)
-                    ?: return false
+                val intent =
+                    explicit ?: context.packageManager.getLaunchIntentForPackage(packageName)
+                        ?: return false
                 if (context !is Activity) intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 context.startActivity(intent)
                 true
@@ -43,8 +49,10 @@ class EmulatorLauncher {
         ): Intent = ScriptEngineLaunchers.buildTyranoIntent(requireNotNull(context), gamePath, launchTarget)
 
         @JvmStatic
-        fun resolveInternalTyranoGameDirectory(rootUri: String?, launchTarget: String?): String? =
-            ScriptEngineLaunchers.resolveTyranoGameDirectory(rootUri, launchTarget)
+        fun resolveInternalTyranoGameDirectory(
+            rootUri: String?,
+            launchTarget: String?
+        ): String? = ScriptEngineLaunchers.resolveTyranoGameDirectory(rootUri, launchTarget)
 
         @JvmStatic
         fun buildInternalOnsIntent(
@@ -91,9 +99,15 @@ class EmulatorLauncher {
             originMode: Boolean,
             engineVersion: String?,
             safFileFallback: Boolean,
-        ): Intent = KrkrLauncher.buildIntent(
-            requireNotNull(context), gamePath, launchTarget, originMode, engineVersion, safFileFallback,
-        )
+        ): Intent =
+            KrkrLauncher.buildIntent(
+                requireNotNull(context),
+                gamePath,
+                launchTarget,
+                originMode,
+                engineVersion,
+                safFileFallback,
+            )
 
         @JvmStatic
         fun resolveActualSaveLocation(
@@ -129,7 +143,6 @@ class EmulatorLauncher {
             gameId: Long,
         ): List<File> = EngineSaveLocations.resolveDirectories(context, engine, rootUri, launchTarget, gameId)
 
-        private fun EngineSaveLocations.Location.toPublicLocation() =
-            ActualSaveLocation(directory, description, available)
+        private fun EngineSaveLocations.Location.toPublicLocation() = ActualSaveLocation(directory, description, available)
     }
 }

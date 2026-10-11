@@ -1,21 +1,13 @@
 package com.kireibox.ui
 
-import java.io.File
-import androidx.compose.ui.graphics.Color
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AdaptiveShellWiringTest {
     private fun source(): String {
-        val candidates = listOf(
-            File("src/main/java/com/kireibox/ui/KireiBoxApp.kt"),
-            File("../app/src/main/java/com/kireibox/ui/KireiBoxApp.kt"),
-        )
-        return candidates.firstOrNull { it.isFile }?.readText()
-            ?: error("KireiBoxApp.kt not found from ${File("").absolutePath}")
+        return UiSourceFiles.all()
     }
 
     @Test
@@ -29,46 +21,18 @@ class AdaptiveShellWiringTest {
     }
 
     @Test
-    fun immersiveDockUsesThemeResolvedPaletteAndGridFadeIsDrawPhase() {
-        val dock = Alpha11KireiBoxAppIntegration.dockHaze(
-            isDark = true,
-            reducedTransparency = false,
-            hazeAvailable = true,
-            apiSupportsHaze = true,
-        )
+    fun dockUsesThemeResolvedPaletteAndTheSampledOverlay() {
+        val dock =
+            Alpha11KireiBoxAppIntegration.dockHaze(
+                isDark = true,
+                reducedTransparency = false,
+                hazeAvailable = true,
+                apiSupportsHaze = true,
+            )
         assertFalse("the normal dock path must use the sampled overlay", dock.useOpaqueFallback)
         assertEquals(
             dev.chrisbanes.haze.HazeInputScale.Fixed(.5f),
             dock.inputScale,
-        )
-
-        // The grid fade is represented by the existing policy stops and visibility gate. This
-        // keeps the overlay fade testable without coupling it to a production local variable.
-        assertTrue(LibraryGridTopFadePolicy.visible(firstVisibleItemIndex = 0, searchActive = false))
-        assertFalse(LibraryGridTopFadePolicy.visible(firstVisibleItemIndex = 1, searchActive = false))
-        assertFalse(LibraryGridTopFadePolicy.visible(firstVisibleItemIndex = 0, searchActive = true))
-        assertEquals(listOf(0f, 72f), LibraryGridTopFadePolicy.stops.map { it.offsetDp })
-        assertEquals(listOf(.45f, 0f), LibraryGridTopFadePolicy.stops.map { it.alpha })
-
-        // A collapsed/non-overlay grid has no extra fade start; an expanded overlay derives its
-        // start from measured header geometry rather than a hard-coded source marker.
-        assertEquals(
-            0f,
-            LibraryCardLayoutPolicy.gridFadeStartDp(
-                gridViewportTopDp = 20f,
-                headerBottomDp = 92f,
-                toolbarCollapsed = true,
-            ),
-            .001f,
-        )
-        assertEquals(
-            72f,
-            LibraryCardLayoutPolicy.gridFadeStartDp(
-                gridViewportTopDp = 20f,
-                headerBottomDp = 92f,
-                toolbarCollapsed = false,
-            ),
-            .001f,
         )
     }
 
@@ -86,19 +50,16 @@ class AdaptiveShellWiringTest {
         assertTrue(text.contains("dockRect = adaptiveMetrics.dockRect"))
         assertTrue(text.contains("safeBottomDp = safeDrawingPadding.calculateBottomPadding().value"))
         // Final row clearance is maxOf(rendered dock padding, policy minimum).dp in one construct.
-        val clearanceStart = text.indexOf("bottom = maxOf(")
-        assertTrue("grid bottom must use maxOf(...).dp", clearanceStart >= 0)
+        // Whitespace-tolerant so ktlint's argument wrapping cannot decouple the arguments.
         assertTrue(
-            "maxOf must take the rendered dock padding",
-            text.indexOf("bottomContentPadding.value,", clearanceStart) > clearanceStart,
-        )
-        assertTrue(
-            "maxOf must take the policy minimum dock clearance",
-            text.indexOf("LibraryCardLayoutPolicy.MIN_DOCK_CLEARANCE_DP,", clearanceStart) > clearanceStart,
-        )
-        assertTrue(
-            "the max must stay in dp",
-            text.indexOf(").dp,", clearanceStart) > clearanceStart,
+            "grid bottom must use maxOf(rendered dock padding, policy minimum).dp",
+            text.contains(
+                Regex(
+                    "bottom\\s*=\\s*maxOf\\(\\s*" +
+                        "bottomContentPadding\\.value,\\s*" +
+                        "LibraryCardLayoutPolicy\\.MIN_DOCK_CLEARANCE_DP,?\\s*\\)\\.dp",
+                ),
+            ),
         )
         assertTrue(
             "the dock clearance contract keeps the final row at least 8dp above the dock",
@@ -139,9 +100,10 @@ class AdaptiveShellWiringTest {
         for (width in widths) {
             for (height in heights) {
                 val presentation = resolveDockPresentation(width, height)
-                val total = presentation.buttonWidthDp * 3f +
-                    presentation.horizontalPaddingDp * 2f +
-                    presentation.slotGapDp * 2f
+                val total =
+                    presentation.buttonWidthDp * 3f +
+                        presentation.horizontalPaddingDp * 2f +
+                        presentation.slotGapDp * 2f
                 assertTrue(
                     "width=$width height=$height total=$total",
                     total <= width + .01f,
@@ -179,10 +141,11 @@ class AdaptiveShellWiringTest {
 
     @Test
     fun immersiveSharedSpecMirrorsComponentsControlSizes() {
-        val sharedChrome = HomePresentationPolicy.topChromeSpec(
-            HomeRect(0f, 0f, 411f, 900f),
-            HomeSizeClass.COMPACT,
-        )
+        val sharedChrome =
+            HomePresentationPolicy.topChromeSpec(
+                HomeRect(0f, 0f, 411f, 900f),
+                HomeSizeClass.COMPACT,
+            )
         assertEquals(48f, sharedChrome.menuDiameterDp, .001f)
         assertEquals(HOME_MIN_TOUCH_TARGET_DP, sharedChrome.menuHitRect.w, .001f)
         assertEquals(34f, ImmersiveSharedSpec.brandFontSizeSp(HomeOrientation.PORTRAIT), .001f)
@@ -195,51 +158,34 @@ class AdaptiveShellWiringTest {
     }
 
     @Test
-    fun dockGlassFallsBackToOpaqueWhenHazeUnavailableOrReducedTransparency() {
-        assertTrue(DockGlassPolicy.useOpaqueFallback(reducedTransparency = false, hazeAvailable = false))
-        assertTrue(DockGlassPolicy.useOpaqueFallback(reducedTransparency = true, hazeAvailable = true))
-        assertFalse(DockGlassPolicy.useOpaqueFallback(reducedTransparency = false, hazeAvailable = true))
-        assertEquals(null, DockGlassPolicy.tint(isDark = true, reducedTransparency = true, hazeAvailable = true))
-        assertEquals(null, DockGlassPolicy.tint(isDark = false, reducedTransparency = false, hazeAvailable = false))
-        assertNotNull(DockGlassPolicy.tint(isDark = true, reducedTransparency = false, hazeAvailable = true))
-        // Opaque fallback keeps the clear reduced-transparency surface colors.
-        assertEquals(
-            Color(0xF20C101C),
-            DockGlassPolicy.containerColor(
-                isDark = true,
-                pageBackground = Color.White,
-                reducedTransparency = true,
-                hazeAvailable = true,
-            ),
-        )
-        assertEquals(
-            Color(0xFFF4F2FA),
-            DockGlassPolicy.containerColor(
-                isDark = false,
-                pageBackground = Color.Black,
-                reducedTransparency = false,
-                hazeAvailable = false,
-            ),
-        )
-        // With Haze available the dock samples content behind a transparent base (Alpha 8).
-        assertEquals(
-            Color.Transparent,
-            DockGlassPolicy.containerColor(
-                isDark = true,
-                pageBackground = Color.White,
-                reducedTransparency = false,
-                hazeAvailable = true,
-            ),
-        )
-    }
-
-    @Test
     fun lowLandscapeDockExpandsItsOuterRectBeforeDrawing() {
         val renderRect = resolveDockRenderRect(HomeRect(100f, 200f, 320f, 32f))
 
         assertEquals(48f, renderRect.h, 0.001f)
         assertEquals(192f, renderRect.y, 0.001f)
         assertTrue(resolveDockPresentation(renderRect.w, renderRect.h).contentHeightDp <= renderRect.h)
+    }
+
+    @Test
+    fun everyTabDrawsTheSameDockAtTheMetricsRectAndTheContentClearanceFollowsIt() {
+        // r5: one Dock rect per window. The shell draws it at the measured position on every tab (no per-tab
+        // offset, no glide), and every page that reserves room for it reads the same metrics.
+        val app = UiSourceFiles.file("KireiBoxApp.kt")
+        assertTrue(app.contains("metrics = adaptiveMetrics,"))
+        assertTrue(app.contains("modifier = Modifier.align(Alignment.BottomCenter)\n"))
+        assertFalse("no per-tab Dock offset", app.contains("immersiveDockDrop") || app.contains("rememberImmersiveDockDrop"))
+        assertTrue("components home and settings keep the metrics clearance", app.contains("val responsiveDockContentPadding = adaptiveMetrics.bottomContentPaddingDp.dp"))
+        assertTrue("the library clearance is measured from the drawn Dock", app.contains("dockRect = adaptiveMetrics.dockRect,"))
+        assertTrue(UiSourceFiles.file("KireiCommonUi.kt").contains("resolveDockRenderRect(metrics.dockRect)"))
+        assertTrue(UiSourceFiles.file("SettingsScaffold.kt").contains("bottom = adaptiveMetrics.bottomContentPaddingDp.dp"))
+        // The immersive layout is solved against that same rect.
+        assertTrue(UiSourceFiles.file("ImmersiveHome.kt").contains("metrics.dockRect.toPx(density)"))
+
+        // Landscape: 12dp above the 24dp gesture area on every page; portrait keeps its fixed 16dp gap.
+        val landscape = resolveAdaptiveUiMetrics(914f, 411f, 0f, 0f, 0f, 24f)
+        assertEquals(411f - 24f - AdaptiveLayoutConstants.DOCK_LANDSCAPE_BOTTOM_GAP_DP, landscape.dockRect.y + landscape.dockRect.h, .01f)
+        val portrait = resolveAdaptiveUiMetrics(411f, 914f, 0f, 24f, 0f, 24f)
+        assertEquals(914f - 24f - AdaptiveLayoutConstants.DOCK_PORTRAIT_BOTTOM_GAP_DP, portrait.dockRect.y + portrait.dockRect.h, .01f)
     }
 
     @Test
@@ -266,8 +212,8 @@ class AdaptiveShellWiringTest {
     @Test
     fun modalSystemBarsConsumeTheFourWayClassAndReapplyOnTransitions() {
         val text = source()
-        val start = text.indexOf("private fun ModalSystemBarVisibilityEffect")
-        val end = text.indexOf("\n@Composable\nprivate fun LibraryOverviewSheet", start)
+        val start = text.indexOf("fun ModalSystemBarVisibilityEffect(")
+        val end = text.indexOf("\n@Composable\ninternal fun LibraryOverviewSheet(", start)
         assertTrue("modal system-bar effect must be present", start >= 0 && end > start)
         val modal = text.substring(start, end)
 
@@ -281,77 +227,52 @@ class AdaptiveShellWiringTest {
     }
 
     @Test
-    fun landscapeLibraryUsesFixedToolbarLaneAndSingleMeasuredGap() {
-        val text = source()
+    fun libraryBarSitsOverTheGridAndLandscapeGridClearsIt() {
+        val page = UiSourceFiles.file("LibraryPages.kt")
         assertTrue(
-            "overlay toolbar lane must be the fixed policy height",
-            text.contains(".height(LibraryHeaderTransitionPolicy.TOOLBAR_HEIGHT_DP.dp)"),
+            "the landscape grid top is derived from the bar's bottom edge by LibraryCardLayoutPolicy",
+            page.contains(Regex("val landscapeGridTopDp\\s*=\\s*LibraryCardLayoutPolicy\\.gridTopPaddingDp\\(")) &&
+                page.contains(Regex("val resolvedLibraryHeaderBottomDp\\s*=\\s*LibraryCardLayoutPolicy\\.resolvedHeaderBottomDp\\(")) &&
+                page.contains("toolbarHeightDp = LibraryHeaderTransitionPolicy.TOOLBAR_HEIGHT_DP"),
         )
         assertTrue(
-            "compact landscape grid top must be derived by LibraryCardLayoutPolicy",
-            text.contains("val compactGridTopPaddingDp = LibraryCardLayoutPolicy.gridTopPaddingDp("),
+            "the derived top is wired as the grid content top (portrait starts at the safe top: the header block scrolls under the bar)",
+            page.contains("contentTopDp = if (landscape) landscapeGridTopDp else safeDrawingTop.value"),
         )
+        assertTrue("the grid fills the window and is the bar's haze source", page.contains("Modifier.fillMaxSize().then(if (barHaze != null) Modifier.hazeSource(barHaze) else Modifier)"))
+        assertTrue("one glass bar is drawn over the grid", page.contains("LibraryTopBar("))
+        assertFalse("the landscape toolbar no longer fades away on scroll", UiSourceFiles.file("LibraryHeaders.kt").contains("toolbarAlpha"))
+        assertFalse("the retired hardcoded first-row top must not be assigned directly", page.contains("firstRowTopDp"))
         assertTrue(
-            "the derived top must be wired as the grid content top",
-            text.contains("contentTopDp = compactGridTopPaddingDp"),
-        )
-        assertTrue(
-            "the measured header bottom must include the grid header's measured title/actions gap",
-            text.contains("val resolvedLibraryHeaderBottomDp = LibraryCardLayoutPolicy.resolvedHeaderBottomDp(") &&
-                text.contains("measuredLibraryTitleBounds?.bottomDp") &&
-                text.contains("measuredLibraryActionsBounds?.bottomDp"),
-        )
-        assertFalse(
-            "the retired hardcoded first-row top must not be assigned directly",
-            text.contains("contentTopDp = LibraryHeaderTransitionPolicy.firstRowTopDp()"),
-        )
-        assertTrue(
-            "the top fade must not consume pointer input",
-            !text.substring(
-                text.indexOf("private fun LibraryGameGrid"),
-                text.indexOf("private fun LibraryPage"),
-            ).contains("pointerInput"),
+            "the grid must not consume pointer input",
+            // LibraryGameGrid lives in LibraryGrid.kt; read that file directly so the slice cannot
+            // pick up LibraryPage's imports from the concatenated package.
+            !UiSourceFiles.file("LibraryGrid.kt").contains("pointerInput"),
         )
     }
 
     @Test
-    fun libraryGridBranchesAreExclusiveSoLandscapeCannotComposeTwoGrids() {
-        val text = source()
-        val libraryPage = text.substring(
-            text.indexOf("private fun LibraryPage"),
-            text.indexOf("private fun CoverTaskToolbarAnchor"),
-        )
-        val layoutBranches = libraryPage.substring(
-            libraryPage.indexOf("val gridColumns = GridCells.Fixed"),
-            libraryPage.indexOf("if (state.taskCenterOpen && CoverTaskPresentationPolicy.containerFor"),
-        )
-        val regularBranchMarker = "\n        } else {\n            Row(Modifier.fillMaxWidth()"
-        val regularBranchStart = layoutBranches.indexOf(regularBranchMarker)
-        val firstGrid = layoutBranches.indexOf("LibraryGameGrid(")
-        val regularGrid = layoutBranches.lastIndexOf("LibraryGameGrid(")
+    fun libraryPageComposesOneGridForBothOrientations() {
+        val libraryPage = UiSourceFiles.file("LibraryPages.kt")
+        require(libraryPage.contains("fun LibraryPage(")) { "LibraryPage missing" }
 
         assertEquals(
-            "LibraryPage keeps one grid implementation per mutually exclusive layout branch",
-            2,
-            Regex("LibraryGameGrid\\(").findAll(layoutBranches).count(),
+            "LibraryPage keeps one grid: landscape just leaves the portrait header block out",
+            1,
+            Regex("LibraryGameGrid\\(").findAll(libraryPage).count(),
         )
-        assertTrue(
-            "the narrow grid must be composed before the layout-level else branch",
-            firstGrid in 0 until regularBranchStart,
-        )
-        assertTrue(
-            "the regular grid must stay inside the layout-level else branch",
-            regularBranchStart >= 0 && regularGrid > regularBranchStart,
-        )
+        assertTrue(libraryPage.contains("header = portraitHeader.takeUnless { landscape }"))
+        assertTrue("the grid keeps the same Dock clearance in both orientations", libraryPage.contains("bottomContentPadding = bottomContentPadding"))
     }
 
     @Test
     fun wideCoverTaskCenterUsesFixedPopupInsteadOfIntrinsicDropdownMenu() {
         val text = source()
-        val taskToolbarAnchor = text.substring(
-            text.indexOf("private fun CoverTaskToolbarAnchor"),
-            text.indexOf("private fun CoverTaskButton"),
-        )
+        val taskToolbarAnchor =
+            text.substring(
+                text.indexOf("fun CoverTaskToolbarAnchor("),
+                text.indexOf("fun CoverTaskButton("),
+            )
 
         assertTrue(
             "wide task center must use the fixed popup host",
@@ -366,10 +287,9 @@ class AdaptiveShellWiringTest {
     @Test
     fun gameLibraryRequestsDedicatedSharpCoverRole() {
         val text = source()
-        val gameCard = text.substring(
-            text.indexOf("private fun GameCard"),
-            text.indexOf("private fun SettingsPage"),
-        )
+        val gameCardStart = text.indexOf("fun GameCard(")
+        val gameCardEnd = text.indexOf("\n@Composable", gameCardStart + 1).let { if (it < 0) text.length else it }
+        val gameCard = text.substring(gameCardStart, gameCardEnd)
 
         assertTrue(
             "library cards must not reuse the fixed 256x384 thumbnail role",
@@ -400,19 +320,19 @@ class AdaptiveShellWiringTest {
 
     @Test
     fun settingsPaddingIsDerivedFromAdaptiveDockMetrics() {
-        val metrics = resolveAdaptiveUiMetrics(
-            windowWidthDp = 914f,
-            windowHeightDp = 411f,
-            safeLeftDp = 0f,
-            safeTopDp = 0f,
-            safeRightDp = 0f,
-            safeBottomDp = 0f,
-        )
+        val metrics =
+            resolveAdaptiveUiMetrics(
+                windowWidthDp = 914f,
+                windowHeightDp = 411f,
+                safeLeftDp = 0f,
+                safeTopDp = 0f,
+                safeRightDp = 0f,
+                safeBottomDp = 0f,
+            )
 
         // Alpha 10 review: padding clears the dock so the final row can scroll above it.
         assertTrue(metrics.bottomContentPaddingDp >= metrics.dockRect.h)
         assertFalse(source().contains("navigationBottom + 106.dp"))
         assertFalse(source().contains("navigationBottom + 106"))
     }
-
 }

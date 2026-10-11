@@ -17,12 +17,13 @@ class PortraitCoverPolicyTest {
 
     @Test
     fun `taller source crops vertically centered and fills the full card width`() {
-        val layout = PortraitCoverPolicy.layout(
-            srcWidthPx = 900,
-            srcHeightPx = 2000,
-            targetWidthPx = 180f,
-            targetHeightPx = 320f,
-        )
+        val layout =
+            PortraitCoverPolicy.layout(
+                srcWidthPx = 900,
+                srcHeightPx = 2000,
+                targetWidthPx = 180f,
+                targetHeightPx = 320f,
+            )
         assertEquals(180f, layout.contentWidthPx, .001f)
         assertEquals(400f, layout.contentHeightPx, .001f)
         assertEquals(0f, layout.offsetXPx, .001f)
@@ -32,12 +33,13 @@ class PortraitCoverPolicyTest {
 
     @Test
     fun `exact 9 to 16 source fills the box with no crop`() {
-        val layout = PortraitCoverPolicy.layout(
-            srcWidthPx = 900,
-            srcHeightPx = 1600,
-            targetWidthPx = 180f,
-            targetHeightPx = 320f,
-        )
+        val layout =
+            PortraitCoverPolicy.layout(
+                srcWidthPx = 900,
+                srcHeightPx = 1600,
+                targetWidthPx = 180f,
+                targetHeightPx = 320f,
+            )
         assertEquals(320f, layout.contentHeightPx, .001f)
         assertEquals(180f, layout.contentWidthPx, .001f)
         assertEquals(0f, layout.offsetYPx, .001f)
@@ -47,12 +49,13 @@ class PortraitCoverPolicyTest {
 
     @Test
     fun `wide source center crops horizontally to fill the 9 to 16 card`() {
-        val layout = PortraitCoverPolicy.layout(
-            srcWidthPx = 1600,
-            srcHeightPx = 900,
-            targetWidthPx = 180f,
-            targetHeightPx = 320f,
-        )
+        val layout =
+            PortraitCoverPolicy.layout(
+                srcWidthPx = 1600,
+                srcHeightPx = 900,
+                targetWidthPx = 180f,
+                targetHeightPx = 320f,
+            )
         // Scale is driven by height: 320/900, so the width overflows and is center-cropped.
         assertEquals(320f, layout.contentHeightPx, .001f)
         assertEquals(568.888f, layout.contentWidthPx, .01f)
@@ -63,12 +66,13 @@ class PortraitCoverPolicyTest {
 
     @Test
     fun `very wide source still fills the card with no letterbox`() {
-        val layout = PortraitCoverPolicy.layout(
-            srcWidthPx = 3000,
-            srcHeightPx = 1000,
-            targetWidthPx = 180f,
-            targetHeightPx = 320f,
-        )
+        val layout =
+            PortraitCoverPolicy.layout(
+                srcWidthPx = 3000,
+                srcHeightPx = 1000,
+                targetWidthPx = 180f,
+                targetHeightPx = 320f,
+            )
         assertEquals(320f, layout.contentHeightPx, .001f)
         assertEquals(960f, layout.contentWidthPx, .001f)
         assertEquals(0f, layout.offsetYPx, .001f)
@@ -78,12 +82,13 @@ class PortraitCoverPolicyTest {
 
     @Test
     fun `unknown source has no content so the caller renders the placeholder`() {
-        val layout = PortraitCoverPolicy.layout(
-            srcWidthPx = 0,
-            srcHeightPx = 0,
-            targetWidthPx = 180f,
-            targetHeightPx = 320f,
-        )
+        val layout =
+            PortraitCoverPolicy.layout(
+                srcWidthPx = 0,
+                srcHeightPx = 0,
+                targetWidthPx = 180f,
+                targetHeightPx = 320f,
+            )
         assertEquals(0f, layout.contentHeightPx, .001f)
         assertEquals(0f, layout.contentWidthPx, .001f)
         assertFalse(layout.hasContent)
@@ -93,12 +98,13 @@ class PortraitCoverPolicyTest {
     fun `crop keeps the source aspect and always covers both target axes`() {
         val targetWidthPx = 240f
         val targetHeightPx = 320f
-        val layout = PortraitCoverPolicy.layout(
-            srcWidthPx = 1200,
-            srcHeightPx = 2400,
-            targetWidthPx = targetWidthPx,
-            targetHeightPx = targetHeightPx,
-        )
+        val layout =
+            PortraitCoverPolicy.layout(
+                srcWidthPx = 1200,
+                srcHeightPx = 2400,
+                targetWidthPx = targetWidthPx,
+                targetHeightPx = targetHeightPx,
+            )
         assertEquals(480f, layout.contentHeightPx, .001f)
         assertEquals(240f, layout.contentWidthPx, .001f)
         assertEquals(240f / 480f, 1200f / 2400f, 1e-4f)
@@ -109,12 +115,13 @@ class PortraitCoverPolicyTest {
 
     @Test
     fun `fit layout keeps the complete source centered inside the target`() {
-        val fit = PortraitCoverPolicy.fitLayout(
-            srcWidthPx = 900,
-            srcHeightPx = 1600,
-            targetWidthPx = 438f,
-            targetHeightPx = 247f,
-        )
+        val fit =
+            PortraitCoverPolicy.fitLayout(
+                srcWidthPx = 900,
+                srcHeightPx = 1600,
+                targetWidthPx = 438f,
+                targetHeightPx = 247f,
+            )
         assertEquals(138.94f, fit.contentWidthPx, .01f)
         assertEquals(247f, fit.contentHeightPx, .01f)
         assertEquals((438f - 138.94f) / 2f, fit.offsetXPx, .01f)
@@ -145,13 +152,14 @@ class PortraitCoverPolicyTest {
 
     @Test
     fun `D adaptive mode fits a portrait source with blurred fill`() {
-        val plan = FocusCoverArtworkPolicy.plan(
-            srcWidthPx = 900,
-            srcHeightPx = 1600,
-            targetWidthPx = 438f,
-            targetHeightPx = 247f,
-            style = LandscapeHomeStyle.IMMERSIVE_COVER,
-        )
+        val plan =
+            FocusCoverArtworkPolicy.plan(
+                srcWidthPx = 900,
+                srcHeightPx = 1600,
+                targetWidthPx = 438f,
+                targetHeightPx = 247f,
+                style = LandscapeHomeStyle.IMMERSIVE_COVER,
+            )
         assertEquals(FocusCoverMode.ADAPTIVE_BLUR_FILL, plan.mode)
         assertTrue(plan.ratioMismatch > FocusCoverArtworkPolicy.MISMATCH_THRESHOLD)
         assertNotNull(plan.foreground)
@@ -167,13 +175,14 @@ class PortraitCoverPolicyTest {
 
     @Test
     fun `C adaptive mode fits a wide source with blurred fill`() {
-        val plan = FocusCoverArtworkPolicy.plan(
-            srcWidthPx = 1600,
-            srcHeightPx = 900,
-            targetWidthPx = 180f,
-            targetHeightPx = 320f,
-            style = LandscapeHomeStyle.FOCUS_POSTER,
-        )
+        val plan =
+            FocusCoverArtworkPolicy.plan(
+                srcWidthPx = 1600,
+                srcHeightPx = 900,
+                targetWidthPx = 180f,
+                targetHeightPx = 320f,
+                style = LandscapeHomeStyle.FOCUS_POSTER,
+            )
         assertEquals(FocusCoverMode.ADAPTIVE_BLUR_FILL, plan.mode)
         assertTrue(plan.ratioMismatch > FocusCoverArtworkPolicy.MISMATCH_THRESHOLD)
         assertNotNull(plan.foreground)
@@ -184,24 +193,26 @@ class PortraitCoverPolicyTest {
 
     @Test
     fun `matched aspect stays single layer crop`() {
-        val dMatched = FocusCoverArtworkPolicy.plan(
-            srcWidthPx = 1600,
-            srcHeightPx = 900,
-            targetWidthPx = 438f,
-            targetHeightPx = 247f,
-            style = LandscapeHomeStyle.IMMERSIVE_COVER,
-        )
+        val dMatched =
+            FocusCoverArtworkPolicy.plan(
+                srcWidthPx = 1600,
+                srcHeightPx = 900,
+                targetWidthPx = 438f,
+                targetHeightPx = 247f,
+                style = LandscapeHomeStyle.IMMERSIVE_COVER,
+            )
         assertEquals(FocusCoverMode.CROP, dMatched.mode)
         assertEquals(null, dMatched.foreground)
         assertTrue(dMatched.ratioMismatch <= FocusCoverArtworkPolicy.MISMATCH_THRESHOLD)
 
-        val cMatched = FocusCoverArtworkPolicy.plan(
-            srcWidthPx = 900,
-            srcHeightPx = 1600,
-            targetWidthPx = 180f,
-            targetHeightPx = 320f,
-            style = LandscapeHomeStyle.FOCUS_POSTER,
-        )
+        val cMatched =
+            FocusCoverArtworkPolicy.plan(
+                srcWidthPx = 900,
+                srcHeightPx = 1600,
+                targetWidthPx = 180f,
+                targetHeightPx = 320f,
+                style = LandscapeHomeStyle.FOCUS_POSTER,
+            )
         assertEquals(FocusCoverMode.CROP, cMatched.mode)
         assertEquals(null, cMatched.foreground)
     }
@@ -209,26 +220,28 @@ class PortraitCoverPolicyTest {
     @Test
     fun `moderate mismatch below threshold stays crop`() {
         // 3:4 source inside a 9:16 card: mismatch = (3/4)/(9/16) = 1.333 < 1.35.
-        val plan = FocusCoverArtworkPolicy.plan(
-            srcWidthPx = 900,
-            srcHeightPx = 1200,
-            targetWidthPx = 180f,
-            targetHeightPx = 320f,
-            style = LandscapeHomeStyle.FOCUS_POSTER,
-        )
+        val plan =
+            FocusCoverArtworkPolicy.plan(
+                srcWidthPx = 900,
+                srcHeightPx = 1200,
+                targetWidthPx = 180f,
+                targetHeightPx = 320f,
+                style = LandscapeHomeStyle.FOCUS_POSTER,
+            )
         assertEquals(FocusCoverMode.CROP, plan.mode)
         assertEquals(null, plan.foreground)
     }
 
     @Test
     fun `unknown source has no adaptive content so the caller renders the placeholder`() {
-        val plan = FocusCoverArtworkPolicy.plan(
-            srcWidthPx = 0,
-            srcHeightPx = 0,
-            targetWidthPx = 180f,
-            targetHeightPx = 320f,
-            style = LandscapeHomeStyle.IMMERSIVE_COVER,
-        )
+        val plan =
+            FocusCoverArtworkPolicy.plan(
+                srcWidthPx = 0,
+                srcHeightPx = 0,
+                targetWidthPx = 180f,
+                targetHeightPx = 320f,
+                style = LandscapeHomeStyle.IMMERSIVE_COVER,
+            )
         assertFalse(plan.hasContent)
     }
 }

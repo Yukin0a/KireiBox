@@ -1,8 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="yh_bg">#0B1020</color>
-    <color name="yh_bg_2">#111936</color>
-    <color name="yh_primary">#8AB4FF</color>
+    <!-- AppTheme (AppCompat/View chrome) mirrors the Compose design tokens: graphite + the default purple accent.
+         Engine windows use Theme.YukiHub.Kirikiroid2* and the launcher_* colors below, which stay unchanged. -->
+    <color name="yh_bg">#F5F5F7</color>
+    <color name="yh_bg_2">#EFEFF2</color>
+    <color name="yh_primary">#5B45C7</color>
+    <!-- Adaptive-icon backdrop: the fixed brand sakura. Deliberately has no values-night variant,
+         so the launcher icon never changes with the system theme. -->
+    <color name="brand_icon_background">#F7B5C0</color>
     <color name="launcher_bg_color">#F4F5F5</color>
     <color name="launcher_card_color">#FFFFFF</color>
     <color name="launcher_card_alt_color">#EEF7F1</color>

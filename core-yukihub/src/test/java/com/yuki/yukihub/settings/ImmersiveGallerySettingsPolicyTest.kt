@@ -105,13 +105,14 @@ class ImmersiveGallerySettingsPolicyTest {
 
     @Test
     fun normalizeSettingsPreservesOrderAndDropsStaleIds() {
-        val normalized = ImmersiveGallerySettings(
-            selectionMode = SpotlightSelectionMode.MANUAL,
-            manualIds = listOf(8L, 99L, 8L, 3L, 4L, 5L, 6L),
-            source = SpotlightSource.FIXED,
-            strategy = SpotlightStrategy.DAILY_RANDOM,
-            count = 0,
-        ).normalized(validGameIds = setOf(8L, 3L, 4L, 5L, 6L))
+        val normalized =
+            ImmersiveGallerySettings(
+                selectionMode = SpotlightSelectionMode.MANUAL,
+                manualIds = listOf(8L, 99L, 8L, 3L, 4L, 5L, 6L),
+                source = SpotlightSource.FIXED,
+                strategy = SpotlightStrategy.DAILY_RANDOM,
+                count = 0,
+            ).normalized(validGameIds = setOf(8L, 3L, 4L, 5L, 6L))
 
         assertEquals(SpotlightSelectionMode.MANUAL, normalized.selectionMode)
         assertEquals(listOf(8L, 3L, 4L, 5L, 6L), normalized.manualIds)

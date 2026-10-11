@@ -16,20 +16,27 @@ import retrofit2.http.Url
  * 路径均使用 @Url 动态指定，由各 Client 拼接完整 URL。
  */
 interface ApiService {
+    @GET
+    fun get(
+        @Url url: String,
+    ): Call<ResponseBody>
 
     @GET
-    fun get(@Url url: String): Call<ResponseBody>
-
-    @GET
-    fun getWithHeader(@Url url: String, @Header("Authorization") auth: String): Call<ResponseBody>
+    fun getWithHeader(
+        @Url url: String,
+        @Header("Authorization") auth: String,
+    ): Call<ResponseBody>
 
     @POST
-    fun post(@Url url: String, @Body body: RequestBody): Call<ResponseBody>
+    fun post(
+        @Url url: String,
+        @Body body: RequestBody,
+    ): Call<ResponseBody>
 
     @POST
     fun postWithAuth(
         @Url url: String,
         @Body body: RequestBody,
-        @Header("Authorization") auth: String
+        @Header("Authorization") auth: String,
     ): Call<ResponseBody>
 }

@@ -30,7 +30,11 @@ class ScanRequest private constructor(builder: Builder) {
     private val _visitedNodes: AtomicInteger = AtomicInteger()
 
     val isCancelled: Boolean get() = cancelled.get()
-    fun cancel() { cancelled.set(true) }
+
+    fun cancel() {
+        cancelled.set(true)
+    }
+
     val visitedNodes: Int get() = _visitedNodes.get()
 
     val isDeadlineReached: Boolean
@@ -43,7 +47,10 @@ class ScanRequest private constructor(builder: Builder) {
     internal fun getProgressListener(): ProgressListener? = progressListener
 
     @JvmName("shouldSkipDirectory")
-    internal fun shouldSkipDirectory(name: String?, uri: String?): Boolean =
+    internal fun shouldSkipDirectory(
+        name: String?,
+        uri: String?,
+    ): Boolean =
         ScanExclusionMatcher.matchesName(name, excludedDirectoryPatterns) ||
             ScanExclusionMatcher.matchesUri(uri, ignoredUriKeys)
 
@@ -64,7 +71,11 @@ class ScanRequest private constructor(builder: Builder) {
      * Kotlin 调用方亦可使用 lambda 或函数引用。
      */
     fun interface ProgressListener {
-        fun onProgress(visitedNodes: Int, foundGames: Int, currentUri: String)
+        fun onProgress(
+            visitedNodes: Int,
+            foundGames: Int,
+            currentUri: String,
+        )
     }
 
     // Kotlin 与 Java 不同：外部类无法访问嵌套类的 private 成员（Java 允许）。
@@ -79,7 +90,10 @@ class ScanRequest private constructor(builder: Builder) {
         internal val ignoredUriKeys: MutableSet<String> = LinkedHashSet()
 
         /** A value <= 0 means no node-count limit. */
-        fun setMaxNodes(value: Int): Builder { maxNodes = value; return this }
+        fun setMaxNodes(value: Int): Builder {
+            maxNodes = value
+            return this
+        }
 
         /** A value <= 0 means no deadline. */
         fun setDeadlineAfterMs(value: Long): Builder {
@@ -87,14 +101,27 @@ class ScanRequest private constructor(builder: Builder) {
             return this
         }
 
-        fun setDeadlineAtElapsedMs(value: Long): Builder { deadlineAtElapsedMs = value; return this }
-        fun setCancellationFlag(value: AtomicBoolean?): Builder { cancelled = value; return this }
-        fun setProgressListener(value: ProgressListener?): Builder { progressListener = value; return this }
+        fun setDeadlineAtElapsedMs(value: Long): Builder {
+            deadlineAtElapsedMs = value
+            return this
+        }
+
+        fun setCancellationFlag(value: AtomicBoolean?): Builder {
+            cancelled = value
+            return this
+        }
+
+        fun setProgressListener(value: ProgressListener?): Builder {
+            progressListener = value
+            return this
+        }
+
         fun setExcludedDirectoryPatterns(value: Collection<String>?): Builder {
             excludedDirectoryPatterns.clear()
             if (value != null) excludedDirectoryPatterns.addAll(value.filter(String::isNotBlank))
             return this
         }
+
         fun setIgnoredUriKeys(value: Collection<String>?): Builder {
             ignoredUriKeys.clear()
             if (value != null) ignoredUriKeys.addAll(value.filter(String::isNotBlank))
@@ -109,9 +136,10 @@ class ScanRequest private constructor(builder: Builder) {
         const val DEFAULT_DEADLINE_MS: Long = 2L * 60L * 1000L
 
         @JvmStatic
-        fun defaults(maxDepth: Int): ScanRequest = Builder(maxDepth)
-            .setMaxNodes(DEFAULT_MAX_NODES)
-            .setDeadlineAfterMs(DEFAULT_DEADLINE_MS)
-            .build()
+        fun defaults(maxDepth: Int): ScanRequest =
+            Builder(maxDepth)
+                .setMaxNodes(DEFAULT_MAX_NODES)
+                .setDeadlineAfterMs(DEFAULT_DEADLINE_MS)
+                .build()
     }
 }

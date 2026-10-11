@@ -6,7 +6,10 @@ import java.util.Locale
 
 /** Accent-, punctuation- and spacing-insensitive library title/alias index. */
 object GameSearchIndex {
-    fun build(game: Game, aliases: Iterable<String>): String =
+    fun build(
+        game: Game,
+        aliases: Iterable<String>,
+    ): String =
         sequenceOf(game.title.orEmpty(), game.originalTitle.orEmpty())
             .plus(aliases.asSequence())
             .map(::normalize)
@@ -14,7 +17,10 @@ object GameSearchIndex {
             .distinct()
             .joinToString("|")
 
-    fun matches(indexedText: String?, query: String): Boolean {
+    fun matches(
+        indexedText: String?,
+        query: String,
+    ): Boolean {
         if (query.isBlank()) return true
         val haystack = indexedText.orEmpty()
         return query.split(Regex("\\s+"))
@@ -24,8 +30,9 @@ object GameSearchIndex {
     }
 
     fun normalize(value: String): String {
-        val normalized = Normalizer.normalize(value, Normalizer.Form.NFKC)
-            .lowercase(Locale.ROOT)
+        val normalized =
+            Normalizer.normalize(value, Normalizer.Form.NFKC)
+                .lowercase(Locale.ROOT)
         return buildString(normalized.length) {
             normalized.forEach { character ->
                 if (Character.isLetterOrDigit(character)) append(character)

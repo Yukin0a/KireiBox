@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- API 31+ splash mark: the launcher tile artwork inset so the whole rounded tile (hat and lettering
+     included) sits inside the system's circular splash-icon mask (2/3 of the icon box). The adaptive
+     launcher icon keeps its own 8% inset (ic_launcher_foreground_inset). -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/ic_launcher_foreground"
+    android:inset="27%" />

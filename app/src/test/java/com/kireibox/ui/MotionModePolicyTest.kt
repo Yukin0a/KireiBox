@@ -19,15 +19,19 @@ class MotionModePolicyTest {
         assertEquals(MotionMode.REDUCED, MotionModePolicy.resolve(MotionMode.AUTO, capable.copy(powerSaveMode = true)))
     }
 
-    @Test fun disabledSystemAnimationsAlwaysWin() {
+    @Test fun autoFallsBackToReducedWhenSystemAnimationsAreOff() {
         assertEquals(
             MotionMode.REDUCED,
-            MotionModePolicy.resolve(MotionMode.POLISHED, capable.copy(animatorsEnabled = false))
+            MotionModePolicy.resolve(MotionMode.AUTO, capable.copy(animatorsEnabled = false))
         )
     }
 
-    @Test fun explicitModeWinsWhenSystemAnimationsAreAvailable() {
+    @Test fun explicitModeWinsInEveryConstrainedCondition() {
         assertEquals(MotionMode.REDUCED, MotionModePolicy.resolve(MotionMode.REDUCED, capable))
+        // 完整 is a real choice: system animations off, low RAM, tiny heap and power save all yield
+        // the full experience instead of silently pausing it.
+        val constrained = capable.copy(animatorsEnabled = false, lowRamDevice = true, memoryClassMb = 128, powerSaveMode = true)
+        assertEquals(MotionMode.POLISHED, MotionModePolicy.resolve(MotionMode.POLISHED, constrained))
         assertEquals(MotionMode.POLISHED, MotionModePolicy.resolve(MotionMode.POLISHED, capable.copy(lowRamDevice = true)))
     }
 }

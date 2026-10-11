@@ -113,32 +113,6 @@ KireiBox/
 
 KireiBox 使用 Kotlin、Jetpack Compose、Coroutines / Flow 与 MVVM 架构构建应用界面和交互。
 
-### 包职责说明
-
-`app` 模块（`src/main/java/com/kireibox/`）：
-
-- `app/` —— 应用壳：`LauncherActivity` 与 `app/launcher/*` 协调器（存储权限、启动、导入、窗口 chrome、诊断导出）；`app/diagnostics/` 为诊断日志。
-- `designsystem/` —— 设计系统：`AppleDesignTheme` / `AppleMotion` / `AppleTypography` 与 `KireiColors`。
-- `ui/` —— Compose 界面：`KireiBoxApp` 外壳、各 feature 页面（首页/游戏库/设置/封面/文件选择）与 `KireiViewModel`（Facade）+ `Kirei*Controller` 控制器。
-- `cover/`、`update/`、`auth/`、`external/shortcut/`、`krkr/`、`shortcut/` —— 各自领域平台逻辑。
-- `com/yuki/yukihub/{launcher,launcherbridge,tyrano}` 与 `YukiHubApp` —— 引擎桥接，命名固定，供 Manifest / JNI / 反射按名查找。
-
-`core-yukihub` 模块（`src/main/java/com/yuki/yukihub/`）：
-
-- `model/`、`scanner/` —— 领域模型与游戏扫描。
-- `data/` —— `GameRepository`（门面）+ `data/game/GameQueryRepository`、`data/play/PlaySessionRepository`、`data/play/PlayStatsRepository`、`data/backup/GameBackupCodec`、`data/db/GameIdentityKey`。
-- `metadata/` —— 元数据与封面来源客户端、标题匹配与混合匹配置信度（`CoverSourcePriority` / `CoverMatchConfidence`）。
-- `settings/` —— 设置模型与 `YukiSettingsStore`。
-- `launch/ net/ auth/ storage/ migration/ util/` —— 启动、网络、授权、存储、迁移与工具。
-
-### 结构门禁
-
-CI（`.github/workflows/android-debug.yml`）除构建与测试外，还运行：
-
-- `verifyFileSize`：`app` / `core-yukihub` 的 `src/main` 单文件不得超过 800 行（`engine/` 为第三方冻结区，不纳入）。
-- `detekt`：结构复杂度门禁，当前违规以 `config/detekt/*-baseline.xml` 冻结，只对新增违规报错。
-- `ktlint`：格式门禁，规则见根目录 `.editorconfig`。
-
 ***
 
 ## 构建信息

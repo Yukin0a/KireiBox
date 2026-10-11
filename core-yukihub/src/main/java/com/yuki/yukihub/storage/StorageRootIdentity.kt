@@ -29,14 +29,20 @@ object StorageRootIdentity {
     }
 
     @JvmStatic
-    fun equivalent(first: String?, second: String?): Boolean {
+    fun equivalent(
+        first: String?,
+        second: String?,
+    ): Boolean {
         val left = key(first)
         return left.isNotEmpty() && left == key(second)
     }
 
     /** True only for the same directory or a real path-segment descendant. */
     @JvmStatic
-    fun contains(root: String?, candidate: String?): Boolean {
+    fun contains(
+        root: String?,
+        candidate: String?,
+    ): Boolean {
         val rootKey = key(root).trimEnd('/')
         val candidateKey = key(candidate).trimEnd('/')
         if (rootKey.isEmpty() || candidateKey.isEmpty()) return false
@@ -46,8 +52,9 @@ object StorageRootIdentity {
     private fun contentKey(uri: URI): String {
         val authority = uri.authority?.lowercase(Locale.ROOT).orEmpty()
         val encodedPath = uri.rawPath.orEmpty()
-        val documentId = encodedSegmentAfter(encodedPath, "/document/")
-            ?: encodedSegmentAfter(encodedPath, "/tree/")
+        val documentId =
+            encodedSegmentAfter(encodedPath, "/document/")
+                ?: encodedSegmentAfter(encodedPath, "/tree/")
         val decodedId = decode(documentId.orEmpty())
         if (authority == EXTERNAL_STORAGE_AUTHORITY && decodedId.isNotEmpty()) {
             return externalStorageDocumentKey(decodedId)
@@ -56,7 +63,10 @@ object StorageRootIdentity {
         return "content:$authority:/$stableDocument".trimEnd('/')
     }
 
-    private fun encodedSegmentAfter(path: String, marker: String): String? {
+    private fun encodedSegmentAfter(
+        path: String,
+        marker: String,
+    ): String? {
         val index = path.lastIndexOf(marker)
         if (index < 0) return null
         return path.substring(index + marker.length).substringBefore('/').takeIf(String::isNotEmpty)
@@ -77,12 +87,13 @@ object StorageRootIdentity {
     private fun fileKey(path: String): String {
         val normalized = "/${normalizedSegments(path)}".replace(Regex("/+"), "/")
         val lower = normalized.lowercase(Locale.ROOT).trimEnd('/').ifEmpty { "/" }
-        val primaryPrefixes = listOf(
-            "/storage/emulated/0",
-            "/storage/self/primary",
-            "/mnt/sdcard",
-            "/sdcard",
-        )
+        val primaryPrefixes =
+            listOf(
+                "/storage/emulated/0",
+                "/storage/self/primary",
+                "/mnt/sdcard",
+                "/sdcard",
+            )
         primaryPrefixes.firstOrNull { lower == it || lower.startsWith("$it/") }?.let { prefix ->
             return storageKey("primary", lower.removePrefix(prefix).trim('/'))
         }
@@ -97,16 +108,20 @@ object StorageRootIdentity {
         return "file:$lower"
     }
 
-    private fun storageKey(volume: String, relative: String): String {
+    private fun storageKey(
+        volume: String,
+        relative: String,
+    ): String {
         val clean = normalizedSegments(relative)
         return if (clean.isEmpty()) "$volume:/" else "$volume:/$clean"
     }
 
-    private fun genericKey(raw: String): String = raw
-        .replace('\\', '/')
-        .replace(Regex("/+"), "/")
-        .trimEnd('/')
-        .lowercase(Locale.ROOT)
+    private fun genericKey(raw: String): String =
+        raw
+            .replace('\\', '/')
+            .replace(Regex("/+"), "/")
+            .trimEnd('/')
+            .lowercase(Locale.ROOT)
 
     private fun normalizedSegments(value: String): String {
         val output = ArrayList<String>()
@@ -121,7 +136,8 @@ object StorageRootIdentity {
         return output.joinToString("/")
     }
 
-    private fun decode(value: String): String = runCatching {
-        URLDecoder.decode(value.replace("+", "%2B"), StandardCharsets.UTF_8.name())
-    }.getOrDefault(value)
+    private fun decode(value: String): String =
+        runCatching {
+            URLDecoder.decode(value.replace("+", "%2B"), StandardCharsets.UTF_8.name())
+        }.getOrDefault(value)
 }

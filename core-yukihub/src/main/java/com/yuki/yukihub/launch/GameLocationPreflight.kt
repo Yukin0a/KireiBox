@@ -13,12 +13,18 @@ import java.util.Locale
 object GameLocationPreflight {
     data class Result(val game: Game?, val repaired: Boolean, val message: String)
 
-    fun verify(context: Context, repository: GameRepository, source: Game): Result {
+    fun verify(
+        context: Context,
+        repository: GameRepository,
+        source: Game,
+    ): Result {
         if (source.engine == EngineType.ANDROID_APP) return Result(source, false, "android package")
-        val rootUri = source.rootUri?.takeIf(String::isNotBlank)
-            ?: return Result(null, false, "游戏目录为空")
-        val root = StorageNodes.resolve(context, rootUri)
-            ?: return Result(null, false, "无法读取游戏目录，请重新授权")
+        val rootUri =
+            source.rootUri?.takeIf(String::isNotBlank)
+                ?: return Result(null, false, "游戏目录为空")
+        val root =
+            StorageNodes.resolve(context, rootUri)
+                ?: return Result(null, false, "无法读取游戏目录，请重新授权")
         val target = source.launchTarget?.trim().orEmpty()
         if (target.isBlank() || target.startsWith("[")) return Result(source, false, "directory entry")
         if (source.engine == EngineType.KIRIKIRI && Xp3EntrySelector.isAssetTarget(target)) {
@@ -29,22 +35,24 @@ object GameLocationPreflight {
         val candidates = ArrayList<StorageNode>()
         collectDirectoriesContaining(root, target, 0, 3, candidates)
         val distinct = candidates.distinctBy { it.uri.toString() }
-        val selected = when {
-            distinct.size == 1 -> distinct.single()
-            distinct.isEmpty() -> null
-            else -> distinct.filter { titleCompatible(source.title, it.name) }.singleOrNull()
-        } ?: return Result(
-            null,
-            false,
-            if (distinct.isEmpty()) "找不到启动文件 $target" else "找到多个 $target，请重新选择游戏目录"
-        )
+        val selected =
+            when {
+                distinct.size == 1 -> distinct.single()
+                distinct.isEmpty() -> null
+                else -> distinct.filter { titleCompatible(source.title, it.name) }.singleOrNull()
+            } ?: return Result(
+                null,
+                false,
+                if (distinct.isEmpty()) "找不到启动文件 $target" else "找到多个 $target，请重新选择游戏目录",
+            )
 
-        val repaired = source.copy(
-            rootUri = selected.uri.toString(),
-            entryKey = if (source.entryKey.isBlank()) "" else GameRepository.normalizeEntryKey(target),
-            launchTarget = target,
-            updatedAt = System.currentTimeMillis()
-        )
+        val repaired =
+            source.copy(
+                rootUri = selected.uri.toString(),
+                entryKey = if (source.entryKey.isBlank()) "" else GameRepository.normalizeEntryKey(target),
+                launchTarget = target,
+                updatedAt = System.currentTimeMillis(),
+            )
         repository.update(repaired)
         return Result(repository.findById(source.id) ?: repaired, true, "已修复游戏目录：${selected.name.orEmpty()}")
     }
@@ -55,16 +63,18 @@ object GameLocationPreflight {
         root: StorageNode,
     ): Result {
         val children = runCatching { root.children() }.getOrDefault(emptyList())
-        val entries = children.asSequence()
-            .filter { it.isFile && it.name.endsWith(".xp3", ignoreCase = true) }
-            .map { Xp3EntrySelector.Entry(it.name, it.size) }
-            .toList()
+        val entries =
+            children.asSequence()
+                .filter { it.isFile && it.name.endsWith(".xp3", ignoreCase = true) }
+                .map { Xp3EntrySelector.Entry(it.name, it.size) }
+                .toList()
         val selected = Xp3EntrySelector.select(entries, root.name, source.title)
         val newTarget = selected ?: "[游戏目录]"
-        val repaired = source.copy(
-            launchTarget = newTarget,
-            updatedAt = System.currentTimeMillis(),
-        )
+        val repaired =
+            source.copy(
+                launchTarget = newTarget,
+                updatedAt = System.currentTimeMillis(),
+            )
         repository.update(repaired)
         return Result(
             repository.findById(source.id) ?: repaired,
@@ -78,7 +88,7 @@ object GameLocationPreflight {
         target: String,
         depth: Int,
         maxDepth: Int,
-        output: MutableList<StorageNode>
+        output: MutableList<StorageNode>,
     ) {
         if (resolve(directory, target) != null) output += directory
         if (depth >= maxDepth) return
@@ -89,7 +99,10 @@ object GameLocationPreflight {
         }
     }
 
-    private fun resolve(root: StorageNode, relativePath: String): StorageNode? {
+    private fun resolve(
+        root: StorageNode,
+        relativePath: String,
+    ): StorageNode? {
         var current: StorageNode? = root
         for (segment in relativePath.replace('\\', '/').split('/').filter(String::isNotBlank)) {
             current = runCatching { current?.findChild(segment) }.getOrNull() ?: return null
@@ -97,12 +110,16 @@ object GameLocationPreflight {
         return current?.takeIf { it.isFile }
     }
 
-    private fun titleCompatible(title: String?, directoryName: String?): Boolean {
+    private fun titleCompatible(
+        title: String?,
+        directoryName: String?,
+    ): Boolean {
         val a = normalize(title)
         val b = normalize(directoryName)
         return a.isNotEmpty() && b.isNotEmpty() && (a.contains(b) || b.contains(a))
     }
 
-    private fun normalize(value: String?): String = Normalizer.normalize(value.orEmpty(), Normalizer.Form.NFKC)
-        .lowercase(Locale.ROOT).replace(Regex("[^\\p{L}\\p{N}]+"), "")
+    private fun normalize(value: String?): String =
+        Normalizer.normalize(value.orEmpty(), Normalizer.Form.NFKC)
+            .lowercase(Locale.ROOT).replace(Regex("[^\\p{L}\\p{N}]+"), "")
 }

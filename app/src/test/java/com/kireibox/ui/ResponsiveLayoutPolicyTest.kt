@@ -66,28 +66,31 @@ class ResponsiveLayoutPolicyTest {
     }
 
     @Test fun wideDashboardUsesCompactHeightDensityForShortWindows() {
-        val presentation = ResponsiveLayoutPolicy.dashboardPresentation(
-            KireiLayoutMode.WIDE,
-            availableHeightDp = 411f,
-        )
+        val presentation =
+            ResponsiveLayoutPolicy.dashboardPresentation(
+                KireiLayoutMode.WIDE,
+                availableHeightDp = 411f,
+            )
 
         assertEquals(DashboardProfile.WIDE, presentation.profile)
         assertEquals(DashboardDensity.COMPACT_HEIGHT, presentation.density)
     }
 
     @Test fun pixel8LandscapeUsesTheSameOpticalSafeFrameInBothRotations() {
-        val cameraOnLeft = ResponsiveLayoutPolicy.compactLibraryGridMetrics(
-            widthDp = 914f,
-            horizontalPaddingDp = 18f,
-            safeDrawingLeftDp = 50.3f,
-            safeDrawingRightDp = 0f,
-        )
-        val cameraOnRight = ResponsiveLayoutPolicy.compactLibraryGridMetrics(
-            widthDp = 914f,
-            horizontalPaddingDp = 18f,
-            safeDrawingLeftDp = 0f,
-            safeDrawingRightDp = 50.3f,
-        )
+        val cameraOnLeft =
+            ResponsiveLayoutPolicy.compactLibraryGridMetrics(
+                widthDp = 914f,
+                horizontalPaddingDp = 18f,
+                safeDrawingLeftDp = 50.3f,
+                safeDrawingRightDp = 0f,
+            )
+        val cameraOnRight =
+            ResponsiveLayoutPolicy.compactLibraryGridMetrics(
+                widthDp = 914f,
+                horizontalPaddingDp = 18f,
+                safeDrawingLeftDp = 0f,
+                safeDrawingRightDp = 50.3f,
+            )
 
         assertEquals(cameraOnLeft, cameraOnRight)
         assertEquals(68.3f, cameraOnLeft.contentLeftPaddingDp, .001f)
@@ -97,12 +100,13 @@ class ResponsiveLayoutPolicyTest {
     }
 
     @Test fun compactGridKeepsBasePaddingSymmetricWithoutSafeInsets() {
-        val metrics = ResponsiveLayoutPolicy.compactLibraryGridMetrics(
-            widthDp = 914f,
-            horizontalPaddingDp = 18f,
-            safeDrawingLeftDp = 0f,
-            safeDrawingRightDp = 0f,
-        )
+        val metrics =
+            ResponsiveLayoutPolicy.compactLibraryGridMetrics(
+                widthDp = 914f,
+                horizontalPaddingDp = 18f,
+                safeDrawingLeftDp = 0f,
+                safeDrawingRightDp = 0f,
+            )
 
         assertEquals(18f, metrics.contentLeftPaddingDp, .001f)
         assertEquals(18f, metrics.contentRightPaddingDp, .001f)
@@ -110,12 +114,13 @@ class ResponsiveLayoutPolicyTest {
     }
 
     @Test fun compactGridMirrorsTheLargerOfUnequalSafeInsets() {
-        val metrics = ResponsiveLayoutPolicy.compactLibraryGridMetrics(
-            widthDp = 914f,
-            horizontalPaddingDp = 18f,
-            safeDrawingLeftDp = 46f,
-            safeDrawingRightDp = 24f,
-        )
+        val metrics =
+            ResponsiveLayoutPolicy.compactLibraryGridMetrics(
+                widthDp = 914f,
+                horizontalPaddingDp = 18f,
+                safeDrawingLeftDp = 46f,
+                safeDrawingRightDp = 24f,
+            )
 
         assertEquals(64f, metrics.contentLeftPaddingDp, .001f)
         assertEquals(64f, metrics.contentRightPaddingDp, .001f)
@@ -213,14 +218,15 @@ class ResponsiveLayoutPolicyTest {
 
     @Test
     fun retiredCompactProductModeIsNeverProduced() {
-        val windows = listOf(
-            Triple(914f, 411f, 411),
-            Triple(700f, 400f, 400),
-            Triple(660f, 340f, 340),
-            Triple(1000f, 500f, 500),
-            Triple(411f, 914f, 411),
-            Triple(1050f, 600f, 600),
-        )
+        val windows =
+            listOf(
+                Triple(914f, 411f, 411),
+                Triple(700f, 400f, 400),
+                Triple(660f, 340f, 340),
+                Triple(1000f, 500f, 500),
+                Triple(411f, 914f, 411),
+                Triple(1050f, 600f, 600),
+            )
         windows.forEach { (width, height, smallest) ->
             val mode = ResponsiveLayoutPolicy.resolveLayoutMode(width, height, smallest, Configuration.SCREENLAYOUT_SIZE_NORMAL)
             assertTrue("$width x $height", mode == KireiLayoutMode.PHONE_PORTRAIT || mode == KireiLayoutMode.WIDE)
@@ -263,15 +269,16 @@ class ResponsiveLayoutPolicyTest {
             val expected: ResponsiveWindowClass,
         )
 
-        val cases = listOf(
-            Case(360f, 800f, HomeSizeClass.COMPACT, ResponsiveWindowClass.PHONE_PORTRAIT),
-            Case(411f, 914f, HomeSizeClass.COMPACT, ResponsiveWindowClass.PHONE_PORTRAIT),
-            Case(640f, 360f, HomeSizeClass.COMPACT, ResponsiveWindowClass.PHONE_LANDSCAPE),
-            Case(914f, 411f, HomeSizeClass.COMPACT, ResponsiveWindowClass.PHONE_LANDSCAPE),
-            Case(600f, 1024f, HomeSizeClass.WIDE, ResponsiveWindowClass.PAD_PORTRAIT),
-            Case(800f, 1280f, HomeSizeClass.WIDE, ResponsiveWindowClass.PAD_PORTRAIT),
-            Case(1280f, 800f, HomeSizeClass.WIDE, ResponsiveWindowClass.PAD_LANDSCAPE),
-        )
+        val cases =
+            listOf(
+                Case(360f, 800f, HomeSizeClass.COMPACT, ResponsiveWindowClass.PHONE_PORTRAIT),
+                Case(411f, 914f, HomeSizeClass.COMPACT, ResponsiveWindowClass.PHONE_PORTRAIT),
+                Case(640f, 360f, HomeSizeClass.COMPACT, ResponsiveWindowClass.PHONE_LANDSCAPE),
+                Case(914f, 411f, HomeSizeClass.COMPACT, ResponsiveWindowClass.PHONE_LANDSCAPE),
+                Case(600f, 1024f, HomeSizeClass.WIDE, ResponsiveWindowClass.PAD_PORTRAIT),
+                Case(800f, 1280f, HomeSizeClass.WIDE, ResponsiveWindowClass.PAD_PORTRAIT),
+                Case(1280f, 800f, HomeSizeClass.WIDE, ResponsiveWindowClass.PAD_LANDSCAPE),
+            )
 
         cases.forEach { case ->
             assertEquals(
@@ -299,17 +306,17 @@ class ResponsiveLayoutPolicyTest {
 
     @Test
     fun insetsCanChangeClassificationWhenTheyChangeTheSafeFrameAspect() {
-        val safe = ResponsiveSafeFrame(
-            windowWidthDp = 914f,
-            windowHeightDp = 411f,
-            leftDp = 300f,
-            rightDp = 300f,
-        )
+        val safe =
+            ResponsiveSafeFrame(
+                windowWidthDp = 914f,
+                windowHeightDp = 411f,
+                leftDp = 300f,
+                rightDp = 300f,
+            )
 
         assertEquals(
             ResponsiveWindowClass.PHONE_PORTRAIT,
             ResponsiveLayoutPolicy.resolveWindowClass(safe, HomeSizeClass.COMPACT),
         )
     }
-
 }

@@ -124,12 +124,13 @@ class HomePresentationPolicyTest {
                 assertEquals(assignments.size, assignments.map { it.gameIndex }.toSet().size)
                 assertEquals(selected, assignments.single { it.slot == HomeCardSlot.CENTER }.gameIndex)
                 assertEquals(HomeCardDepth.FRONT, assignments.single { it.slot == HomeCardSlot.CENTER }.depth)
-                val expected = linkedMapOf(
-                    HomeCardSlot.NEAR_LEFT to (selected - 1).takeIf { it >= 0 },
-                    HomeCardSlot.FAR_LEFT to (selected - 2).takeIf { it >= 0 },
-                    HomeCardSlot.NEAR_RIGHT to (selected + 1).takeIf { it < count },
-                    HomeCardSlot.FAR_RIGHT to (selected + 2).takeIf { it < count },
-                )
+                val expected =
+                    linkedMapOf(
+                        HomeCardSlot.NEAR_LEFT to (selected - 1).takeIf { it >= 0 },
+                        HomeCardSlot.FAR_LEFT to (selected - 2).takeIf { it >= 0 },
+                        HomeCardSlot.NEAR_RIGHT to (selected + 1).takeIf { it < count },
+                        HomeCardSlot.FAR_RIGHT to (selected + 2).takeIf { it < count },
+                    )
                 expected.forEach { (slot, gameIndex) ->
                     val assignment = assignments.firstOrNull { it.slot == slot }
                     if (gameIndex == null) {
@@ -225,16 +226,18 @@ class HomePresentationPolicyTest {
     @Test
     fun identicalSafeFramesProduceIdenticalChromeAcrossPresentationModes() {
         val safeFrame = HomeRect(x = 18f, y = 24f, w = 375f, h = 881f)
-        val immersive = HomePresentationPolicy.resolvePresentation(
-            mode = HomePresentationMode.IMMERSIVE,
-            safeFrame = safeFrame,
-            sizeClass = HomeSizeClass.COMPACT,
-        )
-        val components = HomePresentationPolicy.resolvePresentation(
-            mode = HomePresentationMode.COMPONENTS,
-            safeFrame = safeFrame,
-            sizeClass = HomeSizeClass.COMPACT,
-        )
+        val immersive =
+            HomePresentationPolicy.resolvePresentation(
+                mode = HomePresentationMode.IMMERSIVE,
+                safeFrame = safeFrame,
+                sizeClass = HomeSizeClass.COMPACT,
+            )
+        val components =
+            HomePresentationPolicy.resolvePresentation(
+                mode = HomePresentationMode.COMPONENTS,
+                safeFrame = safeFrame,
+                sizeClass = HomeSizeClass.COMPACT,
+            )
 
         assertEquals(immersive.topChrome, components.topChrome)
         assertEquals(HomePresentationMode.IMMERSIVE, immersive.mode)
@@ -244,16 +247,18 @@ class HomePresentationPolicyTest {
     @Test
     fun sizeClassChangesChromeDensityButNeverChangesSelectedMode() {
         val safeFrame = HomeRect(x = 50f, y = 0f, w = 812f, h = 402f)
-        val compact = HomePresentationPolicy.resolvePresentation(
-            mode = HomePresentationMode.COMPONENTS,
-            safeFrame = safeFrame,
-            sizeClass = HomeSizeClass.COMPACT,
-        )
-        val wide = HomePresentationPolicy.resolvePresentation(
-            mode = HomePresentationMode.COMPONENTS,
-            safeFrame = safeFrame,
-            sizeClass = HomeSizeClass.WIDE,
-        )
+        val compact =
+            HomePresentationPolicy.resolvePresentation(
+                mode = HomePresentationMode.COMPONENTS,
+                safeFrame = safeFrame,
+                sizeClass = HomeSizeClass.COMPACT,
+            )
+        val wide =
+            HomePresentationPolicy.resolvePresentation(
+                mode = HomePresentationMode.COMPONENTS,
+                safeFrame = safeFrame,
+                sizeClass = HomeSizeClass.WIDE,
+            )
 
         assertEquals(HomePresentationMode.COMPONENTS, compact.mode)
         assertEquals(HomePresentationMode.COMPONENTS, wide.mode)

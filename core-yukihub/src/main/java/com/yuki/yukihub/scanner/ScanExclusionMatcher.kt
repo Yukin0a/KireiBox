@@ -6,25 +6,35 @@ import java.util.Locale
 
 object ScanExclusionMatcher {
     @JvmStatic
-    fun matchesName(name: String?, patterns: Collection<String>): Boolean {
+    fun matchesName(
+        name: String?,
+        patterns: Collection<String>,
+    ): Boolean {
         val normalizedName = normalize(name)
         if (normalizedName.isEmpty()) return false
         return patterns.any { glob(normalizedName, normalize(it)) }
     }
 
     @JvmStatic
-    fun matchesUri(uri: String?, ignoredUriKeys: Collection<String>): Boolean {
+    fun matchesUri(
+        uri: String?,
+        ignoredUriKeys: Collection<String>,
+    ): Boolean {
         val key = GameRepository.normalizeRootUriKey(uri)
         return key.isNotEmpty() && ignoredUriKeys.contains(key)
     }
 
     @JvmStatic
-    fun normalize(value: String?): String = Normalizer
-        .normalize(value.orEmpty(), Normalizer.Form.NFKC)
-        .trim()
-        .lowercase(Locale.ROOT)
+    fun normalize(value: String?): String =
+        Normalizer
+            .normalize(value.orEmpty(), Normalizer.Form.NFKC)
+            .trim()
+            .lowercase(Locale.ROOT)
 
-    private fun glob(value: String, pattern: String): Boolean {
+    private fun glob(
+        value: String,
+        pattern: String,
+    ): Boolean {
         if (pattern.isEmpty()) return false
         val starts = pattern.startsWith("*")
         val ends = pattern.endsWith("*")

@@ -20,7 +20,10 @@ internal object DashboardTrendEditorPolicy {
         return DashboardWidgetType.entries.filter { type -> !type.unique || type !in present }
     }
 
-    fun begin(layout: DashboardLayout, instanceId: String): TrendConfigDraft {
+    fun begin(
+        layout: DashboardLayout,
+        instanceId: String
+    ): TrendConfigDraft {
         val spec = layout.widgets.firstOrNull { it.instanceId == instanceId && it.type == DashboardWidgetType.PLAY_TREND }
         return TrendConfigDraft(
             metric = spec?.trendMetric ?: TrendMetric.PLAY_TIME,
@@ -34,9 +37,15 @@ internal object DashboardTrendEditorPolicy {
         profile: DashboardProfile,
         instanceId: String,
         draft: TrendConfigDraft,
-    ): DashboardLayout = DashboardLayouts.setTrendConfig(
-        layout, profile, instanceId, draft.metric, draft.range, draft.visualStyle,
-    )
+    ): DashboardLayout =
+        DashboardLayouts.setTrendConfig(
+            layout,
+            profile,
+            instanceId,
+            draft.metric,
+            draft.range,
+            draft.visualStyle,
+        )
 
     fun cancel(layout: DashboardLayout): DashboardLayout = layout
 }

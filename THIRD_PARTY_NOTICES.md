@@ -57,3 +57,9 @@ Inventory total: 25 files, 141,474,208 bytes (134.92 MiB).
 Java/Kotlin dependencies and their exact versions are declared in `gradle/libs.versions.toml`. Their own license terms continue to apply. Downstream redistributors should review the complete dependency graph and preserve any required notices when producing binaries.
 
 If a provenance or license statement here is incomplete, please open an issue with the affected file path and supporting upstream information so it can be corrected without removing the original notice.
+
+## Account authorization and metadata services
+
+- [AppAuth for Android](https://github.com/openid/AppAuth-Android), Apache-2.0, is used for browser authorization and PKCE. KireiBox registers its own public clients.
+- [NextMoe / 鲲Galgame](https://developer.nextmoe.dev/) provides aggregated catalog references and cover choices. Cover source, size, and content rating are preserved in the local metadata cache.
+- [Bangumi](https://bangumi.tv/), [Hikarinagi](https://www.hikarinagi.org/), and [VNDB](https://vndb.org/) retain ownership and terms for their catalog data and images. Connecting an account does not transfer credentials to image hosts.

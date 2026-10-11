@@ -16,7 +16,12 @@ import java.util.Collections
  */
 class ScanReport {
     enum class StopReason {
-        COMPLETED, CANCELLED, NODE_LIMIT, DEADLINE, INVALID_ROOT;
+        COMPLETED,
+        CANCELLED,
+        NODE_LIMIT,
+        DEADLINE,
+        INVALID_ROOT,
+        ;
 
         /** Whether this condition applies to the shared request rather than one root only. */
         fun stopsBatch(): Boolean = this == CANCELLED || this == NODE_LIMIT || this == DEADLINE
@@ -46,10 +51,15 @@ class ScanReport {
     }
 
     @JvmName("addSkippedDirectory")
-    internal fun addSkippedDirectory() { _skippedDirectories++ }
+    internal fun addSkippedDirectory() {
+        _skippedDirectories++
+    }
 
     @JvmName("tryVisit")
-    internal fun tryVisit(request: ScanRequest, currentUri: String?): Boolean {
+    internal fun tryVisit(
+        request: ScanRequest,
+        currentUri: String?,
+    ): Boolean {
         if (request.isCancelled) {
             _stopReason = StopReason.CANCELLED
             return false

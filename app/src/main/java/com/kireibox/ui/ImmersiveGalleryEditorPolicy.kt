@@ -1,11 +1,12 @@
 package com.kireibox.ui
 
+import com.yuki.yukihub.model.Game
 import com.yuki.yukihub.settings.DashboardLayouts
 import com.yuki.yukihub.settings.ImmersiveGalleryAutoSource
+import com.yuki.yukihub.settings.ImmersiveGallerySettingsPolicy
 import com.yuki.yukihub.settings.SpotlightSelectionMode
 import com.yuki.yukihub.settings.SpotlightSource
 import com.yuki.yukihub.settings.SpotlightStrategy
-import com.yuki.yukihub.model.Game
 
 internal enum class ImmersiveGalleryEmptyState {
     BUILD_LIBRARY,
@@ -35,12 +36,13 @@ object ImmersiveGalleryEditorPolicy {
         manualIds: List<Long>,
         autoSource: ImmersiveGalleryAutoSource = ImmersiveGalleryAutoSource.RECENT_FIVE,
     ): List<Game> {
-        val source = when (autoSource) {
-            ImmersiveGalleryAutoSource.RECENT_FIVE,
-            ImmersiveGalleryAutoSource.RECENT_ALL,
-            -> SpotlightSource.RECENT
-            ImmersiveGalleryAutoSource.FAVORITES -> SpotlightSource.FAVORITES
-        }
+        val source =
+            when (autoSource) {
+                ImmersiveGalleryAutoSource.RECENT_FIVE,
+                ImmersiveGalleryAutoSource.RECENT_ALL,
+                -> SpotlightSource.RECENT
+                ImmersiveGalleryAutoSource.FAVORITES -> SpotlightSource.FAVORITES
+            }
         val ordered = orderGamesForSource(games, mode, manualIds, source)
         return if (autoSource == ImmersiveGalleryAutoSource.RECENT_FIVE) ordered.take(5) else ordered
     }
@@ -78,78 +80,80 @@ object ImmersiveGalleryEditorPolicy {
             return manualIds.mapNotNull(byId::get)
         }
 
-        val playedSorted = games
-            .filter { it.lastPlayedAt > 0L }
-            .sortedByDescending { it.lastPlayedAt }
-            .distinctBy { it.id }
-        return when (source) {
-            SpotlightSource.RECENT -> playedSorted
-            SpotlightSource.FAVORITES -> games
-                .filter { it.favorite }
+        val playedSorted =
+            games
+                .filter { it.lastPlayedAt > 0L }
                 .sortedByDescending { it.lastPlayedAt }
                 .distinctBy { it.id }
+        return when (source) {
+            SpotlightSource.RECENT -> playedSorted
+            SpotlightSource.FAVORITES ->
+                games
+                    .filter { it.favorite }
+                    .sortedByDescending { it.lastPlayedAt }
+                    .distinctBy { it.id }
             SpotlightSource.ALL -> games
             SpotlightSource.FIXED -> emptyList()
         }
     }
 
-    fun maxPagesCoerced(maxPages: Int): Int =
-        maxPages.coerceIn(1, DashboardLayouts.MAX_SPOTLIGHT_PAGES)
+    fun maxPagesCoerced(maxPages: Int): Int = maxPages.coerceIn(1, DashboardLayouts.MAX_SPOTLIGHT_PAGES)
 
     /** Manual mode cannot save an empty list; the empty state stays editable instead. */
     fun canSaveManual(gameIds: List<Long>): Boolean = gameIds.isNotEmpty()
 
     /** Toggles an id in/out of the ordered manual list, keeping at most five entries. */
-    fun toggleManualId(gameIds: List<Long>, gameId: Long): List<Long> {
-        val without = gameIds.filter { it > 0L && it != gameId }
-        return if (gameId in gameIds) {
-            without
-        } else {
-            (without + gameId).take(DashboardLayouts.MAX_SPOTLIGHT_PAGES)
-        }
-    }
+    fun toggleManualId(
+        gameIds: List<Long>,
+        gameId: Long
+    ): List<Long> = ImmersiveGallerySettingsPolicy.toggleManualId(gameIds, gameId)
 
-    fun moveManualId(gameIds: List<Long>, from: Int, to: Int): List<Long> {
-        if (from !in gameIds.indices || to !in gameIds.indices) return gameIds
-        val mutable = gameIds.toMutableList()
-        val item = mutable.removeAt(from)
-        mutable.add(to.coerceIn(0, mutable.size), item)
-        return mutable
-    }
+    fun moveManualId(
+        gameIds: List<Long>,
+        from: Int,
+        to: Int
+    ): List<Long> = ImmersiveGallerySettingsPolicy.moveManualId(gameIds, from, to)
 
     /** True when the manual list has no entry that still exists in the current library. */
-    fun manualSelectionMissing(spotlightGameIds: List<Long>, validGameIds: Set<Long>): Boolean =
-        spotlightGameIds.none { it in validGameIds }
+    fun manualSelectionMissing(
+        spotlightGameIds: List<Long>,
+        validGameIds: Set<Long>
+    ): Boolean = spotlightGameIds.none { it in validGameIds }
 
-    fun automaticSourceLabel(source: SpotlightSource): String = when (source) {
-        SpotlightSource.RECENT -> "最近打开"
-        SpotlightSource.FAVORITES -> "收藏"
-        SpotlightSource.ALL -> "全部游戏"
-        SpotlightSource.FIXED -> "全部游戏"
-    }
+    fun automaticSourceLabel(source: SpotlightSource): String =
+        when (source) {
+            SpotlightSource.RECENT -> "最近打开"
+            SpotlightSource.FAVORITES -> "收藏"
+            SpotlightSource.ALL -> "全部游戏"
+            SpotlightSource.FIXED -> "全部游戏"
+        }
 
-    fun autoSourceLabel(source: ImmersiveGalleryAutoSource): String = when (source) {
-        ImmersiveGalleryAutoSource.RECENT_FIVE -> "最近游玩 5 个"
-        ImmersiveGalleryAutoSource.RECENT_ALL -> "最近游玩全部"
-        ImmersiveGalleryAutoSource.FAVORITES -> "收藏优先"
-    }
+    fun autoSourceLabel(source: ImmersiveGalleryAutoSource): String =
+        when (source) {
+            ImmersiveGalleryAutoSource.RECENT_FIVE -> "最近游玩 5 个"
+            ImmersiveGalleryAutoSource.RECENT_ALL -> "最近游玩全部"
+            ImmersiveGalleryAutoSource.FAVORITES -> "收藏优先"
+        }
 
-    fun autoSourceDescription(source: ImmersiveGalleryAutoSource): String = when (source) {
-        ImmersiveGalleryAutoSource.RECENT_FIVE -> "默认：按最后游玩时间展示最多 5 个游戏"
-        ImmersiveGalleryAutoSource.RECENT_ALL -> "按最后游玩时间展示全部游戏"
-        ImmersiveGalleryAutoSource.FAVORITES -> "只从收藏游戏中选择"
-    }
+    fun autoSourceDescription(source: ImmersiveGalleryAutoSource): String =
+        when (source) {
+            ImmersiveGalleryAutoSource.RECENT_FIVE -> "默认：按最后游玩时间展示最多 5 个游戏"
+            ImmersiveGalleryAutoSource.RECENT_ALL -> "按最后游玩时间展示全部游戏"
+            ImmersiveGalleryAutoSource.FAVORITES -> "只从收藏游戏中选择"
+        }
 
-    fun automaticSourceDescription(source: SpotlightSource): String = when (source) {
-        SpotlightSource.RECENT -> "优先显示最近实际启动过的游戏"
-        SpotlightSource.FAVORITES -> "只从收藏游戏中选择"
-        SpotlightSource.ALL -> "从当前游戏库中选择"
-        SpotlightSource.FIXED -> "从当前游戏库中选择"
-    }
+    fun automaticSourceDescription(source: SpotlightSource): String =
+        when (source) {
+            SpotlightSource.RECENT -> "优先显示最近实际启动过的游戏"
+            SpotlightSource.FAVORITES -> "只从收藏游戏中选择"
+            SpotlightSource.ALL -> "从当前游戏库中选择"
+            SpotlightSource.FIXED -> "从当前游戏库中选择"
+        }
 
-    fun strategyLabel(strategy: SpotlightStrategy): String = when (strategy) {
-        SpotlightStrategy.FIRST -> "按顺序"
-        SpotlightStrategy.RANDOM_EACH_LAUNCH -> "每次启动随机"
-        SpotlightStrategy.DAILY_RANDOM -> "每日随机"
-    }
+    fun strategyLabel(strategy: SpotlightStrategy): String =
+        when (strategy) {
+            SpotlightStrategy.FIRST -> "按顺序"
+            SpotlightStrategy.RANDOM_EACH_LAUNCH -> "每次启动随机"
+            SpotlightStrategy.DAILY_RANDOM -> "每日随机"
+        }
 }

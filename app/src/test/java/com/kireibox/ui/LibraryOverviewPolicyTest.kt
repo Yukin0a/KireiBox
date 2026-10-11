@@ -1,7 +1,7 @@
 package com.kireibox.ui
 
-import com.yuki.yukihub.model.Game
 import com.yuki.yukihub.model.EngineType
+import com.yuki.yukihub.model.Game
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -30,15 +30,20 @@ class LibraryOverviewPolicyTest {
     }
 
     @Test fun compactTimeTreatsStoredDurationsAsMilliseconds() {
-        assertEquals("0m", LibraryOverviewPolicy.compactPlayTime(-1))
-        assertEquals("0m", LibraryOverviewPolicy.compactPlayTime(0))
-        assertEquals("1m", LibraryOverviewPolicy.compactPlayTime(7_200))
-        assertEquals("1m", LibraryOverviewPolicy.compactPlayTime(30_000))
-        assertEquals("1m", LibraryOverviewPolicy.compactPlayTime(59_000))
-        assertEquals("1m", LibraryOverviewPolicy.compactPlayTime(60_000))
-        assertEquals("5m", LibraryOverviewPolicy.compactPlayTime(300_000))
-        assertEquals("1h", LibraryOverviewPolicy.compactPlayTime(3_600_000))
-        assertEquals("1.5h", LibraryOverviewPolicy.compactPlayTime(5_400_000))
+        assertEquals("0 分钟", LibraryOverviewPolicy.compactPlayTime(-1))
+        assertEquals("0 分钟", LibraryOverviewPolicy.compactPlayTime(0))
+        assertEquals("1 分钟", LibraryOverviewPolicy.compactPlayTime(7_200))
+        assertEquals("1 分钟", LibraryOverviewPolicy.compactPlayTime(30_000))
+        assertEquals("1 分钟", LibraryOverviewPolicy.compactPlayTime(59_000))
+        assertEquals("1 分钟", LibraryOverviewPolicy.compactPlayTime(60_000))
+        assertEquals("5 分钟", LibraryOverviewPolicy.compactPlayTime(300_000))
+        assertEquals("45 分钟", LibraryOverviewPolicy.compactPlayTime(2_700_000))
+        assertEquals("1 小时", LibraryOverviewPolicy.compactPlayTime(3_600_000))
+        assertEquals("1.5 小时", LibraryOverviewPolicy.compactPlayTime(5_400_000))
+        assertEquals("12.5 小时", LibraryOverviewPolicy.compactPlayTime(45_000_000))
+        // Rounds to one decimal, and a whole result never shows ".0".
+        assertEquals("2 小时", LibraryOverviewPolicy.compactPlayTime(7_199_999))
+        assertEquals("52 小时", LibraryOverviewPolicy.compactPlayTime(187_200_000))
     }
 
     @Test fun summaryTimeTreatsStoredDurationsAsMilliseconds() {
@@ -65,9 +70,10 @@ class LibraryOverviewPolicyTest {
     }
 
     @Test fun overviewSheetResetsToTheFirstItemForSortChangesAndReselection() {
-        val source = source("app/src/main/java/com/kireibox/ui/KireiBoxApp.kt")
-        val sheet = source.substringAfter("private fun LibraryOverviewSheet(")
-            .substringBefore("@OptIn(ExperimentalMaterial3Api::class)")
+        val source = UiSourceFiles.all()
+        val sheet =
+            source.substringAfter("fun LibraryOverviewSheet(")
+                .substringBefore("@OptIn(ExperimentalMaterial3Api::class)")
 
         assertTrue(sheet.contains("val listState = rememberLazyListState()"))
         assertTrue(sheet.contains("LaunchedEffect(sort)"))
@@ -84,10 +90,15 @@ class LibraryOverviewPolicyTest {
     }
 
     @Test fun emptyStateIsCenteredAndHasNoGlowLayer() {
-        val source = source("app/src/main/java/com/kireibox/ui/KireiBoxApp.kt")
-        val emptyState = source
-            .substringAfter("if (orderedGames.isEmpty()) {")
-            .substringBefore("} else {")
+        // Scope to the library overview sheet; an immersive gallery empty state shares the same
+        // `orderedGames.isEmpty()` guard elsewhere in the package.
+        val source =
+            UiSourceFiles.all()
+                .substringAfter("fun LibraryOverviewSheet(")
+        val emptyState =
+            source
+                .substringAfter("if (orderedGames.isEmpty()) {")
+                .substringBefore("} else {")
 
         assertTrue(emptyState.contains("Color.Transparent"))
         assertTrue(emptyState.contains("contentAlignment = Alignment.Center"))
@@ -99,14 +110,15 @@ class LibraryOverviewPolicyTest {
     }
 
     @Test fun pixel8Landscape914x411FinalRowStopsAboveRenderedDock() {
-        val metrics = resolveAdaptiveUiMetrics(
-            windowWidthDp = 914f,
-            windowHeightDp = 411f,
-            safeLeftDp = 0f,
-            safeTopDp = 0f,
-            safeRightDp = 0f,
-            safeBottomDp = 24f,
-        )
+        val metrics =
+            resolveAdaptiveUiMetrics(
+                windowWidthDp = 914f,
+                windowHeightDp = 411f,
+                safeLeftDp = 0f,
+                safeTopDp = 0f,
+                safeRightDp = 0f,
+                safeBottomDp = 24f,
+            )
         val dock = resolveDockRenderRect(metrics.dockRect)
         val padding = resolveLibraryGridBottomContentPaddingDp(411f, metrics.dockRect, 24f)
 
@@ -115,14 +127,15 @@ class LibraryOverviewPolicyTest {
     }
 
     @Test fun wideLandscape2358x1080EquivalentFinalRowStopsAboveRenderedDock() {
-        val metrics = resolveAdaptiveUiMetrics(
-            windowWidthDp = 2358f,
-            windowHeightDp = 1080f,
-            safeLeftDp = 0f,
-            safeTopDp = 0f,
-            safeRightDp = 0f,
-            safeBottomDp = 24f,
-        )
+        val metrics =
+            resolveAdaptiveUiMetrics(
+                windowWidthDp = 2358f,
+                windowHeightDp = 1080f,
+                safeLeftDp = 0f,
+                safeTopDp = 0f,
+                safeRightDp = 0f,
+                safeBottomDp = 24f,
+            )
         val dock = resolveDockRenderRect(metrics.dockRect)
         val padding = resolveLibraryGridBottomContentPaddingDp(1080f, metrics.dockRect, 24f)
 
@@ -131,19 +144,18 @@ class LibraryOverviewPolicyTest {
     }
 
     @Test fun androidAppFallbackLeavesOneEngineLabelToTheLibraryCard() {
-        val source = source("app/src/main/java/com/kireibox/ui/KireiBoxApp.kt")
-        val artwork = source
-            .substringAfter("internal fun GameCoverArtwork(")
-            .substringBefore("private fun EngineDefaultCover(")
-        val card = gameCardSource(source)
+        val source = UiSourceFiles.all()
+        val card = UiSourceFiles.file("LibraryCard.kt")
 
         assertEquals("Android 应用", libraryCardEngineLabel(EngineType.ANDROID_APP))
         assertEquals(1, LibraryCardLayoutPolicy.ENGINE_LABELS_PER_CARD)
-        assertTrue(artwork.contains("showFallbackMetadata: Boolean = true"))
+        // The shared cover artwork still draws the engine name by default; the library card has its own
+        // cover (skeleton / fallback glyph) so the meta line under the title is the card's only engine label.
         assertTrue(source.contains("showFallbackMetadata: Boolean = true"))
-        assertTrue(card.contains("showFallbackMetadata = false"))
-        assertTrue(card.contains("if (compact)"))
-        assertTrue(card.contains("if (!compact)"))
+        assertFalse("the card does not use the labelled fallback", card.contains("GameCoverArtwork("))
+        assertFalse("no engine pill on top of the cover", card.contains("KireiShapes.xs"))
+        assertEquals("the meta line is the one place the engine is named", 1, card.split("\$engineLabel · ").size - 1)
+        assertTrue("the meta line is shown in both orientations", !card.contains("if (!compact)"))
     }
 
     @Test fun shortLandscape2400x1080UsesNearSquareCoverAndPortraitKeepsRatio() {
@@ -154,7 +166,7 @@ class LibraryOverviewPolicyTest {
     }
 
     @Test fun longTitlesStayEllipsizedWithAtLeastSixDpBelowTheCover() {
-        val source = source("app/src/main/java/com/kireibox/ui/KireiBoxApp.kt")
+        val source = UiSourceFiles.all()
         val card = gameCardSource(source)
 
         assertEquals(1, LibraryCardLayoutPolicy.titleMaxLines(true))
@@ -180,13 +192,22 @@ class LibraryOverviewPolicyTest {
     }
 
     private fun source(relativePath: String): String {
-        val root = listOf(File("."), File(".."), File("../.."))
-            .firstOrNull { File(it, "app/src/main").isDirectory }
-            ?: error("KireiBox workspace not found from ${File("").absolutePath}")
-        return File(root, relativePath).readText()
+        val root =
+            listOf(File("."), File(".."), File("../.."))
+                .firstOrNull { File(it, "app/src/main").isDirectory }
+                ?: error("KireiBox workspace not found from ${File("").absolutePath}")
+        val file = File(root, relativePath)
+        // The shell was split into several files; fall back to the whole ui package when the
+        // requested file no longer exists.
+        return if (file.isFile) file.readText() else UiSourceFiles.all()
     }
 
-    private fun gameCardSource(source: String): String = source
-        .substringAfter("private fun GameCard(")
-        .substringBefore("@Composable\nprivate fun SettingsPage(")
+    private fun gameCardSource(source: String): String {
+        // End at the next top-level @Composable rather than a specific following function, so the
+        // slice survives the shell being split across files.
+        val start = source.indexOf("fun GameCard(")
+        require(start >= 0) { "GameCard missing" }
+        val end = source.indexOf("\n@Composable", start + 1).let { if (it < 0) source.length else it }
+        return source.substring(start, end)
+    }
 }

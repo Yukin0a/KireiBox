@@ -10,11 +10,12 @@ import org.junit.Test
 class GameLocationLabelTest {
     @Test fun hidesOpaqueDirectLaunchRecipeFromPresentation() {
         val root = ExternalShortcutIdentity.rootUri(0, "com.xiaoji.egggame", "totsulover_chs")
-        val direct = Game(
-            engine = EngineType.ANDROID_APP,
-            rootUri = root,
-            launchTarget = ExternalShortcutDirectLaunch.create("local_2FeqxFmUQBiqMenoyWYaeA")!!.encode(),
-        )
+        val direct =
+            Game(
+                engine = EngineType.ANDROID_APP,
+                rootUri = root,
+                launchTarget = ExternalShortcutDirectLaunch.create("local_2FeqxFmUQBiqMenoyWYaeA")!!.encode(),
+            )
         assertEquals("直接启动应用快捷方式", GameLocationLabel.launchSubtitle(direct))
         assertEquals(
             "通过 Shizuku 启动",

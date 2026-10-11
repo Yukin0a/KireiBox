@@ -7,11 +7,19 @@
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
         tools:ignore="ScopedStorage" />
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <queries>
         <package android:name="moe.shizuku.privileged.api" />
         <package android:name="com.xiaoji.egggame" />
+        <!-- Winlator-CN: by package, and by its launch link so a repackaged build is found too. -->
+        <package android:name="com.winlator" />
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="winlator" android:host="launch" />
+        </intent>
         <intent>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
@@ -21,6 +29,8 @@
     <application
         android:name=".YukiHubApp"
         android:allowBackup="true"
+        android:fullBackupContent="@xml/backup_rules"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
         android:label="@string/app_name"
@@ -29,6 +39,10 @@
         android:requestLegacyExternalStorage="true"
         android:networkSecurityConfig="@xml/network_security_config"
         android:theme="@style/AppTheme">
+
+        <activity android:name="com.kireibox.auth.CoverLoginActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden|uiMode" />
 
         <provider
             android:name="rikka.shizuku.ShizukuProvider"
@@ -49,7 +63,7 @@
         </provider>
 
         <activity
-            android:name="com.apps.LauncherActivity"
+            android:name="com.kireibox.app.LauncherActivity"
             android:exported="true"
             android:resizeableActivity="true"
             android:maxAspectRatio="2.4"

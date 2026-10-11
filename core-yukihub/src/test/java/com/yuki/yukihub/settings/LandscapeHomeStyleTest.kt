@@ -26,5 +26,4 @@ class LandscapeHomeStyleTest {
         assertEquals(LandscapeHomeStyle.IMMERSIVE_COVER, LandscapeHomeStyle.fromStored("  "))
         assertEquals(LandscapeHomeStyle.IMMERSIVE_COVER, LandscapeHomeStyle.fromStored("other"))
     }
-
 }

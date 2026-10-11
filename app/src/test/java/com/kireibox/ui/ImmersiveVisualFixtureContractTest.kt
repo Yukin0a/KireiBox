@@ -1,12 +1,12 @@
 package com.kireibox.ui
 
 import com.yuki.yukihub.BuildConfig
-import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 class ImmersiveVisualFixtureContractTest {
     private fun workspaceRoot(): File {
@@ -23,10 +23,11 @@ class ImmersiveVisualFixtureContractTest {
 
     @Test
     fun debugFixtureDeclaresFiveStableGamesAndTestIntentExtra() {
-        val source = File(
-            workspaceRoot(),
-            "app/src/debug/java/com/kireibox/ui/ImmersiveVisualFixture.kt",
-        )
+        val source =
+            File(
+                workspaceRoot(),
+                "app/src/debug/java/com/kireibox/ui/ImmersiveVisualFixture.kt",
+            )
         assertTrue("debug fixture source missing", source.isFile)
         val text = source.readText()
         assertTrue(text.contains("EXTRA_IMMERSIVE_FIXTURE"))
@@ -40,14 +41,15 @@ class ImmersiveVisualFixtureContractTest {
     @Test
     fun fixtureIsAbsentFromMainAndReleaseSourceSets() {
         val root = workspaceRoot()
-        val forbidden = listOf(
-            File(root, "app/src/main/java/com/kireibox/ui/ImmersiveVisualFixture.kt"),
-            File(root, "app/src/release/java/com/kireibox/ui/ImmersiveVisualFixture.kt"),
-            File(root, "app/src/main/java/com/kireibox/ui/ImmersiveFixtureActivity.kt"),
-            File(root, "app/src/release/java/com/kireibox/ui/ImmersiveFixtureActivity.kt"),
-            File(root, "app/src/main/res/drawable/fixture_cover_1.xml"),
-            File(root, "app/src/release/res/drawable/fixture_cover_1.xml"),
-        )
+        val forbidden =
+            listOf(
+                File(root, "app/src/main/java/com/kireibox/ui/ImmersiveVisualFixture.kt"),
+                File(root, "app/src/release/java/com/kireibox/ui/ImmersiveVisualFixture.kt"),
+                File(root, "app/src/main/java/com/kireibox/ui/ImmersiveFixtureActivity.kt"),
+                File(root, "app/src/release/java/com/kireibox/ui/ImmersiveFixtureActivity.kt"),
+                File(root, "app/src/main/res/drawable/fixture_cover_1.xml"),
+                File(root, "app/src/release/res/drawable/fixture_cover_1.xml"),
+            )
         assertFalse(forbidden.joinToString { it.path }, forbidden.any(File::exists))
     }
 
@@ -67,9 +69,10 @@ class ImmersiveVisualFixtureContractTest {
         if (BuildConfig.DEBUG) {
             val cls = Class.forName("com.kireibox.ui.ImmersiveVisualFixture")
             val instance = cls.getField("INSTANCE").get(null)
-            val method = cls.declaredMethods.firstOrNull {
-                it.name == "immersiveProgress" || it.name.startsWith("immersiveProgress$")
-            } ?: error("immersiveProgress not found in ImmersiveVisualFixture")
+            val method =
+                cls.declaredMethods.firstOrNull {
+                    it.name == "immersiveProgress" || it.name.startsWith("immersiveProgress$")
+                } ?: error("immersiveProgress not found in ImmersiveVisualFixture")
             method.isAccessible = true
 
             val accepted = mapOf(0 to 0f, 25 to 0.25f, 50 to 0.5f, 75 to 0.75f, 100 to 1f)
@@ -110,9 +113,36 @@ class ImmersiveVisualFixtureContractTest {
             text.contains("ImmersiveVisualFixture.frozenTrackProgress(intent)"),
         )
         assertTrue("exact_canvas must be preserved", text.contains("\"exact_canvas\""))
-        assertTrue("reduced_motion must be preserved", text.contains("\"reduced_motion\""))
-        assertTrue("reduced_transparency must be preserved", text.contains("\"reduced_transparency\""))
+        // The legacy extras moved into the fixture object, where they are one switch with the
+        // namespaced IMMERSIVE_REDUCED_* extras; the activity must read them through it.
+        val fixture = readDebugSource("app/src/debug/java/com/kireibox/ui/ImmersiveVisualFixture.kt")
+        assertTrue("reduced_motion must be preserved", fixture.contains("EXTRA_LEGACY_REDUCED_MOTION = \"reduced_motion\""))
+        assertTrue("reduced_transparency must be preserved", fixture.contains("EXTRA_LEGACY_REDUCED_TRANSPARENCY = \"reduced_transparency\""))
+        assertTrue(text.contains("reducedMotion = ImmersiveVisualFixture.reducedMotion(intent)"))
+        assertTrue(text.contains("reducedTransparency = ImmersiveVisualFixture.reducedTransparency(intent)"))
         assertTrue(text.contains("LocalNsfwBlurEnabled provides"))
+    }
+
+    @Test
+    fun fixtureRendersOneResolvedEffectSetFromItsExtras() {
+        val fixture = readDebugSource("app/src/debug/java/com/kireibox/ui/ImmersiveVisualFixture.kt")
+        listOf(
+            "com.kireibox.debug.IMMERSIVE_PRESET",
+            "com.kireibox.debug.IMMERSIVE_BACKDROP",
+            "com.kireibox.debug.IMMERSIVE_AMBIENT",
+            "com.kireibox.debug.IMMERSIVE_REDUCED_MOTION",
+            "com.kireibox.debug.IMMERSIVE_REDUCED_TRANSPARENCY",
+            "com.kireibox.debug.IMMERSIVE_INCREASED_CONTRAST",
+            "com.kireibox.debug.IMMERSIVE_FREEZE_MOTION",
+        ).forEach { extra -> assertTrue("missing $extra", fixture.contains(extra)) }
+        assertTrue("legacy and namespaced reduced-motion extras are one switch", fixture.contains("intent.flag(EXTRA_LEGACY_REDUCED_MOTION) || intent.flag(EXTRA_IMMERSIVE_REDUCED_MOTION)"))
+        assertTrue("the fixture degrades exactly like the app", fixture.contains("resolveImmersiveFx("))
+        val activity = readDebugSource("app/src/debug/java/com/kireibox/ui/ImmersiveFixtureActivity.kt")
+        assertTrue(activity.contains("val fixtureFx = ImmersiveVisualFixture.resolvedFx(intent)"))
+        // r5: 1–5 of the five games, so the small-gallery track can be checked on the fixture.
+        assertTrue(fixture.contains("EXTRA_IMMERSIVE_GAME_COUNT = \"com.kireibox.debug.IMMERSIVE_GAME_COUNT\""))
+        assertTrue(activity.contains("count = ImmersiveVisualFixture.gameCount(intent)"))
+        assertTrue(activity.contains("LocalImmersiveFx provides fixtureFx"))
     }
 
     @Test

@@ -4,54 +4,39 @@ import com.yuki.yukihub.model.Game
 import com.yuki.yukihub.settings.SpotlightSelectionMode
 import com.yuki.yukihub.settings.SpotlightSource
 import com.yuki.yukihub.settings.SpotlightStrategy
-import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 class HomeContentSettingsContractTest {
     @Test
-    fun keepsPhonePortraitChoiceCardsInOneColumn() {
-        assertEquals(
-            HomeContentSettingsLayout.SINGLE_COLUMN,
-            HomeContentSettingsPolicy.layoutFor(widthDp = 360f),
-        )
-        assertEquals(
-            HomeContentSettingsLayout.SINGLE_COLUMN,
-            HomeContentSettingsPolicy.layoutFor(widthDp = 411f),
-        )
-    }
+    fun panelUsesSettingsGroupsAndSegmentedControlsInsteadOfBespokeChoiceCards() {
+        val source = source("app/src/main/java/com/kireibox/ui/HomeContentSettings.kt")
 
-    @Test
-    fun twoColumnsStartAt600DpOnlyWhenCardsFit() {
-        assertEquals(
-            HomeContentSettingsLayout.TWO_COLUMNS,
-            HomeContentSettingsPolicy.layoutFor(widthDp = 600f),
-        )
-        assertEquals(
-            HomeContentSettingsLayout.SINGLE_COLUMN,
-            HomeContentSettingsPolicy.layoutFor(widthDp = 600f, fontScale = 1.3f),
-        )
-        assertEquals(
-            HomeContentSettingsLayout.SINGLE_COLUMN,
-            HomeContentSettingsPolicy.layoutFor(widthDp = 600f, fontScale = 1.5f),
-        )
-        assertEquals(
-            HomeContentSettingsLayout.TWO_COLUMNS,
-            HomeContentSettingsPolicy.layoutFor(widthDp = 840f, fontScale = 1.2f),
-        )
+        // Same vocabulary as the settings pages: captioned KireiListGroup cards, inline KireiSegmented
+        // for short choices, radio rows only where every option needs its sentence.
+        assertTrue(source.contains("KireiListGroup("))
+        assertTrue(source.contains("KireiSegmented("))
+        assertTrue(source.contains("Role.RadioButton"))
+        listOf("GlassSurface(", "IconButton(", "RoundedCornerShape(", "Color(0x", "HomeContentChoiceCard").forEach { forbidden ->
+            assertFalse("$forbidden is gone from the panel", source.contains(forbidden))
+        }
+        // The old width-driven card grid is gone with its policy.
+        assertFalse(source.contains("HomeContentSettingsLayout"))
     }
 
     @Test
     fun settingsNormalizeManualOrderSourceAndCountContract() {
-        val normalized = HomeContentSettings(
-            mode = SpotlightSelectionMode.MANUAL,
-            manualGameIds = listOf(3L, 3L, 0L, 1L, 2L, 4L, 5L),
-            source = SpotlightSource.FIXED,
-            strategy = SpotlightStrategy.DAILY_RANDOM,
-            count = 99,
-        ).normalized()
+        val normalized =
+            HomeContentSettings(
+                mode = SpotlightSelectionMode.MANUAL,
+                manualGameIds = listOf(3L, 3L, 0L, 1L, 2L, 4L, 5L),
+                source = SpotlightSource.FIXED,
+                strategy = SpotlightStrategy.DAILY_RANDOM,
+                count = 99,
+            ).normalized()
 
         assertEquals(listOf(3L, 1L, 2L, 4L, 5L), normalized.manualGameIds)
         assertEquals(SpotlightSource.RECENT, normalized.source)
@@ -61,11 +46,12 @@ class HomeContentSettingsContractTest {
 
     @Test
     fun manualGamesRenderSelectedOrderBeforeRemainingLibrary() {
-        val games = listOf(
-            Game(id = 1L, title = "One"),
-            Game(id = 2L, title = "Two"),
-            Game(id = 3L, title = "Three"),
-        )
+        val games =
+            listOf(
+                Game(id = 1L, title = "One"),
+                Game(id = 2L, title = "Two"),
+                Game(id = 3L, title = "Three"),
+            )
 
         assertEquals(
             listOf(3L, 1L, 2L),
@@ -79,7 +65,7 @@ class HomeContentSettingsContractTest {
 
     @Test
     fun dashboardSheetWiresSharedPanelThroughDraftOnlySavePath() {
-        val source = source("app/src/main/java/com/kireibox/ui/KireiBoxApp.kt")
+        val source = UiSourceFiles.all()
 
         assertTrue(source.contains("HomeContentSettingsPanel("))
         assertTrue(source.contains("onSettings = { next ->"))
@@ -93,7 +79,7 @@ class HomeContentSettingsContractTest {
     @Test
     fun settingsPanelOwnsScrollAndGroupsHeadersWithTheirFirstContent() {
         val panel = source("app/src/main/java/com/kireibox/ui/HomeContentSettings.kt")
-        val app = source("app/src/main/java/com/kireibox/ui/KireiBoxApp.kt")
+        val app = UiSourceFiles.all()
 
         assertTrue(panel.contains("LazyColumn("))
         assertTrue(panel.contains("fillMaxHeight()"))
@@ -110,26 +96,33 @@ class HomeContentSettingsContractTest {
 
         // Formatting-insensitive: the inset chain may legitimately wrap across lines,
         // so assert both semantic tokens inside the bottom-padding computation block.
-        val bottomPaddingBlock =
-            source.substringAfter("val navigationBarBottom = ")
+        // The old delimiter ("val navigationBarBottom = " on one line) no longer existed, so
+        // substringAfter returned the whole file; the block is now the declaration up to the next
+        // statement, with the marker asserted.
+        val marker = Regex("""val navigationBarBottom\s*=""").find(source) ?: error("navigationBarBottom declaration missing")
+        val blockEnd = source.indexOf(".calculateBottomPadding()", marker.range.last)
+        assertTrue("bottom inset computation missing", blockEnd > marker.range.last)
+        val bottomPaddingBlock = source.substring(marker.range.last + 1, blockEnd)
         assertTrue(bottomPaddingBlock.contains("navigationBars"))
         assertTrue(bottomPaddingBlock.contains("asPaddingValues"))
         assertTrue(source.contains("calculateBottomPadding()"))
         assertTrue(source.contains("top = 16.dp"))
         assertTrue(source.contains("bottom = navigationBarBottom + 24.dp"))
         assertTrue(source.contains("testTag(\"home-content-settings-count\")"))
-        assertTrue(source.contains("maxLines = 2"))
-        assertTrue(source.contains("maxLines = 3"))
-        assertTrue(source.contains("TextOverflow.Ellipsis"))
-        assertTrue(source.contains("options.chunked(2)"))
+        // Descriptions and titles stay bounded inside the rows (KireiListRow ellipsizes titles at 2 lines).
+        assertTrue(source.contains("subtitleMaxLines = 3"))
+        assertTrue(source.contains("subtitleMaxLines = 1"))
         assertTrue(source.contains("最近打开按时间排序，其余来源使用稳定顺序"))
         assertFalse(source.contains("最近打开按时间，其余来源使用稳定顺序"))
     }
 
     private fun source(relativePath: String): String {
-        val root = listOf(File("."), File(".."), File("../.."))
-            .firstOrNull { File(it, "app/src/main").isDirectory }
-            ?: error("KireiBox workspace not found from ${File("").absolutePath}")
-        return File(root, relativePath).readText()
+        val root =
+            listOf(File("."), File(".."), File("../.."))
+                .firstOrNull { File(it, "app/src/main").isDirectory }
+                ?: error("KireiBox workspace not found from ${File("").absolutePath}")
+        val file = File(root, relativePath)
+        // UI source may have been split out of KireiBoxApp.kt into sibling files.
+        return if (file.isFile) file.readText() else UiSourceFiles.all()
     }
 }

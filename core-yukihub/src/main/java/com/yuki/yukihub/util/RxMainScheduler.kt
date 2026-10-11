@@ -36,11 +36,15 @@ object RxMainScheduler {
     }
 
     @JvmStatic
-    fun postDelayed(action: Runnable, delayMs: Long): Disposable {
-        val job = mainScope.launch {
-            delay(delayMs)
-            action.run()
-        }
+    fun postDelayed(
+        action: Runnable,
+        delayMs: Long,
+    ): Disposable {
+        val job =
+            mainScope.launch {
+                delay(delayMs)
+                action.run()
+            }
         return JobDisposable(job)
     }
 

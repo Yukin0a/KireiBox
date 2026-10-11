@@ -56,7 +56,7 @@ object SingleCoreMigration {
                     if (hasTable(legacy, "game_local_options")) {
                         legacy.rawQuery(
                             "SELECT game_root_uri_key,custom_title,kr_saf_compatibility FROM game_local_options",
-                            null
+                            null,
                         ).use { c ->
                             while (c.moveToNext()) {
                                 val identity = c.getString(0)?.trim().orEmpty()
@@ -96,20 +96,32 @@ object SingleCoreMigration {
         }
     }
 
-    private fun createBackup(context: Context, main: File, demo: File): File? = runCatching {
+    private fun createBackup(
+        context: Context,
+        main: File,
+        demo: File,
+    ): File? =
         runCatching {
-            YukiDatabaseHelper(context).writableDatabase.rawQuery("PRAGMA wal_checkpoint(FULL)", null).use { it.moveToFirst() }
-        }
-        val stamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())
-        val dir = File(context.filesDir, "migration-backups/alpha1-$stamp").apply { mkdirs() }
-        listOf(main, File(main.path + "-wal"), File(main.path + "-shm"), demo, File(demo.path + "-wal"), File(demo.path + "-shm"))
-            .filter(File::isFile).forEach { it.copyTo(File(dir, it.name), overwrite = false) }
-        val prefs = File(context.applicationInfo.dataDir, "shared_prefs/${YukiSettingsStore.PREFS_NAME}.xml")
-        if (prefs.isFile) prefs.copyTo(File(dir, prefs.name), overwrite = false)
-        dir
-    }.getOrNull()
+            runCatching {
+                YukiDatabaseHelper(context).writableDatabase.rawQuery("PRAGMA wal_checkpoint(FULL)", null).use { it.moveToFirst() }
+            }
+            val stamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())
+            val dir = File(context.filesDir, "migration-backups/alpha1-$stamp").apply { mkdirs() }
+            listOf(main, File(main.path + "-wal"), File(main.path + "-shm"), demo, File(demo.path + "-wal"), File(demo.path + "-shm"))
+                .filter(File::isFile).forEach { it.copyTo(File(dir, it.name), overwrite = false) }
+            val prefs = File(context.applicationInfo.dataDir, "shared_prefs/${YukiSettingsStore.PREFS_NAME}.xml")
+            if (prefs.isFile) {
+                File(dir, prefs.name).writeText(
+                    prefs.readText().replace(Regex("""(?s)\s*<string name="bangumi_token"(?:\s*/>|>.*?</string>)"""), ""),
+                )
+            }
+            dir
+        }.getOrNull()
 
-    private fun hasTable(db: SQLiteDatabase, name: String): Boolean =
+    private fun hasTable(
+        db: SQLiteDatabase,
+        name: String,
+    ): Boolean =
         db.rawQuery("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", arrayOf(name))
             .use { it.moveToFirst() }
 

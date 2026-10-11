@@ -13,6 +13,8 @@ internal object ScanImportClassification {
      * Returns the row id to record as newly added, or null when the result was
      * already present or the insert was ignored.
      */
-    fun addedIdFor(existingId: Long, insertedId: Long): Long? =
-        if (existingId <= 0L && insertedId > 0L) insertedId else null
+    fun addedIdFor(
+        existingId: Long,
+        insertedId: Long,
+    ): Long? = if (existingId <= 0L && insertedId > 0L) insertedId else null
 }

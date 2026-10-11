@@ -1,6 +1,6 @@
 package com.kireibox.ui
 
-import com.yuki.yukihub.metadata.CoverSourceMode
+import com.yuki.yukihub.metadata.model.CoverSourceMode
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -9,63 +9,20 @@ import org.junit.Test
 /** Behavioral contract for the single Alpha 11 shell integration owner. */
 class Alpha11KireiBoxAppIntegrationTest {
     @Test
-    fun libraryHeaderUsesThe68DpContinuousRangeAndSnapsOnlyWhenIdle() {
-        assertEquals(
-            .5f,
-            Alpha11KireiBoxAppIntegration.headerFraction(
-                scrollOffsetPx = 34f,
-                density = 1f,
-                orientation = LibraryHeaderOrientation.LANDSCAPE_PHONE,
-            ),
-            .0001f,
-        )
-        assertEquals(
-            .5f,
-            Alpha11KireiBoxAppIntegration.headerFraction(
-                scrollOffsetPx = 102f,
-                density = 3f,
-                orientation = LibraryHeaderOrientation.LANDSCAPE_PAD,
-            ),
-            .0001f,
-        )
-        assertEquals(
-            0f,
-            Alpha11KireiBoxAppIntegration.headerFraction(
-                scrollOffsetPx = 10_000f,
-                density = 3f,
-                orientation = LibraryHeaderOrientation.PORTRAIT,
-            ),
-            .0001f,
-        )
-        assertEquals(
-            0f,
-            Alpha11KireiBoxAppIntegration.headerFraction(
-                scrollOffsetPx = 10_000f,
-                density = 1f,
-                orientation = LibraryHeaderOrientation.LANDSCAPE_PHONE,
-                searchActive = true,
-            ),
-            .0001f,
-        )
-        assertEquals(0f, Alpha11KireiBoxAppIntegration.headerIdleTarget(.49f), .0001f)
-        assertEquals(1f, Alpha11KireiBoxAppIntegration.headerIdleTarget(.5f), .0001f)
-    }
-
-    @Test
     fun sourceRowsAreMutedOnlyWhenUnselectedAndBangumiFamilyControlsTokenVisibility() {
         val defaultVndb = Alpha11KireiBoxAppIntegration.sourcePresentation(CoverSourceMode.VNDB, null)
         val bangumi = Alpha11KireiBoxAppIntegration.sourcePresentation(CoverSourceMode.BANGUMI, CoverSourceMode.VNDB)
         val selectedBangumi = Alpha11KireiBoxAppIntegration.sourcePresentation(CoverSourceMode.BANGUMI, CoverSourceMode.BANGUMI)
 
-        assertTrue(defaultVndb.isHighlighted)
-        assertFalse(defaultVndb.muted)
-        assertTrue(bangumi.muted)
+        assertFalse(defaultVndb.isHighlighted)
+        assertTrue(defaultVndb.muted)
+        assertFalse(bangumi.muted)
         assertTrue(bangumi.enabled)
         assertTrue(bangumi.accessible)
         assertTrue(selectedBangumi.isHighlighted)
         assertFalse(selectedBangumi.muted)
         assertTrue(Alpha11KireiBoxAppIntegration.tokenVisible(CoverSourceMode.BANGUMI))
-        assertTrue(Alpha11KireiBoxAppIntegration.tokenVisible(CoverSourceMode.BANGUMI_MIRROR))
+        assertFalse(Alpha11KireiBoxAppIntegration.tokenVisible(CoverSourceMode.BANGUMI_MIRROR))
         assertFalse(Alpha11KireiBoxAppIntegration.tokenVisible(CoverSourceMode.VNDB))
     }
 
@@ -102,14 +59,16 @@ class Alpha11KireiBoxAppIntegrationTest {
 
     @Test
     fun sourceChoiceUsesRadioButtonSelectionStateWithoutChangingPresentationPolicy() {
-        val selected = Alpha11KireiBoxAppIntegration.sourceAccessibility(
-            source = CoverSourceMode.BANGUMI,
-            selectedSource = CoverSourceMode.BANGUMI,
-        )
-        val muted = Alpha11KireiBoxAppIntegration.sourceAccessibility(
-            source = CoverSourceMode.YMGAL,
-            selectedSource = CoverSourceMode.BANGUMI,
-        )
+        val selected =
+            Alpha11KireiBoxAppIntegration.sourceAccessibility(
+                source = CoverSourceMode.BANGUMI,
+                selectedSource = CoverSourceMode.BANGUMI,
+            )
+        val muted =
+            Alpha11KireiBoxAppIntegration.sourceAccessibility(
+                source = CoverSourceMode.YMGAL,
+                selectedSource = CoverSourceMode.BANGUMI,
+            )
 
         assertEquals(CoverSourceAccessibilityRole.RADIO_BUTTON, selected.role)
         assertTrue(selected.selected)
@@ -120,7 +79,7 @@ class Alpha11KireiBoxAppIntegrationTest {
         assertEquals(CoverSourceAccessibilityRole.RADIO_BUTTON, muted.role)
         assertFalse(muted.selected)
         assertEquals("未选择", muted.stateDescription)
-        assertTrue(muted.enabled)
+        assertFalse(muted.enabled)
         assertEquals(CoverSourcePresentationPolicy.MUTED_ALPHA, muted.alpha, .0001f)
         assertFalse(muted.tokenVisible)
     }
@@ -135,18 +94,20 @@ class Alpha11KireiBoxAppIntegrationTest {
 
     @Test
     fun dockUsesFixedHalfScaleAndAnOpaqueStableFallback() {
-        val glass = Alpha11KireiBoxAppIntegration.dockHaze(
-            isDark = true,
-            reducedTransparency = false,
-            hazeAvailable = true,
-            apiSupportsHaze = true,
-        )
-        val fallback = Alpha11KireiBoxAppIntegration.dockHaze(
-            isDark = true,
-            reducedTransparency = true,
-            hazeAvailable = true,
-            apiSupportsHaze = true,
-        )
+        val glass =
+            Alpha11KireiBoxAppIntegration.dockHaze(
+                isDark = true,
+                reducedTransparency = false,
+                hazeAvailable = true,
+                apiSupportsHaze = true,
+            )
+        val fallback =
+            Alpha11KireiBoxAppIntegration.dockHaze(
+                isDark = true,
+                reducedTransparency = true,
+                hazeAvailable = true,
+                apiSupportsHaze = true,
+            )
 
         assertEquals(dev.chrisbanes.haze.HazeInputScale.Fixed(.5f), glass.inputScale)
         assertFalse(glass.useOpaqueFallback)

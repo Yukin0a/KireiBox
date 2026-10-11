@@ -95,23 +95,19 @@ class SystemBarVisibilityPolicyTest {
 
     @Test
     fun modalCallSiteDerivesIconToneFromItsSheetBackground() {
-        val candidates = listOf(
-            File("src/main/java/com/kireibox/ui/KireiBoxApp.kt"),
-            File("../app/src/main/java/com/kireibox/ui/KireiBoxApp.kt"),
-        )
-        val source = candidates.firstOrNull { it.isFile }?.readText()
-            ?: error("KireiBoxApp.kt not found")
+        val source = UiSourceFiles.all()
         assertTrue(source.contains("val lightIcons = SystemBarVisibilityPolicy.statusBarIconsLight(isDark)"))
     }
 
     @Test
     fun explicitPhoneAndPadOrientationMatrixIsStable() {
-        val cases = listOf(
-            ResponsiveWindowClass.PHONE_PORTRAIT to HomeOrientation.PORTRAIT,
-            ResponsiveWindowClass.PHONE_LANDSCAPE to HomeOrientation.LANDSCAPE,
-            ResponsiveWindowClass.PAD_PORTRAIT to HomeOrientation.PORTRAIT,
-            ResponsiveWindowClass.PAD_LANDSCAPE to HomeOrientation.LANDSCAPE,
-        )
+        val cases =
+            listOf(
+                ResponsiveWindowClass.PHONE_PORTRAIT to HomeOrientation.PORTRAIT,
+                ResponsiveWindowClass.PHONE_LANDSCAPE to HomeOrientation.LANDSCAPE,
+                ResponsiveWindowClass.PAD_PORTRAIT to HomeOrientation.PORTRAIT,
+                ResponsiveWindowClass.PAD_LANDSCAPE to HomeOrientation.LANDSCAPE,
+            )
 
         cases.forEach { (windowClass, orientation) ->
             val spec = SystemBarVisibilityPolicy.resolve(windowClass, orientation)
@@ -125,20 +121,22 @@ class SystemBarVisibilityPolicyTest {
 
     @Test
     fun configurationPolicyUsesSafeDimensionsAndSizeClass() {
-        val phone = SystemBarVisibilityPolicy.visibilitySpec(
-            widthDp = 640f,
-            heightDp = 360f,
-            smallestScreenWidthDp = 360,
-            screenLayoutSize = Configuration.SCREENLAYOUT_SIZE_NORMAL,
-            orientation = Configuration.ORIENTATION_LANDSCAPE,
-        )
-        val pad = SystemBarVisibilityPolicy.visibilitySpec(
-            widthDp = 600f,
-            heightDp = 1024f,
-            smallestScreenWidthDp = 600,
-            screenLayoutSize = Configuration.SCREENLAYOUT_SIZE_NORMAL,
-            orientation = Configuration.ORIENTATION_PORTRAIT,
-        )
+        val phone =
+            SystemBarVisibilityPolicy.visibilitySpec(
+                widthDp = 640f,
+                heightDp = 360f,
+                smallestScreenWidthDp = 360,
+                screenLayoutSize = Configuration.SCREENLAYOUT_SIZE_NORMAL,
+                orientation = Configuration.ORIENTATION_LANDSCAPE,
+            )
+        val pad =
+            SystemBarVisibilityPolicy.visibilitySpec(
+                widthDp = 600f,
+                heightDp = 1024f,
+                smallestScreenWidthDp = 600,
+                screenLayoutSize = Configuration.SCREENLAYOUT_SIZE_NORMAL,
+                orientation = Configuration.ORIENTATION_PORTRAIT,
+            )
 
         assertEquals(ResponsiveWindowClass.PHONE_LANDSCAPE, phone.windowClass)
         assertTrue(phone.hideStatusBar)
@@ -148,12 +146,13 @@ class SystemBarVisibilityPolicyTest {
 
     @Test
     fun modalTransitionsUseTheFourWayClassWithoutLeakingLandscapeState() {
-        val transitions = listOf(
-            ResponsiveWindowClass.PHONE_PORTRAIT,
-            ResponsiveWindowClass.PAD_LANDSCAPE,
-            ResponsiveWindowClass.PHONE_LANDSCAPE,
-            ResponsiveWindowClass.PAD_PORTRAIT,
-        )
+        val transitions =
+            listOf(
+                ResponsiveWindowClass.PHONE_PORTRAIT,
+                ResponsiveWindowClass.PAD_LANDSCAPE,
+                ResponsiveWindowClass.PHONE_LANDSCAPE,
+                ResponsiveWindowClass.PAD_PORTRAIT,
+            )
 
         assertEquals(
             listOf(false, false, true, false),
@@ -163,14 +162,23 @@ class SystemBarVisibilityPolicyTest {
 
     @Test
     fun launcherActivityWiresLightIconToneWithoutInversion() {
-        val candidates = listOf(
-            File("src/main/java/com/apps/LauncherActivity.kt"),
-            File("../app/src/main/java/com/apps/LauncherActivity.kt"),
-        )
-        val source = candidates.firstOrNull { it.isFile }?.readText()
-            ?: error("LauncherActivity.kt not found")
-        assertTrue("must wire the composed tone request", source.contains("onSystemBarIconsLight = ::applyStatusBarTone"))
+        val source = appSource()
+        assertTrue("must wire the composed tone request", source.contains("onSystemBarIconsLight = this::applyStatusBarTone"))
         assertTrue("light icons must clear the light-status-bar flag", source.contains("isAppearanceLightStatusBars = !lightIcons"))
         assertTrue("navigation icons follow the same tone", source.contains("isAppearanceLightNavigationBars = !lightIcons"))
+    }
+
+    /** Concatenation of the app shell sources; the launcher was split out of LauncherActivity.kt. */
+    private fun appSource(): String {
+        val dir =
+            listOf(
+                File("src/main/java/com/kireibox/app"),
+                File("../app/src/main/java/com/kireibox/app"),
+            ).firstOrNull(File::isDirectory)
+                ?: error("app source dir not found")
+        return dir.walkTopDown()
+            .filter { it.isFile && it.extension == "kt" }
+            .sortedBy { it.path }
+            .joinToString("\n") { it.readText() }
     }
 }

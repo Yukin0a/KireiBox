@@ -7,14 +7,15 @@ import org.junit.Test
 class UpdateInstallerTest {
     @Test
     fun validNewerPackageIsAccepted() {
-        val result = UpdatePackagePolicy.validate(
-            installedVersionCode = 19,
-            currentSignerSha256 = SIGNER,
-            deviceSdk = 35,
-            deviceAbis = listOf("arm64-v8a"),
-            archive = archive(),
-            manifest = manifest(),
-        )
+        val result =
+            UpdatePackagePolicy.validate(
+                installedVersionCode = 19,
+                currentSignerSha256 = SIGNER,
+                deviceSdk = 35,
+                deviceAbis = listOf("arm64-v8a"),
+                archive = archive(),
+                manifest = manifest(),
+            )
 
         assertEquals(UpdatePackageValidation.Valid, result)
     }
@@ -51,22 +52,24 @@ class UpdateInstallerTest {
 
     @Test
     fun signedBareApkRequiresMatchingTagAndInstalledSigner() {
-        val valid = UpdatePackagePolicy.validateSignedApkFallback(
-            installedVersionCode = 19,
-            currentSignerSha256 = SIGNER,
-            deviceSdk = 35,
-            deviceAbis = listOf("arm64-v8a"),
-            archive = archive(),
-            expectedVersionName = "v0.5.0-alpha.14",
-        )
-        val wrongTag = UpdatePackagePolicy.validateSignedApkFallback(
-            installedVersionCode = 19,
-            currentSignerSha256 = SIGNER,
-            deviceSdk = 35,
-            deviceAbis = listOf("arm64-v8a"),
-            archive = archive(),
-            expectedVersionName = "0.5.0-alpha.15",
-        )
+        val valid =
+            UpdatePackagePolicy.validateSignedApkFallback(
+                installedVersionCode = 19,
+                currentSignerSha256 = SIGNER,
+                deviceSdk = 35,
+                deviceAbis = listOf("arm64-v8a"),
+                archive = archive(),
+                expectedVersionName = "v0.5.0-alpha.14",
+            )
+        val wrongTag =
+            UpdatePackagePolicy.validateSignedApkFallback(
+                installedVersionCode = 19,
+                currentSignerSha256 = SIGNER,
+                deviceSdk = 35,
+                deviceAbis = listOf("arm64-v8a"),
+                archive = archive(),
+                expectedVersionName = "0.5.0-alpha.15",
+            )
 
         assertEquals(UpdatePackageValidation.Valid, valid)
         assertTrue((wrongTag as UpdatePackageValidation.Invalid).message.contains("GitHub Release"))
@@ -85,25 +88,27 @@ class UpdateInstallerTest {
         manifest = manifest(),
     )
 
-    private fun archive() = UpdatePackageMetadata(
-        packageName = KIREIBOX_PACKAGE_NAME,
-        versionCode = 20,
-        versionName = "0.5.0-alpha.14",
-        minSdk = 26,
-        abis = listOf("arm64-v8a"),
-        signerSha256 = SIGNER,
-    )
+    private fun archive() =
+        UpdatePackageMetadata(
+            packageName = KIREIBOX_PACKAGE_NAME,
+            versionCode = 20,
+            versionName = "0.5.0-alpha.14",
+            minSdk = 26,
+            abis = listOf("arm64-v8a"),
+            signerSha256 = SIGNER,
+        )
 
-    private fun manifest() = UpdateManifest(
-        packageName = KIREIBOX_PACKAGE_NAME,
-        versionCode = 20,
-        versionName = "0.5.0-alpha.14",
-        minSdk = 26,
-        abis = listOf("arm64-v8a"),
-        apkAsset = "update.apk",
-        sha256 = "1".repeat(64),
-        signingCertSha256 = SIGNER,
-    )
+    private fun manifest() =
+        UpdateManifest(
+            packageName = KIREIBOX_PACKAGE_NAME,
+            versionCode = 20,
+            versionName = "0.5.0-alpha.14",
+            minSdk = 26,
+            abis = listOf("arm64-v8a"),
+            apkAsset = "update.apk",
+            sha256 = "1".repeat(64),
+            signingCertSha256 = SIGNER,
+        )
 
     companion object {
         private const val SIGNER = "aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899"

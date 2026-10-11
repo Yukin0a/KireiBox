@@ -1,12 +1,12 @@
 package com.kireibox.ui
 
-import java.io.ByteArrayOutputStream
-import java.io.InputStream
-import java.security.MessageDigest
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.ByteArrayOutputStream
+import java.io.InputStream
+import java.security.MessageDigest
 
 class GoldenFixtureManifestTest {
     private fun resource(name: String): ByteArray {
@@ -21,15 +21,16 @@ class GoldenFixtureManifestTest {
     private fun pngDimensions(bytes: ByteArray): Pair<Int, Int> {
         assertTrue(bytes.size >= 24)
         assertTrue(bytes[0] == 0x89.toByte() && bytes[1] == 0x50.toByte() && bytes[2] == 0x4E.toByte() && bytes[3] == 0x47.toByte())
-        val width = ((bytes[16].toInt() and 0xFF) shl 24) or ((bytes[17].toInt() and 0xFF) shl 16) or
-            ((bytes[18].toInt() and 0xFF) shl 8) or (bytes[19].toInt() and 0xFF)
-        val height = ((bytes[20].toInt() and 0xFF) shl 24) or ((bytes[21].toInt() and 0xFF) shl 16) or
-            ((bytes[22].toInt() and 0xFF) shl 8) or (bytes[23].toInt() and 0xFF)
+        val width =
+            ((bytes[16].toInt() and 0xFF) shl 24) or ((bytes[17].toInt() and 0xFF) shl 16) or
+                ((bytes[18].toInt() and 0xFF) shl 8) or (bytes[19].toInt() and 0xFF)
+        val height =
+            ((bytes[20].toInt() and 0xFF) shl 24) or ((bytes[21].toInt() and 0xFF) shl 16) or
+                ((bytes[22].toInt() and 0xFF) shl 8) or (bytes[23].toInt() and 0xFF)
         return width to height
     }
 
-    private fun sha256(bytes: ByteArray): String =
-        MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+    private fun sha256(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
 
     @Test
     fun goldenPortraitMatchesManifestAndSpec() {

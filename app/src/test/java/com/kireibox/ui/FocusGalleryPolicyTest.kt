@@ -10,8 +10,11 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class FocusGalleryPolicyTest {
-    private fun cards(gameCount: Int, index: Int, direction: FocusDirection): List<FocusCard> =
-        FocusGalleryMappingPolicy.cards(gameCount, index, direction)
+    private fun cards(
+        gameCount: Int,
+        index: Int,
+        direction: FocusDirection
+    ): List<FocusCard> = FocusGalleryMappingPolicy.cards(gameCount, index, direction)
 
     private fun geometry(
         style: LandscapeHomeStyle = LandscapeHomeStyle.IMMERSIVE_COVER,
@@ -19,13 +22,14 @@ class FocusGalleryPolicyTest {
         symmetricSafeGuardDp: Float = 0f,
         dockTopDp: Float = 332f,
         stageHeightDp: Float = 332f,
-    ): FocusGalleryGeometry = FocusGalleryGeometryPolicy.geometry(
-        viewportWidthDp = viewportWidthDp,
-        symmetricSafeGuardDp = symmetricSafeGuardDp,
-        dockTopDp = dockTopDp,
-        stageHeightDp = stageHeightDp,
-        style = style,
-    )
+    ): FocusGalleryGeometry =
+        FocusGalleryGeometryPolicy.geometry(
+            viewportWidthDp = viewportWidthDp,
+            symmetricSafeGuardDp = symmetricSafeGuardDp,
+            dockTopDp = dockTopDp,
+            stageHeightDp = stageHeightDp,
+            style = style,
+        )
 
     @Test
     fun `advance mapping moves right to center and fills right`() {
@@ -103,8 +107,10 @@ class FocusGalleryPolicyTest {
     fun `D side card width is exactly 42 percent of the center card`() {
         assertEquals(.42f, FocusGalleryGeometryPolicy.D_SIDE_WIDTH_FRACTION, .001f)
         listOf(
-            geometry(), // Pixel 8 914dp stage.
-            geometry(viewportWidthDp = 700f, dockTopDp = 320f, stageHeightDp = 320f), // short window.
+            // Pixel 8 914dp stage.
+            geometry(),
+            // short window.
+            geometry(viewportWidthDp = 700f, dockTopDp = 320f, stageHeightDp = 320f),
         ).forEach { g ->
             assertEquals(.42f, g.sideWidthDp / g.centerWidthDp, .001f)
         }
@@ -118,11 +124,12 @@ class FocusGalleryPolicyTest {
                 LandscapeHomeStyle.FOCUS_POSTER,
             ).forEach { style ->
                 val g = geometry(style)
-                val aspect = if (style == LandscapeHomeStyle.IMMERSIVE_COVER) {
-                    FocusGalleryGeometryPolicy.D_WIDTH_TO_HEIGHT_RATIO
-                } else {
-                    PortraitCoverPolicy.WIDTH_TO_HEIGHT_RATIO
-                }
+                val aspect =
+                    if (style == LandscapeHomeStyle.IMMERSIVE_COVER) {
+                        FocusGalleryGeometryPolicy.D_WIDTH_TO_HEIGHT_RATIO
+                    } else {
+                        PortraitCoverPolicy.WIDTH_TO_HEIGHT_RATIO
+                    }
                 assertEquals(aspect, g.centerWidthDp / g.centerHeightDp, .001f)
                 assertEquals(aspect, g.sideWidthDp / g.sideHeightDp, .001f)
             }
@@ -173,11 +180,12 @@ class FocusGalleryPolicyTest {
 
     @Test
     fun `short landscape keeps the whole 16 to 9 D card above the dock`() {
-        val g = geometry(
-            viewportWidthDp = 700f,
-            dockTopDp = 320f,
-            stageHeightDp = 320f,
-        )
+        val g =
+            geometry(
+                viewportWidthDp = 700f,
+                dockTopDp = 320f,
+                stageHeightDp = 320f,
+            )
         assertEquals(336f, g.centerWidthDp, .001f)
         assertEquals(189f, g.centerHeightDp, .001f)
         assertEquals(141.12f, g.sideWidthDp, .001f)
@@ -194,11 +202,12 @@ class FocusGalleryPolicyTest {
         // dockTop = 120dp leaves only 108dp of usable height; 108 * 16/9 = 192dp of
         // width is less than the nominal 300dp minimum, so the center card must shrink
         // below the minimum instead of overflowing past the Dock.
-        val g = geometry(
-            viewportWidthDp = 914f,
-            dockTopDp = 120f,
-            stageHeightDp = 120f,
-        )
+        val g =
+            geometry(
+                viewportWidthDp = 914f,
+                dockTopDp = 120f,
+                stageHeightDp = 120f,
+            )
         val heightBudget = 120f - FocusGalleryGeometryPolicy.DOCK_GAP_DP
         val widthByHeight = heightBudget * FocusGalleryGeometryPolicy.D_WIDTH_TO_HEIGHT_RATIO
         assertEquals(192f, widthByHeight, .001f)
@@ -233,8 +242,10 @@ class FocusGalleryPolicyTest {
         assertEquals(60f, FocusGalleryGeometryPolicy.sideVisualLeftDp(guarded), .001f)
         assertEquals(
             60f,
-            914f - (guarded.rightSlotCenterXDp +
-                guarded.sideWidthDp * FocusGalleryGeometryPolicy.SIDE_SCALE / 2f),
+            914f - (
+                guarded.rightSlotCenterXDp +
+                    guarded.sideWidthDp * FocusGalleryGeometryPolicy.SIDE_SCALE / 2f
+            ),
             .001f,
         )
     }
@@ -270,15 +281,24 @@ class FocusGalleryPolicyTest {
         assertEquals(16f, g.arcRotationDegrees, .001f)
 
         val mapped = cards(5, 2, FocusDirection.ADVANCE)
-        val left = FocusGalleryGeometryPolicy.cardGeometry(
-            mapped.first { it.sourceSlot == FocusSlot.LEFT }, 0f, g,
-        )
-        val right = FocusGalleryGeometryPolicy.cardGeometry(
-            mapped.first { it.sourceSlot == FocusSlot.RIGHT }, 0f, g,
-        )
-        val center = FocusGalleryGeometryPolicy.cardGeometry(
-            mapped.first { it.sourceSlot == FocusSlot.CENTER }, 0f, g,
-        )
+        val left =
+            FocusGalleryGeometryPolicy.cardGeometry(
+                mapped.first { it.sourceSlot == FocusSlot.LEFT },
+                0f,
+                g,
+            )
+        val right =
+            FocusGalleryGeometryPolicy.cardGeometry(
+                mapped.first { it.sourceSlot == FocusSlot.RIGHT },
+                0f,
+                g,
+            )
+        val center =
+            FocusGalleryGeometryPolicy.cardGeometry(
+                mapped.first { it.sourceSlot == FocusSlot.CENTER },
+                0f,
+                g,
+            )
         assertEquals(FocusGalleryGeometryPolicy.D_ARC_LIFT_DP, left.offsetYDp, .001f)
         assertEquals(FocusGalleryGeometryPolicy.D_ARC_LIFT_DP, right.offsetYDp, .001f)
         assertEquals(0f, center.offsetYDp, .001f)
@@ -320,8 +340,10 @@ class FocusGalleryPolicyTest {
             )
             assertTrue(incomingGeometry.offsetYDp >= 0f)
             assertTrue(oldGeometry.offsetYDp >= 0f)
-            assertTrue(kotlin.math.abs(incomingGeometry.rotationYDegrees) <=
-                FocusGalleryGeometryPolicy.D_ARC_ROTATION_DEGREES + .001f)
+            assertTrue(
+                kotlin.math.abs(incomingGeometry.rotationYDegrees) <=
+                    FocusGalleryGeometryPolicy.D_ARC_ROTATION_DEGREES + .001f
+            )
         }
 
         // Endpoints equal the committed resting frame (no teleport after commit).
@@ -332,8 +354,9 @@ class FocusGalleryPolicyTest {
         assertEquals(FocusGalleryGeometryPolicy.D_ARC_LIFT_DP, endOld.offsetYDp, .001f)
         assertEquals(-FocusGalleryGeometryPolicy.D_ARC_ROTATION_DEGREES, endOld.rotationYDegrees, .001f)
         val committed = FocusGalleryMappingPolicy.committedCurrentIndex(2, 5, FocusDirection.ADVANCE)
-        val committedLeft = cards(5, committed, FocusDirection.ADVANCE)
-            .first { it.sourceSlot == FocusSlot.LEFT }
+        val committedLeft =
+            cards(5, committed, FocusDirection.ADVANCE)
+                .first { it.sourceSlot == FocusSlot.LEFT }
         val committedGeometry = FocusGalleryGeometryPolicy.cardGeometry(committedLeft, 0f, g)
         assertEquals(endOld.offsetYDp, committedGeometry.offsetYDp, .001f)
         assertEquals(endOld.rotationYDegrees, committedGeometry.rotationYDegrees, .001f)
@@ -381,9 +404,10 @@ class FocusGalleryPolicyTest {
     fun `reduced motion keeps the resting arc pose without motion`() {
         val g = geometry()
         cards(5, 0, FocusDirection.BACK).forEach { card ->
-            val frames = listOf(.25f, .5f, .75f, 1f).map {
-                FocusGalleryGeometryPolicy.cardGeometry(card, it, g, reducedMotion = true)
-            }
+            val frames =
+                listOf(.25f, .5f, .75f, 1f).map {
+                    FocusGalleryGeometryPolicy.cardGeometry(card, it, g, reducedMotion = true)
+                }
             frames.drop(1).forEach { frame ->
                 assertEquals(frames.first().offsetYDp, frame.offsetYDp, .001f)
                 assertEquals(frames.first().rotationYDegrees, frame.rotationYDegrees, .001f)
@@ -409,13 +433,14 @@ class FocusGalleryPolicyTest {
 
     @Test
     fun `focus poster geometry stays inside a cutout guarded short window`() {
-        val g = geometry(
-            style = LandscapeHomeStyle.FOCUS_POSTER,
-            viewportWidthDp = 660f,
-            symmetricSafeGuardDp = 60f,
-            dockTopDp = 260f,
-            stageHeightDp = 260f,
-        )
+        val g =
+            geometry(
+                style = LandscapeHomeStyle.FOCUS_POSTER,
+                viewportWidthDp = 660f,
+                symmetricSafeGuardDp = 60f,
+                dockTopDp = 260f,
+                stageHeightDp = 260f,
+            )
         assertEquals(248f, g.centerHeightDp, .001f)
         assertEquals(139.5f, g.centerWidthDp, .001f)
         assertTrue(g.leftSlotCenterXDp >= g.sideWidthDp / 2f)
@@ -430,16 +455,26 @@ class FocusGalleryPolicyTest {
     @Test
     fun `focus poster exposes mirrored side hit targets outside the center card`() {
         val g = geometry(LandscapeHomeStyle.FOCUS_POSTER)
-        val left = requireNotNull(
-            FocusGalleryHitTargetPolicy.sideHitBounds(
-                FocusSlot.LEFT, g, LandscapeHomeStyle.FOCUS_POSTER, 0f, false,
-            ),
-        )
-        val right = requireNotNull(
-            FocusGalleryHitTargetPolicy.sideHitBounds(
-                FocusSlot.RIGHT, g, LandscapeHomeStyle.FOCUS_POSTER, 0f, false,
-            ),
-        )
+        val left =
+            requireNotNull(
+                FocusGalleryHitTargetPolicy.sideHitBounds(
+                    FocusSlot.LEFT,
+                    g,
+                    LandscapeHomeStyle.FOCUS_POSTER,
+                    0f,
+                    false,
+                ),
+            )
+        val right =
+            requireNotNull(
+                FocusGalleryHitTargetPolicy.sideHitBounds(
+                    FocusSlot.RIGHT,
+                    g,
+                    LandscapeHomeStyle.FOCUS_POSTER,
+                    0f,
+                    false,
+                ),
+            )
         val centerLeft = g.centerSlotCenterXDp - g.centerWidthDp / 2f
         val centerRight = g.centerSlotCenterXDp + g.centerWidthDp / 2f
 
@@ -466,27 +501,47 @@ class FocusGalleryPolicyTest {
         val gD = geometry(LandscapeHomeStyle.IMMERSIVE_COVER)
         assertNull(
             FocusGalleryHitTargetPolicy.sideHitBounds(
-                FocusSlot.LEFT, gD, LandscapeHomeStyle.IMMERSIVE_COVER, 0f, false,
+                FocusSlot.LEFT,
+                gD,
+                LandscapeHomeStyle.IMMERSIVE_COVER,
+                0f,
+                false,
             ),
         )
         assertNull(
             FocusGalleryHitTargetPolicy.sideHitBounds(
-                FocusSlot.LEFT, gC, LandscapeHomeStyle.FOCUS_POSTER, .01f, false,
+                FocusSlot.LEFT,
+                gC,
+                LandscapeHomeStyle.FOCUS_POSTER,
+                .01f,
+                false,
             ),
         )
         assertNull(
             FocusGalleryHitTargetPolicy.sideHitBounds(
-                FocusSlot.LEFT, gC, LandscapeHomeStyle.FOCUS_POSTER, 0f, true,
+                FocusSlot.LEFT,
+                gC,
+                LandscapeHomeStyle.FOCUS_POSTER,
+                0f,
+                true,
             ),
         )
         assertNull(
             FocusGalleryHitTargetPolicy.sideHitBounds(
-                FocusSlot.CENTER, gC, LandscapeHomeStyle.FOCUS_POSTER, 0f, false,
+                FocusSlot.CENTER,
+                gC,
+                LandscapeHomeStyle.FOCUS_POSTER,
+                0f,
+                false,
             ),
         )
         assertNotNull(
             FocusGalleryHitTargetPolicy.sideHitBounds(
-                FocusSlot.LEFT, gC, LandscapeHomeStyle.FOCUS_POSTER, 0f, false,
+                FocusSlot.LEFT,
+                gC,
+                LandscapeHomeStyle.FOCUS_POSTER,
+                0f,
+                false,
             ),
         )
     }
@@ -494,8 +549,9 @@ class FocusGalleryPolicyTest {
     @Test
     fun `shared 520ms animation moves both cards continuously with no endpoint jump`() {
         val g = geometry()
-        val samples = listOf(80f, 160f, 260f, 360f, 440f, 520f)
-            .map { it / FocusGalleryController.TRANSITION_MILLIS }
+        val samples =
+            listOf(80f, 160f, 260f, 360f, 440f, 520f)
+                .map { it / FocusGalleryController.TRANSITION_MILLIS }
         FocusDirection.entries.forEach { direction ->
             val mapped = cards(5, 2, direction)
             val incoming = mapped.first { it.role == FocusCardRole.SIDE_TO_CENTER }
@@ -533,15 +589,24 @@ class FocusGalleryPolicyTest {
         val g = geometry()
         FocusDirection.entries.forEach { direction ->
             val mapped = cards(5, 2, direction)
-            val left = FocusGalleryGeometryPolicy.cardGeometry(
-                mapped.first { it.sourceSlot == FocusSlot.LEFT }, 0f, g,
-            )
-            val center = FocusGalleryGeometryPolicy.cardGeometry(
-                mapped.first { it.sourceSlot == FocusSlot.CENTER }, 0f, g,
-            )
-            val right = FocusGalleryGeometryPolicy.cardGeometry(
-                mapped.first { it.sourceSlot == FocusSlot.RIGHT }, 0f, g,
-            )
+            val left =
+                FocusGalleryGeometryPolicy.cardGeometry(
+                    mapped.first { it.sourceSlot == FocusSlot.LEFT },
+                    0f,
+                    g,
+                )
+            val center =
+                FocusGalleryGeometryPolicy.cardGeometry(
+                    mapped.first { it.sourceSlot == FocusSlot.CENTER },
+                    0f,
+                    g,
+                )
+            val right =
+                FocusGalleryGeometryPolicy.cardGeometry(
+                    mapped.first { it.sourceSlot == FocusSlot.RIGHT },
+                    0f,
+                    g,
+                )
             listOf(left, right).forEach { side ->
                 assertEquals(g.sideWidthDp, side.widthDp, .001f)
                 assertEquals(g.sideHeightDp, side.heightDp, .001f)
@@ -588,13 +653,15 @@ class FocusGalleryPolicyTest {
     fun `progress one matches post commit resting frame without stack or teleport`() {
         val g = geometry()
         FocusDirection.entries.forEach { direction ->
-            val beforeCommit = cards(5, 2, direction)
-                .associateBy({ it.gameId }, { FocusGalleryGeometryPolicy.cardGeometry(it, 1f, g) })
-                .filterValues { it.alpha > .001f }
+            val beforeCommit =
+                cards(5, 2, direction)
+                    .associateBy({ it.gameId }, { FocusGalleryGeometryPolicy.cardGeometry(it, 1f, g) })
+                    .filterValues { it.alpha > .001f }
             val committed = FocusGalleryMappingPolicy.committedCurrentIndex(2, 5, direction)
-            val afterCommit = cards(5, committed, direction)
-                .associateBy({ it.gameId }, { FocusGalleryGeometryPolicy.cardGeometry(it, 0f, g) })
-                .filterValues { it.alpha > .001f }
+            val afterCommit =
+                cards(5, committed, direction)
+                    .associateBy({ it.gameId }, { FocusGalleryGeometryPolicy.cardGeometry(it, 0f, g) })
+                    .filterValues { it.alpha > .001f }
             assertEquals(beforeCommit.keys, afterCommit.keys)
             beforeCommit.forEach { (id, before) ->
                 val after = requireNotNull(afterCommit[id])
@@ -646,10 +713,14 @@ class FocusGalleryPolicyTest {
                 assertEquals(2f + 2f * p, FocusGalleryGeometryPolicy.zIndexAt(incoming, p), .001f)
                 assertEquals(3f - p, FocusGalleryGeometryPolicy.zIndexAt(oldCenter, p), .001f)
             }
-            assertTrue(FocusGalleryGeometryPolicy.zIndexAt(incoming, .3f) <
-                FocusGalleryGeometryPolicy.zIndexAt(oldCenter, .3f))
-            assertTrue(FocusGalleryGeometryPolicy.zIndexAt(incoming, .6f) >
-                FocusGalleryGeometryPolicy.zIndexAt(oldCenter, .6f))
+            assertTrue(
+                FocusGalleryGeometryPolicy.zIndexAt(incoming, .3f) <
+                    FocusGalleryGeometryPolicy.zIndexAt(oldCenter, .3f)
+            )
+            assertTrue(
+                FocusGalleryGeometryPolicy.zIndexAt(incoming, .6f) >
+                    FocusGalleryGeometryPolicy.zIndexAt(oldCenter, .6f)
+            )
         }
     }
 
@@ -662,12 +733,16 @@ class FocusGalleryPolicyTest {
             val g = geometry(style)
             FocusDirection.entries.forEach { direction ->
                 val mapped = cards(5, 2, direction)
-                val center = FocusGalleryGeometryPolicy.cardGeometry(
-                    mapped.first { it.sourceSlot == FocusSlot.CENTER }, 0f, g,
-                )
-                val sides = mapped.filter {
-                    it.sourceSlot == FocusSlot.LEFT || it.sourceSlot == FocusSlot.RIGHT
-                }.map { FocusGalleryGeometryPolicy.cardGeometry(it, 0f, g) }
+                val center =
+                    FocusGalleryGeometryPolicy.cardGeometry(
+                        mapped.first { it.sourceSlot == FocusSlot.CENTER },
+                        0f,
+                        g,
+                    )
+                val sides =
+                    mapped.filter {
+                        it.sourceSlot == FocusSlot.LEFT || it.sourceSlot == FocusSlot.RIGHT
+                    }.map { FocusGalleryGeometryPolicy.cardGeometry(it, 0f, g) }
                 assertTrue(sides.all { center.zIndex > it.zIndex })
             }
         }
@@ -678,12 +753,17 @@ class FocusGalleryPolicyTest {
         val g = geometry(LandscapeHomeStyle.FOCUS_POSTER)
         FocusDirection.entries.forEach { direction ->
             val mapped = cards(5, 2, direction)
-            val center = FocusGalleryGeometryPolicy.cardGeometry(
-                mapped.first { it.sourceSlot == FocusSlot.CENTER }, 0f, g, reducedMotion = true,
-            )
-            val sides = mapped.filter {
-                it.sourceSlot == FocusSlot.LEFT || it.sourceSlot == FocusSlot.RIGHT
-            }.map { FocusGalleryGeometryPolicy.cardGeometry(it, 0f, g, reducedMotion = true) }
+            val center =
+                FocusGalleryGeometryPolicy.cardGeometry(
+                    mapped.first { it.sourceSlot == FocusSlot.CENTER },
+                    0f,
+                    g,
+                    reducedMotion = true,
+                )
+            val sides =
+                mapped.filter {
+                    it.sourceSlot == FocusSlot.LEFT || it.sourceSlot == FocusSlot.RIGHT
+                }.map { FocusGalleryGeometryPolicy.cardGeometry(it, 0f, g, reducedMotion = true) }
             assertTrue(sides.all { center.zIndex > it.zIndex })
             sides.forEach { side ->
                 assertEquals(g.sideWidthDp, side.widthDp, .001f)
@@ -702,9 +782,10 @@ class FocusGalleryPolicyTest {
     fun `reduced motion handoff holds fixed position width and scale while fading`() {
         val g = geometry()
         cards(5, 0, FocusDirection.BACK).forEach { card ->
-            val frames = listOf(.25f, .5f, .75f, 1f).map {
-                FocusGalleryGeometryPolicy.cardGeometry(card, it, g, reducedMotion = true)
-            }
+            val frames =
+                listOf(.25f, .5f, .75f, 1f).map {
+                    FocusGalleryGeometryPolicy.cardGeometry(card, it, g, reducedMotion = true)
+                }
             frames.drop(1).forEach { frame ->
                 assertEquals(frames.first().centerXDp, frame.centerXDp, .001f)
                 assertEquals(frames.first().widthDp, frame.widthDp, .001f)
@@ -839,18 +920,26 @@ class FocusGalleryPolicyTest {
             listOf(2, 5).forEach { gameCount ->
                 val mapped = if (gameCount == 2) twoGameCards else fiveGameCards
                 // Underlying cards never expose the action in C.
-                val onCard = mapped.count {
-                    FocusGallerySemanticsPolicy.cardExposesSwitchSemantics(
-                        LandscapeHomeStyle.FOCUS_POSTER, gameCount, it, isSettling = false,
-                    )
-                }
+                val onCard =
+                    mapped.count {
+                        FocusGallerySemanticsPolicy.cardExposesSwitchSemantics(
+                            LandscapeHomeStyle.FOCUS_POSTER,
+                            gameCount,
+                            it,
+                            isSettling = false,
+                        )
+                    }
                 assertEquals(0, onCard)
                 // Only the overlay exposes it; two-game duplicates dedupe to exactly one.
-                val onOverlay = mapped.count {
-                    FocusGallerySemanticsPolicy.overlayExposesSwitchSemantics(
-                        LandscapeHomeStyle.FOCUS_POSTER, gameCount, it, isSettling = false,
-                    )
-                }
+                val onOverlay =
+                    mapped.count {
+                        FocusGallerySemanticsPolicy.overlayExposesSwitchSemantics(
+                            LandscapeHomeStyle.FOCUS_POSTER,
+                            gameCount,
+                            it,
+                            isSettling = false,
+                        )
+                    }
                 assertEquals(if (gameCount == 2) 1 else 2, onOverlay)
                 assertEquals(onOverlay, onCard + onOverlay)
             }
@@ -860,17 +949,25 @@ class FocusGalleryPolicyTest {
     @Test
     fun `D keeps card switch semantics and never adds an overlay action`() {
         val mapped = cards(5, 0, FocusDirection.ADVANCE)
-        val onCard = mapped.count {
-            FocusGallerySemanticsPolicy.cardExposesSwitchSemantics(
-                LandscapeHomeStyle.IMMERSIVE_COVER, 5, it, isSettling = false,
-            )
-        }
+        val onCard =
+            mapped.count {
+                FocusGallerySemanticsPolicy.cardExposesSwitchSemantics(
+                    LandscapeHomeStyle.IMMERSIVE_COVER,
+                    5,
+                    it,
+                    isSettling = false,
+                )
+            }
         assertEquals(2, onCard)
-        val onOverlay = mapped.count {
-            FocusGallerySemanticsPolicy.overlayExposesSwitchSemantics(
-                LandscapeHomeStyle.IMMERSIVE_COVER, 5, it, isSettling = false,
-            )
-        }
+        val onOverlay =
+            mapped.count {
+                FocusGallerySemanticsPolicy.overlayExposesSwitchSemantics(
+                    LandscapeHomeStyle.IMMERSIVE_COVER,
+                    5,
+                    it,
+                    isSettling = false,
+                )
+            }
         assertEquals(0, onOverlay)
     }
 
@@ -879,12 +976,18 @@ class FocusGalleryPolicyTest {
         val mapped = cards(2, 0, FocusDirection.ADVANCE)
         assertTrue(
             FocusGallerySemanticsPolicy.overlayExposesSwitchSemantics(
-                LandscapeHomeStyle.FOCUS_POSTER, 2, mapped[0], isSettling = false,
+                LandscapeHomeStyle.FOCUS_POSTER,
+                2,
+                mapped[0],
+                isSettling = false,
             ),
         )
         assertFalse(
             FocusGallerySemanticsPolicy.overlayExposesSwitchSemantics(
-                LandscapeHomeStyle.FOCUS_POSTER, 2, mapped[0], isSettling = true,
+                LandscapeHomeStyle.FOCUS_POSTER,
+                2,
+                mapped[0],
+                isSettling = true,
             ),
         )
     }
@@ -1017,11 +1120,12 @@ class FocusGalleryPolicyTest {
         }
         // The policy geometry still reports the raw .58; the boost lives only in the
         // Compose visual layer for D, so C and the state machine are untouched.
-        val side = FocusGalleryGeometryPolicy.cardGeometry(
-            cards(5, 2, FocusDirection.ADVANCE).first { it.sourceSlot == FocusSlot.LEFT },
-            0f,
-            g,
-        )
+        val side =
+            FocusGalleryGeometryPolicy.cardGeometry(
+                cards(5, 2, FocusDirection.ADVANCE).first { it.sourceSlot == FocusSlot.LEFT },
+                0f,
+                g,
+            )
         assertEquals(FocusGalleryGeometryPolicy.SIDE_ALPHA, side.alpha, .001f)
         assertEquals(
             FocusGalleryVisualPolicy.D_SIDE_ALPHA,

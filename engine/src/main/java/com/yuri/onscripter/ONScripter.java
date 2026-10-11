@@ -47,6 +47,7 @@ public class ONScripter extends SDLActivity {
 
     private ArrayList<String> onsArgs;
     private boolean ignoreCutout = true;
+    private boolean keepScreenOn = true;
     private String gameRoot;
     private FrameLayout onsOverlay;
     private LinearLayout leftControls;
@@ -100,6 +101,7 @@ public class ONScripter extends SDLActivity {
             }
         }
         ignoreCutout = getIntent().getBooleanExtra(OnsSettings.EXTRA_IGNORE_CUTOUT, settings.ignoreCutout);
+        keepScreenOn = getIntent().getBooleanExtra(OnsSettings.EXTRA_KEEP_SCREEN_ON, settings.keepScreenOn);
         // 提前加载/释放 assets：确保 libonsyuri 与内置 DroidSansFallback.ttf 在 SDLActivity 启动前可用。
         OnsLibLoader.load(this);
         ensureDefaultFont();
@@ -496,7 +498,9 @@ public class ONScripter extends SDLActivity {
             lp.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
             window.setAttributes(lp);
         }
-        window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN | WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        if (keepScreenOn) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         if (Build.VERSION.SDK_INT >= 30) {
             WindowInsetsController c = window.getDecorView().getWindowInsetsController();
             if (c != null) {
@@ -511,7 +515,8 @@ public class ONScripter extends SDLActivity {
                         | android.view.View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
                         | android.view.View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
                         | android.view.View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
-        setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+        setRequestedOrientation(getIntent().getIntExtra("orientation",
+                android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE));
     }
 
     private void showStorageError(String message) {

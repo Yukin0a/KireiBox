@@ -1,9 +1,9 @@
 package com.kireibox.cover
 
-import java.net.SocketTimeoutException
-import java.util.Locale
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
+import java.net.SocketTimeoutException
+import java.util.Locale
 
 internal object CoverTimeoutRetryPolicy {
     const val TOTAL_ATTEMPTS = 3
@@ -20,7 +20,9 @@ internal object CoverTimeoutRetryPolicy {
                 "time out" in message ||
                 "timed out" in message ||
                 "time_out" in message
-            ) return true
+            ) {
+                return true
+            }
             current = current.cause
         }
         return false
@@ -32,11 +34,12 @@ internal object CoverTimeoutRetryPolicy {
     ): Result<T> {
         var lastError: Throwable = SocketTimeoutException(FINAL_MESSAGE)
         for (attempt in 1..TOTAL_ATTEMPTS) {
-            val result = try {
-                operation(attempt)
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            }
+            val result =
+                try {
+                    operation(attempt)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                }
             if (result.isSuccess) return result
             val error = result.exceptionOrNull() ?: IllegalStateException("封面请求失败")
             if (error is CancellationException) throw error
@@ -50,6 +53,5 @@ internal object CoverTimeoutRetryPolicy {
         return Result.failure(SocketTimeoutException(FINAL_MESSAGE).apply { initCause(lastError) })
     }
 
-    fun normalizeFinalError(error: Throwable): Throwable =
-        if (isTimeout(error)) SocketTimeoutException(FINAL_MESSAGE).apply { initCause(error) } else error
+    fun normalizeFinalError(error: Throwable): Throwable = if (isTimeout(error)) SocketTimeoutException("资料搜索超时，请检查网络后重试").apply { initCause(error) } else error
 }

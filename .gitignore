@@ -20,6 +20,8 @@
 .kotlin/
 /build/
 **/build/
+# build symlinks (module build dirs redirected off the exFAT drive)
+**/build
 
 # Local configuration file (sdk path, etc)
 local.properties
@@ -55,6 +57,7 @@ keystore.properties
 
 # IDE / system files
 .DS_Store
+._*
 Thumbs.db
 .trae/
 .vscode/
@@ -94,7 +97,8 @@ log/
 /apk/
 /artifacts/
 /branding/
-/doc/tasks/
+/doc/
+/ema-bicycle.svg
 
 # Imported residues excluded from every public build
 /app/src/main/assets/rtp/sf.sf2

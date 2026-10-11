@@ -3,8 +3,8 @@ package com.yuki.yukihub.data
 import android.content.ContentValues
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
-import com.yuki.yukihub.metadata.VnMetadata
-import com.yuki.yukihub.metadata.CoverSourceMode
+import com.yuki.yukihub.metadata.model.CoverSourceMode
+import com.yuki.yukihub.metadata.model.VnMetadata
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -13,43 +13,69 @@ import org.json.JSONObject
  * 提供 YukiHub 五个来源的 get/save/clear，以及 JSON 导入导出（含冲突检测）。
  */
 class MetadataRepository(context: Context) {
-
     private val helper = YukiDatabaseHelper(context.applicationContext)
+
+    fun saveNextmoe(
+        gameId: Long,
+        data: VnMetadata?,
+    ) = saveMetadata(gameId, "nextmoe", data)
 
     fun getVndb(gameId: Long): VnMetadata? = getMetadata(gameId, "vndb")
 
-    fun saveVndb(gameId: Long, data: VnMetadata?) = saveMetadata(gameId, "vndb", data)
+    fun saveVndb(
+        gameId: Long,
+        data: VnMetadata?,
+    ) = saveMetadata(gameId, "vndb", data)
 
-    fun saveVndb(gameId: Long, data: VnMetadata?, db: SQLiteDatabase) =
-        saveMetadata(gameId, "vndb", data, db)
+    fun saveVndb(
+        gameId: Long,
+        data: VnMetadata?,
+        db: SQLiteDatabase,
+    ) = saveMetadata(gameId, "vndb", data, db)
 
     fun getBangumi(gameId: Long): VnMetadata? = getMetadata(gameId, "bangumi")
 
-    fun saveBangumi(gameId: Long, data: VnMetadata?) = saveMetadata(gameId, "bangumi", data)
+    fun saveBangumi(
+        gameId: Long,
+        data: VnMetadata?,
+    ) = saveMetadata(gameId, "bangumi", data)
 
     fun getBangumiMirror(gameId: Long): VnMetadata? = getMetadata(gameId, "bangumi_mirror")
 
-    fun saveBangumiMirror(gameId: Long, data: VnMetadata?) = saveMetadata(gameId, "bangumi_mirror", data)
+    fun saveBangumiMirror(
+        gameId: Long,
+        data: VnMetadata?,
+    ) = saveMetadata(gameId, "bangumi_mirror", data)
 
     fun getYmgal(gameId: Long): VnMetadata? = getMetadata(gameId, "ymgal")
 
-    fun saveYmgal(gameId: Long, data: VnMetadata?) = saveMetadata(gameId, "ymgal", data)
+    fun saveYmgal(
+        gameId: Long,
+        data: VnMetadata?,
+    ) = saveMetadata(gameId, "ymgal", data)
 
     fun getHikarinagi(gameId: Long): VnMetadata? = getMetadata(gameId, "hikarinagi")
 
-    fun get(gameId: Long, source: CoverSourceMode): VnMetadata? = getMetadata(gameId, source.key)
+    fun get(
+        gameId: Long,
+        source: CoverSourceMode,
+    ): VnMetadata? = getMetadata(gameId, source.key)
 
-    fun saveHikarinagi(gameId: Long, data: VnMetadata?) = saveMetadata(gameId, "hikarinagi", data)
+    fun saveHikarinagi(
+        gameId: Long,
+        data: VnMetadata?,
+    ) = saveMetadata(gameId, "hikarinagi", data)
 
     /** Returns the source whose cached metadata was most recently bound or refreshed. */
     fun getMostRecentlyUpdatedSource(gameId: Long): String {
         val db = helper.readableDatabase
-        val c = db.rawQuery(
-            "SELECT source FROM metadata_cache WHERE game_id=? " +
-                    "AND source IN ('vndb','bangumi','bangumi_mirror','ymgal','hikarinagi') " +
+        val c =
+            db.rawQuery(
+                "SELECT source FROM metadata_cache WHERE game_id=? " +
+                    "AND source IN ('vndb','bangumi','bangumi_mirror','ymgal','hikarinagi','nextmoe') " +
                     "ORDER BY updated_at DESC LIMIT 1",
-            arrayOf(gameId.toString())
-        )
+                arrayOf(gameId.toString()),
+            )
         return c.use { if (it.moveToFirst()) it.getString(0) else "" }
     }
 
@@ -57,12 +83,13 @@ class MetadataRepository(context: Context) {
     fun exportMetadataJson(): JSONArray {
         val arr = JSONArray()
         val db = helper.readableDatabase
-        val c = db.rawQuery(
-            "SELECT m.game_id,g.root_uri,g.entry_key,m.source,m.source_id,m.json,m.updated_at " +
+        val c =
+            db.rawQuery(
+                "SELECT m.game_id,g.root_uri,g.entry_key,m.source,m.source_id,m.json,m.updated_at " +
                     "FROM metadata_cache m LEFT JOIN games g ON g.id=m.game_id " +
                     "ORDER BY m.updated_at ASC",
-            null
-        )
+                null,
+            )
         c.use {
             while (it.moveToNext()) {
                 val o = JSONObject()
@@ -80,11 +107,13 @@ class MetadataRepository(context: Context) {
     }
 
     @Throws(Exception::class)
-    fun importMetadataJson(arr: JSONArray?): Int =
-        importMetadataJson(helper.writableDatabase, arr)
+    fun importMetadataJson(arr: JSONArray?): Int = importMetadataJson(helper.writableDatabase, arr)
 
     @Throws(Exception::class)
-    fun importMetadataJson(db: SQLiteDatabase, arr: JSONArray?): Int {
+    fun importMetadataJson(
+        db: SQLiteDatabase,
+        arr: JSONArray?,
+    ): Int {
         if (arr == null) return 0
         var changed = 0
         for (i in 0 until arr.length()) {
@@ -100,19 +129,21 @@ class MetadataRepository(context: Context) {
             val incomingUpdatedAt = o.optLong("updated_at", System.currentTimeMillis())
 
             // 冲突检测：如果本地已有更新版本则跳过
-            val shouldSkip = db.rawQuery(
-                "SELECT updated_at FROM metadata_cache WHERE game_id=? AND source=? LIMIT 1",
-                arrayOf(gameId.toString(), source)
-            ).use { it.moveToFirst() && incomingUpdatedAt < it.getLong(0) }
+            val shouldSkip =
+                db.rawQuery(
+                    "SELECT updated_at FROM metadata_cache WHERE game_id=? AND source=? LIMIT 1",
+                    arrayOf(gameId.toString(), source),
+                ).use { it.moveToFirst() && incomingUpdatedAt < it.getLong(0) }
             if (shouldSkip) continue
 
-            val v = ContentValues().apply {
-                put("game_id", gameId)
-                put("source", source)
-                put("source_id", o.optString("source_id", ""))
-                put("json", json)
-                put("updated_at", incomingUpdatedAt)
-            }
+            val v =
+                ContentValues().apply {
+                    put("game_id", gameId)
+                    put("source", source)
+                    put("source_id", o.optString("source_id", ""))
+                    put("json", json)
+                    put("updated_at", incomingUpdatedAt)
+                }
             if (db.insertWithOnConflict("metadata_cache", null, v, SQLiteDatabase.CONFLICT_REPLACE) <= 0) {
                 throw IllegalStateException("导入元数据失败: game=$gameId, source=$source")
             }
@@ -133,18 +164,26 @@ class MetadataRepository(context: Context) {
 
     // ===== private helpers =====
 
-    private fun getMetadata(gameId: Long, source: String): VnMetadata? {
+    private fun getMetadata(
+        gameId: Long,
+        source: String,
+    ): VnMetadata? {
         val db = helper.readableDatabase
-        val c = db.rawQuery(
-            "SELECT json FROM metadata_cache WHERE game_id=? AND source=? LIMIT 1",
-            arrayOf(gameId.toString(), source)
-        )
+        val c =
+            db.rawQuery(
+                "SELECT json FROM metadata_cache WHERE game_id=? AND source=? LIMIT 1",
+                arrayOf(gameId.toString(), source),
+            )
         return c.use {
             if (it.moveToFirst()) VnMetadata.fromJson(it.getString(0)) else null
         }
     }
 
-    private fun saveMetadata(gameId: Long, source: String, data: VnMetadata?) {
+    private fun saveMetadata(
+        gameId: Long,
+        source: String,
+        data: VnMetadata?,
+    ) {
         saveMetadata(gameId, source, data, helper.writableDatabase)
     }
 
@@ -152,41 +191,56 @@ class MetadataRepository(context: Context) {
         gameId: Long,
         source: String,
         data: VnMetadata?,
-        db: SQLiteDatabase
+        db: SQLiteDatabase,
     ) {
         if (gameId <= 0 || data == null) return
-        val v = ContentValues().apply {
-            put("game_id", gameId)
-            put("source", source)
-            put("source_id", data.id)
-            put("json", data.toJson().toString())
-            put("updated_at", System.currentTimeMillis())
-        }
+        val v =
+            ContentValues().apply {
+                put("game_id", gameId)
+                put("source", source)
+                put("source_id", data.id)
+                put("json", data.toJson().toString())
+                put("updated_at", System.currentTimeMillis())
+            }
         db.insertWithOnConflict("metadata_cache", null, v, SQLiteDatabase.CONFLICT_REPLACE)
     }
 
-    private fun clearMetadata(gameId: Long, source: String) {
+    private fun clearMetadata(
+        gameId: Long,
+        source: String,
+    ) {
         val db = helper.writableDatabase
         db.delete("metadata_cache", "game_id=? AND source=?", arrayOf(gameId.toString(), source))
     }
 
-    private fun findGameIdByRootUri(db: SQLiteDatabase, rootUri: String?): Long {
+    private fun findGameIdByRootUri(
+        db: SQLiteDatabase,
+        rootUri: String?,
+    ): Long {
         return findGameIdByIdentity(db, rootUri, "")
     }
 
-    private fun findGameIdByIdentity(db: SQLiteDatabase, rootUri: String?, entryKey: String?): Long {
+    private fun findGameIdByIdentity(
+        db: SQLiteDatabase,
+        rootUri: String?,
+        entryKey: String?,
+    ): Long {
         if (rootUri == null || rootUri.trim().isEmpty()) return -1
         val key = GameRepository.normalizeRootUriKey(rootUri)
         if (key.isEmpty()) return -1
         val entry = GameRepository.normalizeEntryKey(entryKey)
-        val c = db.rawQuery(
-            "SELECT id FROM games WHERE root_uri_key=? AND entry_key=? LIMIT 1",
-            arrayOf(key, entry)
-        )
+        val c =
+            db.rawQuery(
+                "SELECT id FROM games WHERE root_uri_key=? AND entry_key=? LIMIT 1",
+                arrayOf(key, entry),
+            )
         return c.use { if (it.moveToFirst()) it.getLong(0) else -1 }
     }
 
-    private fun findGameIdByLocalId(db: SQLiteDatabase, localId: Long): Long {
+    private fun findGameIdByLocalId(
+        db: SQLiteDatabase,
+        localId: Long,
+    ): Long {
         if (localId <= 0) return -1
         val c = db.rawQuery("SELECT id FROM games WHERE id=? LIMIT 1", arrayOf(localId.toString()))
         return c.use { if (it.moveToFirst()) it.getLong(0) else -1 }

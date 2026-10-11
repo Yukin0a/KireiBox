@@ -8,15 +8,16 @@ import org.junit.Test
 class CoverTaskBadgePolicyTest {
     @Test
     fun badgeLabelsKeepExactSmallCountsAndCapVisibleLabelAt99Plus() {
-        val expected = mapOf(
-            0 to "",
-            1 to "1",
-            9 to "9",
-            10 to "10",
-            99 to "99",
-            100 to "99+",
-            1000 to "99+",
-        )
+        val expected =
+            mapOf(
+                0 to "",
+                1 to "1",
+                9 to "9",
+                10 to "10",
+                99 to "99",
+                100 to "99+",
+                1000 to "99+",
+            )
 
         expected.forEach { (count, label) ->
             val badge = CoverTaskBadgePolicy.presentation(count)

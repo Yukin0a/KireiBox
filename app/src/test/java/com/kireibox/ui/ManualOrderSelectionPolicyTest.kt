@@ -5,13 +5,14 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class ManualOrderSelectionPolicyTest {
-    private val games = listOf(
-        Game(id = 1, title = "F1", favorite = true),
-        Game(id = 2, title = "F2", favorite = true),
-        Game(id = 3, title = "A"),
-        Game(id = 4, title = "B"),
-        Game(id = 5, title = "C"),
-    )
+    private val games =
+        listOf(
+            Game(id = 1, title = "F1", favorite = true),
+            Game(id = 2, title = "F2", favorite = true),
+            Game(id = 3, title = "A"),
+            Game(id = 4, title = "B"),
+            Game(id = 5, title = "C"),
+        )
 
     @Test
     fun tapsAssignAndRemoveCompactNumbersInsideEachGroup() {

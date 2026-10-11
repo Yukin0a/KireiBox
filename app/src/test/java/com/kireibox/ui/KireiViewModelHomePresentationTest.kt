@@ -7,7 +7,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class KireiViewModelHomePresentationTest {
-
     // --- C1 fix: real behavioral test with injected seams ---
 
     @Test
@@ -18,11 +17,12 @@ class KireiViewModelHomePresentationTest {
         val writer: (HomePresentationMode) -> Unit = { mode -> writtenMode = mode }
         val reloader: () -> Unit = { reloadCount++ }
 
-        val vm = KireiViewModel(
-            Application(),
-            testHomePresentationWriter = writer,
-            testReloadAction = reloader
-        )
+        val vm =
+            KireiViewModel(
+                Application(),
+                testHomePresentationWriter = writer,
+                testReloadAction = reloader
+            )
 
         // Act
         vm.setHomePresentationMode(HomePresentationMode.COMPONENTS)
@@ -37,11 +37,12 @@ class KireiViewModelHomePresentationTest {
         var writtenMode: HomePresentationMode? = null
         var reloadCount = 0
 
-        val vm = KireiViewModel(
-            Application(),
-            testHomePresentationWriter = { mode -> writtenMode = mode },
-            testReloadAction = { reloadCount++ }
-        )
+        val vm =
+            KireiViewModel(
+                Application(),
+                testHomePresentationWriter = { mode -> writtenMode = mode },
+                testReloadAction = { reloadCount++ }
+            )
 
         vm.setHomePresentationMode(HomePresentationMode.IMMERSIVE)
 
@@ -52,11 +53,15 @@ class KireiViewModelHomePresentationTest {
     // Existing reflection-based tests retained for API contract verification
     @Test
     fun `setHomePresentationMode method signature verified`() {
-        val method = KireiViewModel::class.java.getDeclaredMethod(
-            "setHomePresentationMode", HomePresentationMode::class.java
-        )
-        assertTrue("setHomePresentationMode should accept HomePresentationMode",
+        val method =
+            KireiViewModel::class.java.getDeclaredMethod(
+                "setHomePresentationMode",
+                HomePresentationMode::class.java
+            )
+        assertTrue(
+            "setHomePresentationMode should accept HomePresentationMode",
             method.parameterTypes.size == 1 &&
-            method.parameterTypes[0] == HomePresentationMode::class.java)
+                method.parameterTypes[0] == HomePresentationMode::class.java
+        )
     }
 }

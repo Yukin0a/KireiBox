@@ -8,15 +8,17 @@ import com.yuki.yukihub.storage.StorageRootIdentity
 
 class YukiDatabaseHelper(context: Context) :
     SQLiteOpenHelper(context, DB_NAME, null, DB_VERSION) {
-
     private val appContext = context.applicationContext
 
     companion object {
         const val DB_NAME = "kireibox.db"
+
         // Keep this monotonic for the production package.  The launcher now uses the
         // same applicationId as existing installs; lowering this value makes SQLite
         // reject those installs before the launcher can load any data.
-        const val DB_VERSION = 21
+        const val DB_VERSION = 22
+
+        private val HARMLESS_DOWNGRADES = setOf(15 to 14, 19 to 18, 20 to 19, 21 to 20, 22 to 21)
     }
 
     override fun onConfigure(db: SQLiteDatabase) {
@@ -27,7 +29,8 @@ class YukiDatabaseHelper(context: Context) :
     }
 
     override fun onCreate(db: SQLiteDatabase) {
-        db.execSQL("CREATE TABLE games (" +
+        db.execSQL(
+            "CREATE TABLE games (" +
                 "id INTEGER PRIMARY KEY AUTOINCREMENT," +
                 "title TEXT NOT NULL," +
                 "original_title TEXT," +
@@ -55,8 +58,10 @@ class YukiDatabaseHelper(context: Context) :
                 "nsfw INTEGER NOT NULL DEFAULT 0," +
                 "manual_order INTEGER NOT NULL DEFAULT 0" +
                 ",location_verified_at INTEGER NOT NULL DEFAULT 0" +
-                ")")
-        db.execSQL("CREATE TABLE play_sessions (" +
+                ")",
+        )
+        db.execSQL(
+            "CREATE TABLE play_sessions (" +
                 "id INTEGER PRIMARY KEY AUTOINCREMENT," +
                 "game_id INTEGER NOT NULL," +
                 "start_time INTEGER NOT NULL," +
@@ -71,14 +76,25 @@ class YukiDatabaseHelper(context: Context) :
                 "dirty INTEGER DEFAULT 1," +
                 "deleted INTEGER DEFAULT 0," +
                 "FOREIGN KEY(game_id) REFERENCES games(id) ON DELETE CASCADE" +
-                ")")
+                ")",
+        )
         db.execSQL("CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT)")
         createMetadataCacheTable(db)
-        try { db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS idx_play_sessions_uuid ON play_sessions(session_uuid)") } catch (ignored: Exception) {}
+        try {
+            db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS idx_play_sessions_uuid ON play_sessions(session_uuid)")
+        } catch (
+            ignored: Exception,
+        ) {
+        }
         createGameIdentityIndex(db)
+        createNextmoePlaytimeSyncTable(db)
     }
 
-    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+    override fun onUpgrade(
+        db: SQLiteDatabase,
+        oldVersion: Int,
+        newVersion: Int,
+    ) {
         // Add this before identity migrations so duplicate rows can merge the flag.
         if (oldVersion < 21) {
             safeAlter(db, "ALTER TABLE games ADD COLUMN nsfw INTEGER NOT NULL DEFAULT 0")
@@ -124,7 +140,7 @@ class YukiDatabaseHelper(context: Context) :
             safeAlter(db, "ALTER TABLE play_sessions ADD COLUMN launched_at INTEGER NOT NULL DEFAULT 0")
             db.execSQL(
                 "UPDATE play_sessions SET launched_at=COALESCE(end_time,start_time,0) " +
-                    "WHERE IFNULL(duration,0)>0 AND launched_at=0"
+                    "WHERE IFNULL(duration,0)>0 AND launched_at=0",
             )
         }
         if (oldVersion < 20) {
@@ -133,54 +149,86 @@ class YukiDatabaseHelper(context: Context) :
             YukiSettingsStore(appContext).remapImmersiveGalleryIds(gameIdRemap)
             backfillManualOrder(db)
         }
+        if (oldVersion < 22) {
+            createNextmoePlaytimeSyncTable(db)
+        }
     }
 
-    override fun onDowngrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+    override fun onDowngrade(
+        db: SQLiteDatabase,
+        oldVersion: Int,
+        newVersion: Int,
+    ) {
         // Version 15 was produced by a temporary build and did not introduce a
         // schema change.  Allow returning to the checked-in v14 build without
         // deleting the user's game library or crashing during startup.
-        if (
-            (oldVersion == 15 && newVersion == 14) ||
-            (oldVersion == 19 && newVersion == 18) ||
-            (oldVersion == 20 && newVersion == 19) ||
-            (oldVersion == 21 && newVersion == 20)
-        ) {
-            return
-        }
+        // v22 only adds the NextMoe playtime ledger, which older builds simply ignore.
+        if ((oldVersion to newVersion) in HARMLESS_DOWNGRADES) return
         super.onDowngrade(db, oldVersion, newVersion)
     }
 
+    /** NextMoe playtime sync state per game (NextmoePlaytimeLedger); deleting a game drops its row. */
+    private fun createNextmoePlaytimeSyncTable(db: SQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS nextmoe_playtime_sync (" +
+                "game_id INTEGER PRIMARY KEY," +
+                "account_id TEXT NOT NULL," +
+                "work_id TEXT," +
+                "candidate_id TEXT," +
+                "candidate_title TEXT," +
+                "uploaded_minutes INTEGER NOT NULL DEFAULT 0," +
+                "uploaded_work_id TEXT," +
+                "stale_work_id TEXT," +
+                "bound_from TEXT," +
+                "rejected TEXT," +
+                "FOREIGN KEY(game_id) REFERENCES games(id) ON DELETE CASCADE" +
+                ")",
+        )
+    }
+
     private fun createMetadataCacheTable(db: SQLiteDatabase) {
-        db.execSQL("CREATE TABLE IF NOT EXISTS metadata_cache (" +
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS metadata_cache (" +
                 "game_id INTEGER NOT NULL," +
                 "source TEXT NOT NULL," +
                 "source_id TEXT," +
                 "json TEXT NOT NULL," +
                 "updated_at INTEGER NOT NULL," +
                 "PRIMARY KEY(game_id, source)" +
-                ")")
+                ")",
+        )
     }
 
     private fun upgradeMetadataCachePrimaryKey(db: SQLiteDatabase) {
         try {
             db.beginTransaction()
-            db.execSQL("CREATE TABLE IF NOT EXISTS metadata_cache_new (" +
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS metadata_cache_new (" +
                     "game_id INTEGER NOT NULL," +
                     "source TEXT NOT NULL," +
                     "source_id TEXT," +
                     "json TEXT NOT NULL," +
                     "updated_at INTEGER NOT NULL," +
                     "PRIMARY KEY(game_id, source)" +
-                    ")")
-            db.execSQL("INSERT OR REPLACE INTO metadata_cache_new(game_id,source,source_id,json,updated_at) " +
-                    "SELECT game_id,source,source_id,json,updated_at FROM metadata_cache")
+                    ")",
+            )
+            db.execSQL(
+                "INSERT OR REPLACE INTO metadata_cache_new(game_id,source,source_id,json,updated_at) " +
+                    "SELECT game_id,source,source_id,json,updated_at FROM metadata_cache",
+            )
             db.execSQL("DROP TABLE IF EXISTS metadata_cache")
             db.execSQL("ALTER TABLE metadata_cache_new RENAME TO metadata_cache")
             db.setTransactionSuccessful()
         } catch (ignored: Exception) {
-            try { createMetadataCacheTable(db) } catch (ignored2: Exception) {}
+            try {
+                createMetadataCacheTable(db)
+            } catch (ignored2: Exception) {
+            }
         } finally {
-            try { db.endTransaction() } catch (ignored3: Exception) {}
+            try {
+                db.endTransaction()
+            } catch (ignored3: Exception) {
+            }
         }
     }
 
@@ -191,10 +239,30 @@ class YukiDatabaseHelper(context: Context) :
         safeAlter(db, "ALTER TABLE play_sessions ADD COLUMN updated_at INTEGER DEFAULT 0")
         safeAlter(db, "ALTER TABLE play_sessions ADD COLUMN dirty INTEGER DEFAULT 1")
         safeAlter(db, "ALTER TABLE play_sessions ADD COLUMN deleted INTEGER DEFAULT 0")
-        try { db.execSQL("UPDATE play_sessions SET session_uuid=lower(hex(randomblob(16))) WHERE session_uuid IS NULL OR session_uuid='' ") } catch (ignored: Exception) {}
-        try { db.execSQL("UPDATE play_sessions SET created_at=start_time WHERE created_at IS NULL OR created_at=0") } catch (ignored: Exception) {}
-        try { db.execSQL("UPDATE play_sessions SET updated_at=COALESCE(end_time,start_time) WHERE updated_at IS NULL OR updated_at=0") } catch (ignored: Exception) {}
-        try { db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS idx_play_sessions_uuid ON play_sessions(session_uuid)") } catch (ignored: Exception) {}
+        try {
+            db.execSQL("UPDATE play_sessions SET session_uuid=lower(hex(randomblob(16))) WHERE session_uuid IS NULL OR session_uuid='' ")
+        } catch (
+            ignored: Exception,
+        ) {
+        }
+        try {
+            db.execSQL("UPDATE play_sessions SET created_at=start_time WHERE created_at IS NULL OR created_at=0")
+        } catch (
+            ignored: Exception,
+        ) {
+        }
+        try {
+            db.execSQL("UPDATE play_sessions SET updated_at=COALESCE(end_time,start_time) WHERE updated_at IS NULL OR updated_at=0")
+        } catch (
+            ignored: Exception,
+        ) {
+        }
+        try {
+            db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS idx_play_sessions_uuid ON play_sessions(session_uuid)")
+        } catch (
+            ignored: Exception,
+        ) {
+        }
     }
 
     /**
@@ -211,9 +279,12 @@ class YukiDatabaseHelper(context: Context) :
             db.execSQL("DELETE FROM play_sessions WHERE NOT EXISTS (SELECT 1 FROM games WHERE games.id=play_sessions.game_id)")
 
             val canonicalByKey = HashMap<String, Long>()
-            val cursor = db.rawQuery(
+            val cursor =
+                db.rawQuery(
                     "SELECT id,root_uri,total_play_time,last_played_at,created_at,updated_at,hidden,favorite " +
-                            "FROM games ORDER BY updated_at DESC,id DESC", null)
+                        "FROM games ORDER BY updated_at DESC,id DESC",
+                    null,
+                )
             cursor.use {
                 while (it.moveToNext()) {
                     val id = it.getLong(0)
@@ -237,12 +308,18 @@ class YukiDatabaseHelper(context: Context) :
     }
 
     /** Moves dependent data before deleting an historical duplicate URI row.  */
-    private fun mergeDuplicateGame(db: SQLiteDatabase, canonicalId: Long, duplicateId: Long) {
-        db.execSQL("INSERT OR REPLACE INTO metadata_cache(game_id,source,source_id,json,updated_at) " +
+    private fun mergeDuplicateGame(
+        db: SQLiteDatabase,
+        canonicalId: Long,
+        duplicateId: Long,
+    ) {
+        db.execSQL(
+            "INSERT OR REPLACE INTO metadata_cache(game_id,source,source_id,json,updated_at) " +
                 "SELECT ?,d.source,d.source_id,d.json,d.updated_at FROM metadata_cache d " +
                 "WHERE d.game_id=? AND NOT EXISTS (SELECT 1 FROM metadata_cache c " +
                 "WHERE c.game_id=? AND c.source=d.source AND c.updated_at>=d.updated_at)",
-                arrayOf<Any>(canonicalId, duplicateId, canonicalId))
+            arrayOf<Any>(canonicalId, duplicateId, canonicalId),
+        )
         db.delete("metadata_cache", "game_id=?", arrayOf(duplicateId.toString()))
         db.execSQL(
             "DELETE FROM play_sessions WHERE game_id=? AND IFNULL(session_uuid,'')!='' AND EXISTS (" +
@@ -255,23 +332,28 @@ class YukiDatabaseHelper(context: Context) :
         db.execSQL(
             "UPDATE games SET title=(SELECT title FROM games WHERE id=?), " +
                 "original_title=CASE WHEN IFNULL(original_title,'')='' THEN " +
-                    "(SELECT original_title FROM games WHERE id=?) ELSE original_title END " +
+                "(SELECT original_title FROM games WHERE id=?) ELSE original_title END " +
                 "WHERE id=? AND IFNULL((SELECT title FROM games WHERE id=?),'')!='' " +
                 "AND IFNULL((SELECT original_title FROM games WHERE id=?),'')!='' " +
                 "AND lower(trim((SELECT title FROM games WHERE id=?)))!=" +
-                    "lower(trim((SELECT original_title FROM games WHERE id=?))) " +
+                "lower(trim((SELECT original_title FROM games WHERE id=?))) " +
                 "AND (IFNULL(original_title,'')='' OR lower(trim(title))=lower(trim(original_title)))",
             arrayOf<Any>(
-                duplicateId, duplicateId, canonicalId, duplicateId, duplicateId,
-                duplicateId, duplicateId,
+                duplicateId,
+                duplicateId,
+                canonicalId,
+                duplicateId,
+                duplicateId,
+                duplicateId,
+                duplicateId,
             ),
         )
         db.execSQL(
             "UPDATE games SET " +
                 "description=CASE WHEN IFNULL(description,'')='' THEN " +
-                    "(SELECT description FROM games WHERE id=?) ELSE description END, " +
+                "(SELECT description FROM games WHERE id=?) ELSE description END, " +
                 "tags=CASE WHEN IFNULL(tags,'')='' THEN " +
-                    "(SELECT tags FROM games WHERE id=?) ELSE tags END WHERE id=?",
+                "(SELECT tags FROM games WHERE id=?) ELSE tags END WHERE id=?",
             arrayOf<Any>(duplicateId, duplicateId, canonicalId),
         )
         // MANUAL is the durable signal that a user confirmed this cover.  Move all
@@ -295,7 +377,8 @@ class YukiDatabaseHelper(context: Context) :
                 "AND IFNULL((SELECT cover_uri FROM games WHERE id=?),'')!=''",
             arrayOf<Any>(duplicateId, duplicateId, duplicateId, duplicateId, canonicalId, duplicateId),
         )
-        db.execSQL("UPDATE games SET total_play_time=MAX(IFNULL(total_play_time,0),(SELECT IFNULL(total_play_time,0) FROM games WHERE id=?)), " +
+        db.execSQL(
+            "UPDATE games SET total_play_time=MAX(IFNULL(total_play_time,0),(SELECT IFNULL(total_play_time,0) FROM games WHERE id=?)), " +
                 "last_played_at=MAX(IFNULL(last_played_at,0),(SELECT IFNULL(last_played_at,0) FROM games WHERE id=?)), " +
                 "created_at=MIN(IFNULL(created_at,0),(SELECT IFNULL(created_at,0) FROM games WHERE id=?)), " +
                 "updated_at=MAX(IFNULL(updated_at,0),(SELECT IFNULL(updated_at,0) FROM games WHERE id=?)), " +
@@ -303,28 +386,29 @@ class YukiDatabaseHelper(context: Context) :
                 "favorite=MAX(IFNULL(favorite,0),(SELECT IFNULL(favorite,0) FROM games WHERE id=?)), " +
                 "nsfw=MAX(IFNULL(nsfw,0),(SELECT IFNULL(nsfw,0) FROM games WHERE id=?)), " +
                 "manual_order=CASE WHEN IFNULL(manual_order,0)<=0 THEN " +
-                    "(SELECT IFNULL(manual_order,0) FROM games WHERE id=?) " +
-                    "WHEN (SELECT IFNULL(manual_order,0) FROM games WHERE id=?)<=0 THEN manual_order " +
-                    "ELSE MIN(manual_order,(SELECT manual_order FROM games WHERE id=?)) END, " +
+                "(SELECT IFNULL(manual_order,0) FROM games WHERE id=?) " +
+                "WHEN (SELECT IFNULL(manual_order,0) FROM games WHERE id=?)<=0 THEN manual_order " +
+                "ELSE MIN(manual_order,(SELECT manual_order FROM games WHERE id=?)) END, " +
                 "root_uri=CASE WHEN (SELECT root_uri FROM games WHERE id=?) LIKE 'content://%' " +
-                    "THEN (SELECT root_uri FROM games WHERE id=?) ELSE root_uri END, " +
+                "THEN (SELECT root_uri FROM games WHERE id=?) ELSE root_uri END, " +
                 "cover_uri=CASE WHEN IFNULL(cover_uri,'')='' THEN " +
-                    "(SELECT cover_uri FROM games WHERE id=?) ELSE cover_uri END, " +
+                "(SELECT cover_uri FROM games WHERE id=?) ELSE cover_uri END, " +
                 "cover_persist_uri=CASE WHEN IFNULL(cover_persist_uri,'')='' THEN " +
-                    "(SELECT cover_persist_uri FROM games WHERE id=?) ELSE cover_persist_uri END, " +
+                "(SELECT cover_persist_uri FROM games WHERE id=?) ELSE cover_persist_uri END, " +
                 "vndb_binding_mode=CASE " +
-                    "WHEN vndb_binding_mode='MANUAL' THEN vndb_binding_mode " +
-                    "WHEN (SELECT vndb_binding_mode FROM games WHERE id=?)='MANUAL' THEN 'MANUAL' " +
-                    "WHEN vndb_binding_mode='AUTO' THEN vndb_binding_mode " +
-                    "WHEN (SELECT vndb_binding_mode FROM games WHERE id=?)='AUTO' THEN 'AUTO' " +
-                    "ELSE vndb_binding_mode END " +
+                "WHEN vndb_binding_mode='MANUAL' THEN vndb_binding_mode " +
+                "WHEN (SELECT vndb_binding_mode FROM games WHERE id=?)='MANUAL' THEN 'MANUAL' " +
+                "WHEN vndb_binding_mode='AUTO' THEN vndb_binding_mode " +
+                "WHEN (SELECT vndb_binding_mode FROM games WHERE id=?)='AUTO' THEN 'AUTO' " +
+                "ELSE vndb_binding_mode END " +
                 "WHERE id=?",
-                arrayOf<Any>(
-                    duplicateId, duplicateId, duplicateId, duplicateId, duplicateId, duplicateId,
-                    duplicateId,
-                    duplicateId, duplicateId, duplicateId, duplicateId, duplicateId, duplicateId,
-                    duplicateId, duplicateId, duplicateId, canonicalId,
-                ))
+            arrayOf<Any>(
+                duplicateId, duplicateId, duplicateId, duplicateId, duplicateId, duplicateId,
+                duplicateId,
+                duplicateId, duplicateId, duplicateId, duplicateId, duplicateId, duplicateId,
+                duplicateId, duplicateId, duplicateId, canonicalId,
+            ),
+        )
         db.delete("games", "id=?", arrayOf(duplicateId.toString()))
     }
 
@@ -404,11 +488,17 @@ class YukiDatabaseHelper(context: Context) :
     private fun createGameIdentityIndex(db: SQLiteDatabase) {
         db.execSQL(
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_games_identity " +
-                "ON games(root_uri_key,entry_key) WHERE root_uri_key != ''"
+                "ON games(root_uri_key,entry_key) WHERE root_uri_key != ''",
         )
     }
 
-    private fun safeAlter(db: SQLiteDatabase, sql: String) {
-        try { db.execSQL(sql) } catch (ignored: Exception) {}
+    private fun safeAlter(
+        db: SQLiteDatabase,
+        sql: String,
+    ) {
+        try {
+            db.execSQL(sql)
+        } catch (ignored: Exception) {
+        }
     }
 }

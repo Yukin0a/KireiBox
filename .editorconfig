@@ -1,0 +1,20 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{kt,kts}]
+# KireiBox keeps some long engine/settings lines; 200 keeps them readable without churn.
+max_line_length = 200
+# Compose composables use PascalCase by convention (mirrors detekt's Composable naming exception).
+ktlint_function_naming_ignore_when_annotated_with = Composable
+# Persisted test/source-scanning helpers reference file names explicitly; allow descriptive names.
+ktlint_standard_filename = disabled
+# The project intentionally uses trailing commas and Kotlin 2.x style.
+ktlint_standard_trailing-comma-on-call-site = disabled
+ktlint_standard_trailing-comma-on-declaration-site = disabled

@@ -16,11 +16,12 @@ internal object CoverTaskBadgePolicy {
 
     fun presentation(pendingCount: Int): CoverTaskBadgePresentation {
         val count = pendingCount.coerceAtLeast(0)
-        val label = when {
-            count == 0 -> ""
-            count >= 100 -> "99+"
-            else -> count.toString()
-        }
+        val label =
+            when {
+                count == 0 -> ""
+                count >= 100 -> "99+"
+                else -> count.toString()
+            }
         return CoverTaskBadgePresentation(
             visible = count > 0,
             label = label,

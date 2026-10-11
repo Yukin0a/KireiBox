@@ -12,17 +12,20 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ImmersiveGalleryEditorPolicyTest {
-    private fun game(id: Long, title: String = "G$id"): Game =
-        Game(id = id, title = title)
+    private fun game(
+        id: Long,
+        title: String = "G$id"
+    ): Game = Game(id = id, title = title)
 
     @Test
     fun automaticRecentAllKeepsOnlyRealPlayHistoryNewestFirstDeduped() {
-        val games = listOf(
-            game(3L).also { it.lastPlayedAt = 50L },
-            game(1L).also { it.lastPlayedAt = 300L },
-            game(2L),
-            game(1L).also { it.lastPlayedAt = 300L },
-        )
+        val games =
+            listOf(
+                game(3L).also { it.lastPlayedAt = 50L },
+                game(1L).also { it.lastPlayedAt = 300L },
+                game(2L),
+                game(1L).also { it.lastPlayedAt = 300L },
+            )
         assertEquals(
             listOf(1L, 3L),
             ImmersiveGalleryEditorPolicy.orderGames(
@@ -59,66 +62,73 @@ class ImmersiveGalleryEditorPolicyTest {
 
     @Test
     fun recentFiveKeepsOnlyPlayedGamesInMostRecentOrderUpToFive() {
-        val games = listOf(
-            game(1L).also { it.lastPlayedAt = 100L },
-            game(2L),
-            game(3L).also { it.lastPlayedAt = 300L },
-            game(4L).also { it.lastPlayedAt = 200L },
-            game(5L).also { it.lastPlayedAt = 50L },
-            game(6L).also { it.lastPlayedAt = 400L },
-        )
-        val ordered = ImmersiveGalleryEditorPolicy.orderGames(
-            games,
-            SpotlightSelectionMode.AUTOMATIC,
-            emptyList(),
-            ImmersiveGalleryAutoSource.RECENT_FIVE,
-        )
+        val games =
+            listOf(
+                game(1L).also { it.lastPlayedAt = 100L },
+                game(2L),
+                game(3L).also { it.lastPlayedAt = 300L },
+                game(4L).also { it.lastPlayedAt = 200L },
+                game(5L).also { it.lastPlayedAt = 50L },
+                game(6L).also { it.lastPlayedAt = 400L },
+            )
+        val ordered =
+            ImmersiveGalleryEditorPolicy.orderGames(
+                games,
+                SpotlightSelectionMode.AUTOMATIC,
+                emptyList(),
+                ImmersiveGalleryAutoSource.RECENT_FIVE,
+            )
         assertEquals(listOf(6L, 3L, 4L, 1L, 5L), ordered.map { it.id })
         assertEquals(5, ordered.size)
     }
 
     @Test
     fun recentFiveNeverPadsWithUnplayedGamesWhenPlayHistoryExists() {
-        val games = listOf(
-            game(1L).also { it.lastPlayedAt = 100L },
-            game(2L),
-            game(3L),
-        )
-        val ordered = ImmersiveGalleryEditorPolicy.orderGames(
-            games,
-            SpotlightSelectionMode.AUTOMATIC,
-            emptyList(),
-            ImmersiveGalleryAutoSource.RECENT_FIVE,
-        )
+        val games =
+            listOf(
+                game(1L).also { it.lastPlayedAt = 100L },
+                game(2L),
+                game(3L),
+            )
+        val ordered =
+            ImmersiveGalleryEditorPolicy.orderGames(
+                games,
+                SpotlightSelectionMode.AUTOMATIC,
+                emptyList(),
+                ImmersiveGalleryAutoSource.RECENT_FIVE,
+            )
         assertEquals(listOf(1L), ordered.map { it.id })
     }
 
     @Test
     fun recentFiveReturnsEmptyWhenNoPlayHistoryExists() {
         val games = listOf(game(1L), game(2L), game(3L), game(4L), game(5L), game(6L))
-        val ordered = ImmersiveGalleryEditorPolicy.orderGames(
-            games,
-            SpotlightSelectionMode.AUTOMATIC,
-            emptyList(),
-            ImmersiveGalleryAutoSource.RECENT_FIVE,
-        )
+        val ordered =
+            ImmersiveGalleryEditorPolicy.orderGames(
+                games,
+                SpotlightSelectionMode.AUTOMATIC,
+                emptyList(),
+                ImmersiveGalleryAutoSource.RECENT_FIVE,
+            )
         assertEquals(emptyList<Game>(), ordered)
     }
 
     @Test
     fun recentAllExcludesUnplayedGamesAndKeepsNewestFirst() {
-        val games = listOf(
-            game(3L).also { it.lastPlayedAt = 50L },
-            game(1L).also { it.lastPlayedAt = 300L },
-            game(2L),
-            game(4L).also { it.lastPlayedAt = 100L },
-        )
-        val ordered = ImmersiveGalleryEditorPolicy.orderGames(
-            games,
-            SpotlightSelectionMode.AUTOMATIC,
-            emptyList(),
-            ImmersiveGalleryAutoSource.RECENT_ALL,
-        )
+        val games =
+            listOf(
+                game(3L).also { it.lastPlayedAt = 50L },
+                game(1L).also { it.lastPlayedAt = 300L },
+                game(2L),
+                game(4L).also { it.lastPlayedAt = 100L },
+            )
+        val ordered =
+            ImmersiveGalleryEditorPolicy.orderGames(
+                games,
+                SpotlightSelectionMode.AUTOMATIC,
+                emptyList(),
+                ImmersiveGalleryAutoSource.RECENT_ALL,
+            )
         assertEquals(listOf(1L, 4L, 3L), ordered.map { it.id })
     }
 
@@ -138,18 +148,26 @@ class ImmersiveGalleryEditorPolicyTest {
 
     @Test
     fun favoritesPicksOnlyFavoritesInRecentOrder() {
-        val games = listOf(
-            game(1L).also { it.lastPlayedAt = 100L; it.favorite = true },
-            game(2L).also { it.favorite = true },
-            game(3L).also { it.lastPlayedAt = 300L },
-            game(4L).also { it.lastPlayedAt = 200L; it.favorite = true },
-        )
-        val ordered = ImmersiveGalleryEditorPolicy.orderGames(
-            games,
-            SpotlightSelectionMode.AUTOMATIC,
-            emptyList(),
-            ImmersiveGalleryAutoSource.FAVORITES,
-        )
+        val games =
+            listOf(
+                game(1L).also {
+                    it.lastPlayedAt = 100L
+                    it.favorite = true
+                },
+                game(2L).also { it.favorite = true },
+                game(3L).also { it.lastPlayedAt = 300L },
+                game(4L).also {
+                    it.lastPlayedAt = 200L
+                    it.favorite = true
+                },
+            )
+        val ordered =
+            ImmersiveGalleryEditorPolicy.orderGames(
+                games,
+                SpotlightSelectionMode.AUTOMATIC,
+                emptyList(),
+                ImmersiveGalleryAutoSource.FAVORITES,
+            )
         assertEquals(listOf(4L, 1L, 2L), ordered.map { it.id })
     }
 
@@ -169,10 +187,11 @@ class ImmersiveGalleryEditorPolicyTest {
 
     @Test
     fun canonicalSourcesKeepRecentAndFavoritesEmptyAndMakeAllExplicit() {
-        val games = listOf(
-            game(1L).also { it.lastPlayedAt = 100L },
-            game(2L),
-        )
+        val games =
+            listOf(
+                game(1L).also { it.lastPlayedAt = 100L },
+                game(2L),
+            )
         assertEquals(
             emptyList<Game>(),
             ImmersiveGalleryEditorPolicy.orderGames(
@@ -208,25 +227,37 @@ class ImmersiveGalleryEditorPolicyTest {
         assertEquals(
             ImmersiveGalleryEmptyState.BUILD_LIBRARY,
             ImmersiveGalleryEditorPolicy.emptyState(
-                emptyList(), SpotlightSelectionMode.AUTOMATIC, emptyList(), SpotlightSource.ALL,
+                emptyList(),
+                SpotlightSelectionMode.AUTOMATIC,
+                emptyList(),
+                SpotlightSource.ALL,
             ),
         )
         assertEquals(
             ImmersiveGalleryEmptyState.SELECT_GAMES,
             ImmersiveGalleryEditorPolicy.emptyState(
-                games, SpotlightSelectionMode.MANUAL, emptyList(), SpotlightSource.RECENT,
+                games,
+                SpotlightSelectionMode.MANUAL,
+                emptyList(),
+                SpotlightSource.RECENT,
             ),
         )
         assertEquals(
             ImmersiveGalleryEmptyState.NO_PLAY_HISTORY,
             ImmersiveGalleryEditorPolicy.emptyState(
-                games, SpotlightSelectionMode.AUTOMATIC, emptyList(), SpotlightSource.RECENT,
+                games,
+                SpotlightSelectionMode.AUTOMATIC,
+                emptyList(),
+                SpotlightSource.RECENT,
             ),
         )
         assertEquals(
             ImmersiveGalleryEmptyState.NO_FAVORITES,
             ImmersiveGalleryEditorPolicy.emptyState(
-                games, SpotlightSelectionMode.AUTOMATIC, emptyList(), SpotlightSource.FAVORITES,
+                games,
+                SpotlightSelectionMode.AUTOMATIC,
+                emptyList(),
+                SpotlightSource.FAVORITES,
             ),
         )
     }

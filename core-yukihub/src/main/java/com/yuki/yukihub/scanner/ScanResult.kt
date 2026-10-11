@@ -10,21 +10,26 @@ import com.yuki.yukihub.model.EngineType
  * - `@JvmOverloads` 让 Java 调用方继续使用原 Java 的 6 个 telescoping 重载。
  * - `init` 块复刻原 10 参构造器的 null 归一化与 `xp3Candidates` 防御性拷贝。
  */
-data class ScanResult @JvmOverloads constructor(
-    @JvmField var title: String? = null,
-    @JvmField var uri: String? = null,
-    @JvmField var engine: EngineType? = null,
-    @JvmField var confidence: Int = 0,
-    @JvmField var launchTarget: String? = "",
-    @JvmField var coverUri: String? = "",
-    /** Multiple non-data XP3 candidates which require a user choice before import. */
-    @JvmField var xp3Candidates: List<String>? = null
-) {
-    init {
-        if (launchTarget == null) launchTarget = ""
-        if (coverUri == null) coverUri = ""
-        // 防御性拷贝：null → 空 ArrayList，非空 → 新 ArrayList 拷贝原列表元素。
-        // 使用 `?: emptyList()` 统一处理可空类型，避免对 `var` 属性 smart-cast 失败的告警。
-        xp3Candidates = ArrayList(xp3Candidates ?: emptyList())
+data class ScanResult
+    @JvmOverloads
+    constructor(
+        @JvmField var title: String? = null,
+        @JvmField var uri: String? = null,
+        @JvmField var engine: EngineType? = null,
+        @JvmField var confidence: Int = 0,
+        @JvmField var launchTarget: String? = "",
+        @JvmField var coverUri: String? = "",
+        /** Multiple non-data XP3 candidates which require a user choice before import. */
+        @JvmField var xp3Candidates: List<String>? = null,
+        /** The .exe files at the top of the folder, the game's likeliest one first; filled when one folder is looked at. */
+        @JvmField var exeCandidates: List<String>? = null,
+    ) {
+        init {
+            if (launchTarget == null) launchTarget = ""
+            if (coverUri == null) coverUri = ""
+            // 防御性拷贝：null → 空 ArrayList，非空 → 新 ArrayList 拷贝原列表元素。
+            // 使用 `?: emptyList()` 统一处理可空类型，避免对 `var` 属性 smart-cast 失败的告警。
+            xp3Candidates = ArrayList(xp3Candidates ?: emptyList())
+            exeCandidates = ArrayList(exeCandidates ?: emptyList())
+        }
     }
-}

@@ -1,6 +1,10 @@
 package com.kireibox.ui
-
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
+import com.kireibox.designsystem.KireiColors
+import com.kireibox.designsystem.KireiTokens
+import com.kireibox.designsystem.darkKireiColors
+import com.yuki.yukihub.settings.AccentChoice
 
 /**
  * Immersive home palette tokens. Dark and light are fully distinct so the immersive
@@ -19,7 +23,7 @@ data class ImmersivePalette(
     val secondary: Color,
     /** Glass surface fill. */
     val glass: Color,
-    /** Glass border (subtle white in dark, visible cool-purple in light). */
+    /** Glass border (subtle white in dark, neutral strong stroke in light). */
     val glassBorder: Color,
     /** Accent fill for controls. */
     val accent: Color,
@@ -43,56 +47,108 @@ data class ImmersivePalette(
     val glowAlpha: Float,
     /** Center-card glow alpha under reduced transparency. */
     val glowReducedAlpha: Float,
+    /**
+     * Dark pages: the accent's hue as a deep, saturated shade — what the dark room leans to (r4:
+     * 「氛围色」 + 紫色, see [ImmersiveDarkDepth]). Light pages: the accent (the light backdrop keeps
+     * the cover tone).
+     */
+    val atmosphere: Color = accent,
 )
 
 object ImmersivePaletteResolver {
-    fun resolve(isDark: Boolean): ImmersivePalette = if (isDark) dark() else light()
+    /** Token palette for [accent] (default purple); the app passes its resolved colors instead. */
+    fun resolve(
+        isDark: Boolean,
+        accent: AccentChoice = AccentChoice.DEFAULT,
+    ): ImmersivePalette {
+        val tone = KireiTokens.accent(accent, isDark)
+        return resolve(isDark, tone.accent, tone.onAccent)
+    }
 
-    private fun dark(): ImmersivePalette = ImmersivePalette(
-        isDark = true,
-        base = Color(0xFF05070D),
-        primary = Color.White,
-        secondary = Color.White.copy(alpha = .70f),
-        glass = Color(0x66121720),
-        glassBorder = Color.White.copy(alpha = .28f),
-        accent = Color(0xFF9B8CFF),
-        accentBright = Color(0xFFB8A7FF),
-        playInk = Color(0xFF21164E),
-        scrimStart = Color(0xF705070D),
-        scrimMid = Color(0xB805070D),
-        cardOverlayBottom = Color(0xF005070D),
-        blendAlpha = .38f,
-        radialAlpha = .28f,
-        radialReducedAlpha = .20f,
-        glowAlpha = .22f,
-        glowReducedAlpha = .16f,
-    )
+    /**
+     * Graphite palette whose accent, highlight and play ink follow the app accent ([accent] /
+     * [onAccent] from the resolved app palette), so the immersive home never hardcodes a hue.
+     */
+    fun resolve(
+        isDark: Boolean,
+        accent: Color,
+        onAccent: Color,
+    ): ImmersivePalette = if (isDark) dark(accent, onAccent) else light(accent, onAccent)
 
-    private fun light(): ImmersivePalette = ImmersivePalette(
-        isDark = false,
-        base = Color(0xFFF4F2F9),
-        primary = Color(0xFF18151F),
-        secondary = Color(0xFF6E6778),
-        glass = Color(0xB3FFFFFF),
-        glassBorder = Color(0x996750D8),
-        accent = Color(0xFF6C5CE7),
-        accentBright = Color(0xFF8F7BFF),
-        playInk = Color.White,
-        scrimStart = Color(0xF7F6F3FC),
-        scrimMid = Color(0xB8F6F3FC),
-        cardOverlayBottom = Color(0xF005070D),
-        blendAlpha = .26f,
-        radialAlpha = .18f,
-        radialReducedAlpha = .12f,
-        glowAlpha = .14f,
-        glowReducedAlpha = .10f,
-    )
+    private fun dark(
+        accent: Color,
+        onAccent: Color,
+    ): ImmersivePalette {
+        // As dark as the graphite DarkBase, in the accent's hue (alpha.17's #05070D was blue-black).
+        val base = immersiveDarkBase(accent)
+        val ink = KireiTokens.DarkNeutrals.text
+        return ImmersivePalette(
+            isDark = true,
+            base = base,
+            primary = ink,
+            secondary = ink.copy(alpha = .70f),
+            glass = KireiTokens.Immersive.DarkGlass,
+            glassBorder = Color.White.copy(alpha = .28f),
+            accent = accent,
+            accentBright = lerp(accent, Color.White, DARK_HIGHLIGHT_MIX),
+            playInk = onAccent,
+            scrimStart = base.copy(alpha = .97f),
+            scrimMid = base.copy(alpha = .72f),
+            // Cover-internal overlay: the neutral graphite in both themes (cover readability).
+            cardOverlayBottom = KireiTokens.Immersive.DarkBase.copy(alpha = CARD_OVERLAY_ALPHA),
+            blendAlpha = .38f,
+            radialAlpha = .28f,
+            radialReducedAlpha = .20f,
+            glowAlpha = .22f,
+            glowReducedAlpha = .16f,
+            atmosphere = immersiveAccentShade(accent, ImmersiveDarkDepth.ATMOSPHERE_SATURATION, ImmersiveDarkDepth.ATMOSPHERE_LUMINANCE),
+        )
+    }
+
+    private fun light(
+        accent: Color,
+        onAccent: Color,
+    ): ImmersivePalette {
+        val base = KireiTokens.Immersive.LightBase
+        return ImmersivePalette(
+            isDark = false,
+            base = base,
+            primary = KireiTokens.LightNeutrals.text,
+            secondary = KireiTokens.LightNeutrals.secondary,
+            glass = KireiTokens.Immersive.LightGlass,
+            glassBorder = KireiTokens.LightNeutrals.strokeStrong,
+            accent = accent,
+            accentBright = lerp(accent, Color.White, LIGHT_HIGHLIGHT_MIX),
+            playInk = onAccent,
+            scrimStart = base.copy(alpha = .97f),
+            scrimMid = base.copy(alpha = .72f),
+            // Cover-internal overlay stays dark in both themes for cover readability.
+            cardOverlayBottom = KireiTokens.Immersive.DarkBase.copy(alpha = CARD_OVERLAY_ALPHA),
+            blendAlpha = .26f,
+            radialAlpha = .18f,
+            radialReducedAlpha = .12f,
+            glowAlpha = .14f,
+            glowReducedAlpha = .10f,
+        )
+    }
+
+    private const val DARK_HIGHLIGHT_MIX = .22f
+    private const val LIGHT_HIGHLIGHT_MIX = .18f
+    private const val CARD_OVERLAY_ALPHA = .94f
 }
 
 /**
- * Immersive chrome (global Dock) palette: the dark theme keeps the chrome-dark palette
- * that always sits on the dark immersive backdrop; the light theme uses the app palette
+ * Immersive chrome (global Dock) palette: the dark theme uses the graphite dark palette on the
+ * immersive base (keeping the app's accent and contrast), the light theme uses the app palette
  * so the Dock matches the light immersive page instead of being forced dark.
  */
 internal fun immersiveDockKireiColors(appColors: KireiColors): KireiColors =
-    if (appColors.isDark) darkKireiColors() else appColors
+    if (appColors.isDark) {
+        darkKireiColors(highContrast = appColors.highContrast).copy(
+            accent = appColors.accent,
+            onAccent = appColors.onAccent,
+            accentContainer = appColors.accentContainer,
+        )
+    } else {
+        appColors
+    }

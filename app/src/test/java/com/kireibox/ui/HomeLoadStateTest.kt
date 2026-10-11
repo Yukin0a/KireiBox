@@ -30,30 +30,31 @@ class HomeLoadStateTest {
         Dispatchers.resetMain()
     }
 
-    private fun snapshot(): YukiSettingsStore.Snapshot = YukiSettingsStore.Snapshot(
-        scanRoots = emptyList(),
-        scanRootEnabled = emptyList(),
-        useBuiltinFileChooser = true,
-        startupScanDepth = 2,
-        autoScanOnStartup = false,
-        sortMode = "",
-        engineLabelPosition = "",
-        metadataSource = "",
-        bangumiToken = "",
-        krEngineVersion = "",
-        krCompatMode = false,
-        krSkipStartupInfoDialog = false,
-        artemisScopedSaveDir = true,
-        tyranoScopedSaveDir = true,
-        darkMode = true,
-        motionMode = MotionMode.AUTO,
-        reducedMotion = false,
-        reducedTransparency = false,
-        increasedContrast = false,
-        dashboardCompact = DashboardLayouts.default(DashboardProfile.COMPACT),
-        dashboardWide = DashboardLayouts.default(DashboardProfile.WIDE),
-        homePresentationMode = HomePresentationMode.IMMERSIVE,
-    )
+    private fun snapshot(): YukiSettingsStore.Snapshot =
+        YukiSettingsStore.Snapshot(
+            scanRoots = emptyList(),
+            scanRootEnabled = emptyList(),
+            useBuiltinFileChooser = true,
+            startupScanDepth = 2,
+            autoScanOnStartup = false,
+            sortMode = "",
+            engineLabelPosition = "",
+            metadataSource = "",
+            bangumiToken = "",
+            krEngineVersion = "",
+            krCompatMode = false,
+            krSkipStartupInfoDialog = false,
+            artemisScopedSaveDir = true,
+            tyranoScopedSaveDir = true,
+            darkMode = true,
+            motionMode = MotionMode.AUTO,
+            reducedMotion = false,
+            reducedTransparency = false,
+            increasedContrast = false,
+            dashboardCompact = DashboardLayouts.default(DashboardProfile.COMPACT),
+            dashboardWide = DashboardLayouts.default(DashboardProfile.WIDE),
+            homePresentationMode = HomePresentationMode.IMMERSIVE,
+        )
 
     private fun payload(games: List<Game> = emptyList()): ReloadPayload =
         ReloadPayload(
@@ -79,28 +80,31 @@ class HomeLoadStateTest {
     }
 
     @Test
-    fun `successful reload marks loaded and empty success`() = runTest {
-        val vm = viewModel { payload(emptyList()) }
-        vm.reloadInternal()
-        assertEquals(HomeLoadState.LOADED, vm.state.value.homeLoadState)
-        assertNull(vm.state.value.homeLoadError)
-        assertTrue(vm.state.value.games.isEmpty())
-    }
+    fun `successful reload marks loaded and empty success`() =
+        runTest {
+            val vm = viewModel { payload(emptyList()) }
+            vm.reloadInternal()
+            assertEquals(HomeLoadState.LOADED, vm.state.value.homeLoadState)
+            assertNull(vm.state.value.homeLoadError)
+            assertTrue(vm.state.value.games.isEmpty())
+        }
 
     @Test
-    fun `failed reload keeps games and transports repository error`() = runTest {
-        var fail = false
-        val vm = viewModel {
-            if (fail) throw IllegalStateException("simulated repository failure") else payload(listOf(Game()))
-        }
-        vm.reloadInternal()
-        assertEquals(HomeLoadState.LOADED, vm.state.value.homeLoadState)
-        assertEquals(1, vm.state.value.games.size)
+    fun `failed reload keeps games and transports repository error`() =
+        runTest {
+            var fail = false
+            val vm =
+                viewModel {
+                    if (fail) throw IllegalStateException("simulated repository failure") else payload(listOf(Game()))
+                }
+            vm.reloadInternal()
+            assertEquals(HomeLoadState.LOADED, vm.state.value.homeLoadState)
+            assertEquals(1, vm.state.value.games.size)
 
-        fail = true
-        vm.reloadInternal()
-        assertEquals(HomeLoadState.RELOAD_FAILED, vm.state.value.homeLoadState)
-        assertEquals("simulated repository failure", vm.state.value.homeLoadError)
-        assertEquals(1, vm.state.value.games.size)
-    }
+            fail = true
+            vm.reloadInternal()
+            assertEquals(HomeLoadState.RELOAD_FAILED, vm.state.value.homeLoadState)
+            assertEquals("simulated repository failure", vm.state.value.homeLoadError)
+            assertEquals(1, vm.state.value.games.size)
+        }
 }

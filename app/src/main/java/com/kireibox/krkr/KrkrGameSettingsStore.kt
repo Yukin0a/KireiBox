@@ -1,6 +1,8 @@
 package com.kireibox.krkr
 
 import android.content.Context
+import com.yuki.yukihub.launcherbridge.LauncherKrkrBridge
+import com.yuki.yukihub.launcherbridge.LauncherKrkrGameOverrides
 import com.yuki.yukihub.model.Game
 import com.yuki.yukihub.storage.StorageNode
 import com.yuki.yukihub.storage.StorageNodes
@@ -24,12 +26,23 @@ data class KrkrGameSettings(
     val keepScreenAwake: Boolean = true,
     val textureCompression: Boolean = false,
     val forceDefaultFont: Boolean = false,
-    val defaultFont: String = ""
+    val defaultFont: String = "",
+    /** Skip the startup info dialog for this game; a game that was never changed shows the global setting's value. */
+    val skipStartupDialog: Boolean = false,
+    /** Font size multiplier written into the game's patch.tjs; 1 = untouched. */
+    val fontScale: Float = KrkrFontScalePatch.OFF
 )
 
 /** Original YukiHub Kirikiroid2Preference.xml semantics, isolated from Config.tjs. */
 class KrkrGameSettingsStore(private val context: Context) {
     fun load(game: Game): KrkrGameSettings {
+        val fontScale = KrkrFontScalePatch.snap(LauncherKrkrGameOverrides.fontScale(context, game.id) ?: KrkrFontScalePatch.OFF)
+        return loadPreferenceFile(game).copy(skipStartupDialog = effectiveStartupPolicy(game) == SKIP_POLICY, fontScale = fontScale)
+    }
+
+    private fun effectiveStartupPolicy(game: Game): String = LauncherKrkrGameOverrides.startupDialogPolicy(context, game.id) ?: LauncherKrkrBridge.getStartupDialogPolicy(context)
+
+    private fun loadPreferenceFile(game: Game): KrkrGameSettings {
         val file = preferenceFile(game, create = false) ?: return KrkrGameSettings()
         return runCatching {
             val values = LinkedHashMap<String, String>()
@@ -58,47 +71,83 @@ class KrkrGameSettingsStore(private val context: Context) {
         }.getOrDefault(KrkrGameSettings())
     }
 
-    fun save(game: Game, settings: KrkrGameSettings): Result<Unit> = runCatching {
-        val file = preferenceFile(game, create = true) ?: error("无法访问游戏目录")
-        val values = linkedMapOf(
-            "menu_handler_opa" to settings.menuOpacity.toString(),
-            "vcursor_scale" to settings.cursorScale.toString(),
-            "renderer" to settings.renderer,
-            "memusage" to settings.memoryUsage,
-            "render_thread" to settings.renderThread,
-            "fps_limit" to settings.fpsLimit.toString(),
-            "outputlog" to if (settings.outputLog) "1" else "0",
-            "showfps" to if (settings.showFps) "1" else "0",
-            "keep_screen_alive" to if (settings.keepScreenAwake) "1" else "0",
-            "texture_compress" to if (settings.textureCompression) "1" else "0",
-            "force_default_font" to if (settings.forceDefaultFont) "1" else "0",
-            "default_font" to settings.defaultFont
-        )
-        val builder = DocumentBuilderFactory.newInstance().newDocumentBuilder()
-        val doc = builder.newDocument()
-        val root = doc.createElement("GlobalPreference")
-        doc.appendChild(root)
-        for ((key, value) in values) {
-            val item = doc.createElement("Item")
-            item.setAttribute("Key", key)
-            item.setAttribute("Value", value)
-            root.appendChild(item)
+    fun save(
+        game: Game,
+        settings: KrkrGameSettings
+    ): Result<Unit> =
+        runCatching {
+            // Kept in the app's prefs, so it is saved even when the game folder cannot be written.
+            saveStartupDialog(game, settings.skipStartupDialog)
+            saveFontScale(game, settings.fontScale)
+            val file = preferenceFile(game, create = true) ?: error("无法访问游戏目录")
+            val values =
+                linkedMapOf(
+                    "menu_handler_opa" to settings.menuOpacity.toString(),
+                    "vcursor_scale" to settings.cursorScale.toString(),
+                    "renderer" to settings.renderer,
+                    "memusage" to settings.memoryUsage,
+                    "render_thread" to settings.renderThread,
+                    "fps_limit" to settings.fpsLimit.toString(),
+                    "outputlog" to if (settings.outputLog) "1" else "0",
+                    "showfps" to if (settings.showFps) "1" else "0",
+                    "keep_screen_alive" to if (settings.keepScreenAwake) "1" else "0",
+                    "texture_compress" to if (settings.textureCompression) "1" else "0",
+                    "force_default_font" to if (settings.forceDefaultFont) "1" else "0",
+                    "default_font" to settings.defaultFont
+                )
+            val builder = DocumentBuilderFactory.newInstance().newDocumentBuilder()
+            val doc = builder.newDocument()
+            val root = doc.createElement("GlobalPreference")
+            doc.appendChild(root)
+            for ((key, value) in values) {
+                val item = doc.createElement("Item")
+                item.setAttribute("Key", key)
+                item.setAttribute("Value", value)
+                root.appendChild(item)
+            }
+            file.openOutputStream(context)?.use { output ->
+                TransformerFactory.newInstance().newTransformer().apply {
+                    setOutputProperty(OutputKeys.ENCODING, "UTF-8")
+                    setOutputProperty(OutputKeys.INDENT, "yes")
+                }.transform(DOMSource(doc), StreamResult(output))
+            } ?: error("无法写入 KRKR 设置")
         }
-        file.openOutputStream(context)?.use { output ->
-            TransformerFactory.newInstance().newTransformer().apply {
-                setOutputProperty(OutputKeys.ENCODING, "UTF-8")
-                setOutputProperty(OutputKeys.INDENT, "yes")
-            }.transform(DOMSource(doc), StreamResult(output))
-        } ?: error("无法写入 KRKR 设置")
+
+    /** The multiplier is kept in the app's prefs, and written to (or removed from) the game's patch.tjs now; it also re-syncs at launch. */
+    private fun saveFontScale(
+        game: Game,
+        scale: Float
+    ) {
+        val snapped = KrkrFontScalePatch.snap(scale)
+        LauncherKrkrGameOverrides.setFontScale(context, game.id, snapped.takeIf { it != KrkrFontScalePatch.OFF })
+        KrkrFontScalePatch.apply(context, game, snapped).getOrThrow()
     }
 
-    private fun preferenceFile(game: Game, create: Boolean): StorageNode? {
+    /** Only a value that differs from the global setting is stored, so a game keeps following later global changes. */
+    private fun saveStartupDialog(
+        game: Game,
+        skip: Boolean
+    ) {
+        val policy = if (skip) SKIP_POLICY else LauncherKrkrBridge.DIALOG_POLICY_SHOW_ALL
+        val global = LauncherKrkrBridge.getStartupDialogPolicy(context)
+        LauncherKrkrGameOverrides.setStartupDialogPolicy(context, game.id, policy.takeIf { it != global })
+    }
+
+    private fun preferenceFile(
+        game: Game,
+        create: Boolean
+    ): StorageNode? {
         val rootUri = game.rootUri?.takeIf(String::isNotBlank) ?: return null
         val root = runCatching { StorageNodes.resolve(context, rootUri) }.getOrNull() ?: return null
         return root.findChild(FILE_NAME) ?: if (create) {
             root.createFile(context, "text/xml", FILE_NAME)
-        } else null
+        } else {
+            null
+        }
     }
 
-    companion object { private const val FILE_NAME = "Kirikiroid2Preference.xml" }
+    companion object {
+        private const val FILE_NAME = "Kirikiroid2Preference.xml"
+        private const val SKIP_POLICY = LauncherKrkrBridge.DIALOG_POLICY_SKIP_SINGLE_BUTTON_STARTUP_INFO
+    }
 }

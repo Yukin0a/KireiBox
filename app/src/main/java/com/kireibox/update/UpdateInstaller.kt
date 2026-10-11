@@ -24,6 +24,7 @@ internal data class UpdatePackageMetadata(
 
 internal sealed interface UpdatePackageValidation {
     data object Valid : UpdatePackageValidation
+
     data class Invalid(val message: String) : UpdatePackageValidation
 }
 
@@ -90,11 +91,16 @@ internal object UpdatePackagePolicy {
 internal class UpdateInstaller(private val context: Context) {
     private val packageManager: PackageManager get() = context.packageManager
 
-    fun validate(file: File, release: UpdateRelease): UpdatePackageValidation {
-        val archive = inspectArchive(file)
-            ?: return UpdatePackageValidation.Invalid("无法读取更新 APK")
-        val installed = installedPackageMetadata()
-            ?: return UpdatePackageValidation.Invalid("无法读取当前应用签名")
+    fun validate(
+        file: File,
+        release: UpdateRelease
+    ): UpdatePackageValidation {
+        val archive =
+            inspectArchive(file)
+                ?: return UpdatePackageValidation.Invalid("无法读取更新 APK")
+        val installed =
+            installedPackageMetadata()
+                ?: return UpdatePackageValidation.Invalid("无法读取当前应用签名")
         return release.manifest?.let { manifest ->
             UpdatePackagePolicy.validate(
                 installedVersionCode = installed.versionCode,
@@ -114,19 +120,20 @@ internal class UpdateInstaller(private val context: Context) {
         )
     }
 
-    fun canRequestPackageInstalls(): Boolean =
-        Build.VERSION.SDK_INT < Build.VERSION_CODES.O || packageManager.canRequestPackageInstalls()
+    fun canRequestPackageInstalls(): Boolean = Build.VERSION.SDK_INT < Build.VERSION_CODES.O || packageManager.canRequestPackageInstalls()
 
-    fun unknownSourcesSettingsIntent(): Intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
-        data = Uri.parse("package:${context.packageName}")
-    }
+    fun unknownSourcesSettingsIntent(): Intent =
+        Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+            data = Uri.parse("package:${context.packageName}")
+        }
 
     fun installIntent(file: File): Intent {
-        val uri = FileProvider.getUriForFile(
-            context,
-            "${context.packageName}.fileprovider",
-            file,
-        )
+        val uri =
+            FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                file,
+            )
         return Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(uri, "application/vnd.android.package-archive")
             clipData = ClipData.newRawUri("KireiBox update", uri)
@@ -149,21 +156,27 @@ internal class UpdateInstaller(private val context: Context) {
     }
 
     @Suppress("DEPRECATION")
-    private fun packageMetadata(info: PackageInfo, abis: List<String>): UpdatePackageMetadata? {
-        val signatures = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            info.signingInfo?.apkContentsSigners.orEmpty()
-        } else {
-            info.signatures.orEmpty()
-        }
+    private fun packageMetadata(
+        info: PackageInfo,
+        abis: List<String>
+    ): UpdatePackageMetadata? {
+        val signatures =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                info.signingInfo?.apkContentsSigners.orEmpty()
+            } else {
+                info.signatures.orEmpty()
+            }
         if (signatures.size != 1) return null
-        val signer = MessageDigest.getInstance("SHA-256")
-            .digest(signatures.single().toByteArray())
-            .joinToString("") { "%02x".format(it) }
-        val versionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            info.longVersionCode.toInt()
-        } else {
-            info.versionCode
-        }
+        val signer =
+            MessageDigest.getInstance("SHA-256")
+                .digest(signatures.single().toByteArray())
+                .joinToString("") { "%02x".format(it) }
+        val versionCode =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                info.longVersionCode.toInt()
+            } else {
+                info.versionCode
+            }
         return UpdatePackageMetadata(
             packageName = info.packageName,
             versionCode = versionCode,
@@ -174,21 +187,23 @@ internal class UpdateInstaller(private val context: Context) {
         )
     }
 
-    private fun apkAbis(file: File): List<String> = runCatching {
-        ZipFile(file).use { zip ->
-            zip.entries().asSequence()
-                .map { it.name }
-                .filter { it.startsWith("lib/") && it.endsWith(".so") }
-                .mapNotNull { it.split('/').getOrNull(1) }
-                .distinct()
-                .toList()
-        }
-    }.getOrDefault(emptyList())
+    private fun apkAbis(file: File): List<String> =
+        runCatching {
+            ZipFile(file).use { zip ->
+                zip.entries().asSequence()
+                    .map { it.name }
+                    .filter { it.startsWith("lib/") && it.endsWith(".so") }
+                    .mapNotNull { it.split('/').getOrNull(1) }
+                    .distinct()
+                    .toList()
+            }
+        }.getOrDefault(emptyList())
 
     @Suppress("DEPRECATION")
-    private fun signingFlags(): Int = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-        PackageManager.GET_SIGNING_CERTIFICATES
-    } else {
-        PackageManager.GET_SIGNATURES
-    }
+    private fun signingFlags(): Int =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            PackageManager.GET_SIGNING_CERTIFICATES
+        } else {
+            PackageManager.GET_SIGNATURES
+        }
 }

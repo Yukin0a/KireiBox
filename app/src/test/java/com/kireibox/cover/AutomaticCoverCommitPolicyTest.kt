@@ -17,7 +17,10 @@ class AutomaticCoverCommitPolicyTest {
         assertFalse(AutomaticCoverCommitPolicy.canCommit(game(bindingMode = "DISABLED")))
     }
 
-    private fun game(coverUri: String? = null, bindingMode: String) = Game(
+    private fun game(
+        coverUri: String? = null,
+        bindingMode: String
+    ) = Game(
         id = 1,
         title = "Game",
         coverUri = coverUri,

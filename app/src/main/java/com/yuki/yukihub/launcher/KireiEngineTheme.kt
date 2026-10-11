@@ -1,18 +1,70 @@
 package com.yuki.yukihub.launcher
 
 import android.content.Context
-import android.graphics.Color
+import androidx.compose.ui.graphics.toArgb
+import com.kireibox.app.LauncherActivity
+import com.kireibox.designsystem.KireiTokens
+import com.yuki.yukihub.settings.AccentChoice
+import com.yuki.yukihub.settings.AppearanceSettings
+import com.yuki.yukihub.settings.ThemeMode
+import com.yuki.yukihub.settings.ThemeModePolicy
 
-/** Minimal engine handoff palette, independent from the removed legacy view theme layer. */
+/**
+ * Engine handoff palette: the colors the launchers pass as intent extras (`primaryColor`,
+ * `themeColor*`), used by the engines for the launch progress ring and the KRKR in-game dialogs.
+ * It is derived from the same design tokens and the same resolved light/dark state as the app
+ * (stored theme mode, SYSTEM following the device night mode), so the `darkMode` extra and the
+ * colors always agree and games no longer launch with the retired purple palette.
+ */
 internal object KireiEngineTheme {
-    private fun dark(context: Context): Boolean =
-        context.getSharedPreferences("yukihub_prefs", Context.MODE_PRIVATE)
-            .getBoolean("launcher_dark_mode", true)
+    /** ARGB colors for one resolved theme and accent. */
+    data class Palette(
+        val primary: Int,
+        val onPrimary: Int,
+        val background: Int,
+        val card: Int,
+        val text: Int,
+        val textMuted: Int,
+    )
 
-    fun primary(context: Context): Int = Color.parseColor(if (dark(context)) "#B3ACFF" else "#5B45C7")
-    fun onPrimary(context: Context): Int = Color.parseColor(if (dark(context)) "#211A4A" else "#FFFFFF")
-    fun background(context: Context): Int = Color.parseColor(if (dark(context)) "#000000" else "#F5F4F8")
-    fun card(context: Context): Int = Color.parseColor(if (dark(context)) "#1C1C1E" else "#FFFFFF")
-    fun text(context: Context): Int = Color.parseColor(if (dark(context)) "#F5F5F7" else "#1C1C1E")
-    fun textMuted(context: Context): Int = Color.parseColor(if (dark(context)) "#B7B4C0" else "#6E6E73")
+    fun palette(
+        dark: Boolean,
+        accent: AccentChoice,
+    ): Palette {
+        val neutrals = KireiTokens.neutrals(dark)
+        val tone = KireiTokens.accent(accent, dark)
+        return Palette(
+            primary = tone.accent.toArgb(),
+            onPrimary = tone.onAccent.toArgb(),
+            background = neutrals.background.toArgb(),
+            card = neutrals.surface.toArgb(),
+            text = neutrals.text.toArgb(),
+            textMuted = neutrals.secondary.toArgb(),
+        )
+    }
+
+    /** Same resolution as LauncherActivity.isLauncherDarkMode: SYSTEM follows [systemNight]. */
+    fun palette(
+        themeMode: ThemeMode,
+        systemNight: Boolean,
+        accent: AccentChoice,
+    ): Palette = palette(ThemeModePolicy.isDark(themeMode, systemNight), accent)
+
+    private fun palette(context: Context): Palette =
+        palette(
+            dark = LauncherActivity.isLauncherDarkMode(context),
+            accent = AppearanceSettings.readAccentChoice(context.getSharedPreferences(LauncherActivity.APP_PREFS, Context.MODE_PRIVATE)),
+        )
+
+    fun primary(context: Context): Int = palette(context).primary
+
+    fun onPrimary(context: Context): Int = palette(context).onPrimary
+
+    fun background(context: Context): Int = palette(context).background
+
+    fun card(context: Context): Int = palette(context).card
+
+    fun text(context: Context): Int = palette(context).text
+
+    fun textMuted(context: Context): Int = palette(context).textMuted
 }

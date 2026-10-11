@@ -6,7 +6,8 @@ import android.net.Uri
 import android.os.Environment
 import android.provider.DocumentsContract
 import android.util.Log
-import com.apps.LauncherActivity
+import com.kireibox.app.LauncherActivity
+import com.yuki.yukihub.launcherbridge.LauncherEngineOptions
 import com.yuki.yukihub.launcherbridge.LauncherOnsGameSettingsBridge
 import com.yuki.yukihub.ons.OnsSettings
 import com.yuki.yukihub.tyrano.TyranoActivity
@@ -18,13 +19,24 @@ import java.util.Locale
 internal object ScriptEngineLaunchers {
     private const val TAG = "EmulatorLauncher"
     private const val PREFS_NAME = "yukihub_prefs"
-    private val onsBootNames = setOf(
-        "0.txt", "00.txt", "nscr_sec.dat", "nscript.dat", "onscript.nt2", "onscript.nt3",
-        "arc.nsa", "arc.sar",
-    )
+    private val onsBootNames =
+        setOf(
+            "0.txt",
+            "00.txt",
+            "nscr_sec.dat",
+            "nscript.dat",
+            "onscript.nt2",
+            "onscript.nt3",
+            "arc.nsa",
+            "arc.sar",
+        )
 
     @JvmStatic
-    fun buildTyranoIntent(context: Context, gamePath: String?, launchTarget: String?): Intent {
+    fun buildTyranoIntent(
+        context: Context,
+        gamePath: String?,
+        launchTarget: String?
+    ): Intent {
         val resolvedPath = resolveTyranoGameDirectory(gamePath, launchTarget)
         val path = stripFileScheme(resolvedPath)
         val scoped = isTyranoScopedSaveEnabled(context)
@@ -46,7 +58,9 @@ internal object ScriptEngineLaunchers {
             putExtra("launchTarget", launchTarget)
             putExtra("type", "Tyrano")
             putExtra("launchMode", "internal.tyrano")
-            putExtra("orientation", 6)
+            putExtra("orientation", LauncherEngineOptions.orientation(context))
+            putExtra("keepScreenOn", LauncherEngineOptions.tyranoKeepScreenOn(context))
+            putExtra("ignoreCutout", LauncherEngineOptions.tyranoIgnoreCutout(context))
             putExtra("scopedSaveDir", scoped)
             putExtra("scopedSaveRoot", save.directory.absolutePath)
             addFlags(engineIntentFlags())
@@ -55,18 +69,22 @@ internal object ScriptEngineLaunchers {
     }
 
     @JvmStatic
-    fun resolveTyranoGameDirectory(rootUri: String?, launchTarget: String?): String? {
+    fun resolveTyranoGameDirectory(
+        rootUri: String?,
+        launchTarget: String?
+    ): String? {
         val rootPath = uriToFilePath(rootUri)
         if (rootPath.isNullOrEmpty()) return rootUri
         val target = launchTarget?.trim().orEmpty()
         if (target.isEmpty() || target == "[游戏目录]" || target.equals("DIR", ignoreCase = true)) {
             return rootPath
         }
-        val targetFile = if (target.startsWith('/') || target.startsWith("file://")) {
-            File(requireNotNull(stripFileScheme(target)))
-        } else {
-            File(rootPath, target)
-        }
+        val targetFile =
+            if (target.startsWith('/') || target.startsWith("file://")) {
+                File(requireNotNull(stripFileScheme(target)))
+            } else {
+                File(rootPath, target)
+            }
         return if (targetFile.isFile) targetFile.parent else targetFile.absolutePath
     }
 
@@ -100,6 +118,8 @@ internal object ScriptEngineLaunchers {
         return Intent(context, ONScripter::class.java).apply {
             putStringArrayListExtra(OnsSettings.EXTRA_GAME_ARGS, settings.buildArgs(context, root, save.directory))
             putExtra(OnsSettings.EXTRA_IGNORE_CUTOUT, settings.ignoreCutout)
+            putExtra(OnsSettings.EXTRA_KEEP_SCREEN_ON, settings.keepScreenOn)
+            putExtra("orientation", LauncherEngineOptions.orientation(context))
             putExtra("path", root)
             putExtra("gamePath", root)
             putExtra("rootUri", gamePath)
@@ -140,12 +160,18 @@ internal object ScriptEngineLaunchers {
     }
 
     @JvmStatic
-    fun resolveOnsSaveDirectory(context: Context, rootPath: String?, scoped: Boolean): File? =
-        resolveOnsSaveLocation(context, rootPath, scoped).directory
+    fun resolveOnsSaveDirectory(
+        context: Context,
+        rootPath: String?,
+        scoped: Boolean
+    ): File? = resolveOnsSaveLocation(context, rootPath, scoped).directory
 
     @JvmStatic
-    fun resolveTyranoSaveDirectory(context: Context?, gameDirectory: String?, scoped: Boolean): File? =
-        resolveTyranoSaveLocation(context, gameDirectory, scoped).directory
+    fun resolveTyranoSaveDirectory(
+        context: Context?,
+        gameDirectory: String?,
+        scoped: Boolean
+    ): File? = resolveTyranoSaveLocation(context, gameDirectory, scoped).directory
 
     private fun validateOnsArchiveLayout(rootPath: String): String? {
         val root = File(rootPath)
@@ -153,32 +179,44 @@ internal object ScriptEngineLaunchers {
         val extra = File(root, "arc1.nsa")
         return if (base.isFile && base.length() > 0 && extra.isFile && extra.length() == 0L) {
             "游戏资源不完整：arc1.nsa 为 0 字节。请重新解压或重新导入完整游戏目录。"
-        } else null
+        } else {
+            null
+        }
     }
 
-    private fun findOnsBootEntry(directory: File?): String? = directory
-        ?.takeIf(File::isDirectory)
-        ?.listFiles()
-        ?.firstOrNull { it?.isFile == true && it.name?.lowercase(Locale.ROOT) in onsBootNames }
-        ?.name
+    private fun findOnsBootEntry(directory: File?): String? =
+        directory
+            ?.takeIf(File::isDirectory)
+            ?.listFiles()
+            ?.firstOrNull { it?.isFile == true && it.name?.lowercase(Locale.ROOT) in onsBootNames }
+            ?.name
 
-    private fun describeDirectory(directory: File?, maxEntries: Int): String {
+    private fun describeDirectory(
+        directory: File?,
+        maxEntries: Int
+    ): String {
         directory ?: return "<null>"
         val files = directory.listFiles() ?: return "<unavailable>"
         val limit = maxEntries.coerceAtLeast(1)
-        val entries = files.take(limit).joinToString(", ") { file ->
-            if (file == null) "<null>" else file.name + if (file.isDirectory) "/" else ""
-        }
+        val entries =
+            files.take(limit).joinToString(", ") { file ->
+                if (file == null) "<null>" else file.name + if (file.isDirectory) "/" else ""
+            }
         return "[$entries${if (files.size > limit) ", … total=${files.size}" else ""}]"
     }
 
     @JvmStatic
-    fun resolveOnsSaveLocation(context: Context, rootPath: String?, scoped: Boolean): SaveLocation {
-        val directory = if (scoped) {
-            OnsSettings.resolveScopedSaveDirectory(context, rootPath)
-        } else {
-            OnsSettings.resolveGameSaveDirectory(rootPath)
-        }
+    fun resolveOnsSaveLocation(
+        context: Context,
+        rootPath: String?,
+        scoped: Boolean
+    ): SaveLocation {
+        val directory =
+            if (scoped) {
+                OnsSettings.resolveScopedSaveDirectory(context, rootPath)
+            } else {
+                OnsSettings.resolveGameSaveDirectory(rootPath)
+            }
         return if (directory == null) {
             SaveLocation.unavailable(
                 if (scoped) "ONS 应用独立存储目录不可用" else "ONS 游戏目录不可用或不是可写的本地目录",
@@ -201,8 +239,9 @@ internal object ScriptEngineLaunchers {
             val root = File(stripFileScheme(gameDirectory).orEmpty()).canonicalFile
             if (!root.isDirectory) return SaveLocation.unavailable("Tyrano 游戏目录不可用")
             if (scoped) {
-                val external = context?.getExternalFilesDir(null)
-                    ?: return SaveLocation.unavailable("Tyrano 应用独立存储目录不可用")
+                val external =
+                    context?.getExternalFilesDir(null)
+                        ?: return SaveLocation.unavailable("Tyrano 应用独立存储目录不可用")
                 SaveLocation.available(
                     File(File(File(external, "save"), "tyrano"), safeSaveName(root.absolutePath)),
                     "Tyrano 应用独立存档目录",
@@ -224,7 +263,10 @@ internal object ScriptEngineLaunchers {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .getBoolean("tyrano_scoped_save_dir", true)
 
-    private fun ensureWritable(directory: File, engine: String) {
+    private fun ensureWritable(
+        directory: File,
+        engine: String
+    ) {
         if (!directory.exists() && !directory.mkdirs()) {
             throw IllegalStateException("无法创建 $engine 存档目录：${directory.absolutePath}")
         }
@@ -233,7 +275,10 @@ internal object ScriptEngineLaunchers {
         }
     }
 
-    private fun appendThemeColors(intent: Intent, context: Context) {
+    private fun appendThemeColors(
+        intent: Intent,
+        context: Context
+    ) {
         try {
             val primary = KireiEngineTheme.primary(context)
             intent.putExtra("primaryColor", primary)
@@ -248,17 +293,21 @@ internal object ScriptEngineLaunchers {
         }
     }
 
-    private fun engineIntentFlags(): Int = Intent.FLAG_ACTIVITY_NEW_TASK or
-        Intent.FLAG_GRANT_READ_URI_PERMISSION or
-        Intent.FLAG_GRANT_WRITE_URI_PERMISSION or
-        Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION or
-        Intent.FLAG_GRANT_PREFIX_URI_PERMISSION
+    private fun engineIntentFlags(): Int =
+        Intent.FLAG_ACTIVITY_NEW_TASK or
+            Intent.FLAG_GRANT_READ_URI_PERMISSION or
+            Intent.FLAG_GRANT_WRITE_URI_PERMISSION or
+            Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION or
+            Intent.FLAG_GRANT_PREFIX_URI_PERMISSION
 
     private fun logInfo(message: String) {
         runCatching { Log.i(TAG, message) }
     }
 
-    private fun logWarn(message: String, error: Throwable? = null) {
+    private fun logWarn(
+        message: String,
+        error: Throwable? = null
+    ) {
         runCatching { if (error == null) Log.w(TAG, message) else Log.w(TAG, message, error) }
     }
 
@@ -283,7 +332,11 @@ internal object ScriptEngineLaunchers {
         @JvmField val available: Boolean,
     ) {
         companion object {
-            fun available(directory: File, description: String) = SaveLocation(directory, description, true)
+            fun available(
+                directory: File,
+                description: String
+            ) = SaveLocation(directory, description, true)
+
             fun unavailable(description: String) = SaveLocation(null, description, false)
         }
     }
@@ -312,14 +365,15 @@ internal object ScriptEngineLaunchers {
                     val colon = documentId.indexOf(':')
                     val volume = if (colon >= 0) documentId.substring(0, colon) else documentId
                     val relative = if (colon >= 0) documentId.substring(colon + 1) else ""
-                    val candidate = if (isInternalVolume(volume)) {
-                        val base = internalStorageBase()
-                        if (relative.isEmpty()) base else "$base/$relative"
-                    } else if (volume.isNotEmpty()) {
-                        if (relative.isEmpty()) "/storage/$volume" else "/storage/$volume/$relative"
-                    } else {
-                        null
-                    }
+                    val candidate =
+                        if (isInternalVolume(volume)) {
+                            val base = internalStorageBase()
+                            if (relative.isEmpty()) base else "$base/$relative"
+                        } else if (volume.isNotEmpty()) {
+                            if (relative.isEmpty()) "/storage/$volume" else "/storage/$volume/$relative"
+                        } else {
+                            null
+                        }
                     if (candidate != null) {
                         if (File(candidate).exists()) return candidate
                         val base = internalStorageBase()

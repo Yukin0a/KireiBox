@@ -43,10 +43,11 @@ internal object PortraitCoverPolicy {
                 offsetYPx = 0f,
             )
         }
-        val scale = minOf(
-            targetWidthPx / srcWidthPx,
-            targetHeightPx / srcHeightPx,
-        )
+        val scale =
+            minOf(
+                targetWidthPx / srcWidthPx,
+                targetHeightPx / srcHeightPx,
+            )
         val contentWidthPx = srcWidthPx * scale
         val contentHeightPx = srcHeightPx * scale
         return CoverLayout(
@@ -87,10 +88,11 @@ internal object PortraitCoverPolicy {
                 offsetYPx = 0f,
             )
         }
-        val scale = maxOf(
-            targetWidthPx / srcWidthPx,
-            targetHeightPx / srcHeightPx,
-        )
+        val scale =
+            maxOf(
+                targetWidthPx / srcWidthPx,
+                targetHeightPx / srcHeightPx,
+            )
         val contentWidthPx = srcWidthPx * scale
         val contentHeightPx = srcHeightPx * scale
         return CoverLayout(
@@ -156,10 +158,11 @@ internal object FocusCoverArtworkPolicy {
     }
 
     /** Target card aspect (width/height) for the requested style. */
-    fun targetAspect(style: LandscapeHomeStyle): Float = when (style) {
-        LandscapeHomeStyle.IMMERSIVE_COVER -> FocusGalleryGeometryPolicy.D_WIDTH_TO_HEIGHT_RATIO
-        LandscapeHomeStyle.FOCUS_POSTER -> PortraitCoverPolicy.WIDTH_TO_HEIGHT_RATIO
-    }
+    fun targetAspect(style: LandscapeHomeStyle): Float =
+        when (style) {
+            LandscapeHomeStyle.IMMERSIVE_COVER -> FocusGalleryGeometryPolicy.D_WIDTH_TO_HEIGHT_RATIO
+            LandscapeHomeStyle.FOCUS_POSTER -> PortraitCoverPolicy.WIDTH_TO_HEIGHT_RATIO
+        }
 
     /**
      * Pure decision for one hero card. [targetWidthPx]/[targetHeightPx] are the actual

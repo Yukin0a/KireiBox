@@ -23,6 +23,7 @@ object DevLogger {
     private var logcatFile: File? = null
     private var process: Process? = null
     private var captureThread: Thread? = null
+
     @Volatile
     private var captureGeneration = 0L
     private val fileAppendLock = Any()
@@ -53,74 +54,76 @@ object DevLogger {
     fun isEnabled(): Boolean = enabled
 
     @JvmStatic
-    fun setEnabled(ctx: Context?, on: Boolean) {
+    fun setEnabled(
+        ctx: Context?,
+        on: Boolean,
+    ) {
         if (ctx == null) return
         enabled = on
         ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY, on).apply()
         if (on) startCapture() else stopCapture()
     }
 
-    private fun startCapture(
-        processFactory: () -> Process = { Runtime.getRuntime().exec("logcat -v threadtime") },
-    ) {
+    private fun startCapture(processFactory: () -> Process = { Runtime.getRuntime().exec("logcat -v threadtime") }) {
         val previous: Thread?
         val next: Thread
         synchronized(DevLogger::class.java) {
             previous = stopCaptureLocked()
             if (!enabled || logcatFile == null) return
             val generation = ++captureGeneration
-            next = Thread({
-                var localProcess: Process? = null
-                var reader: BufferedReader? = null
-                var writer: FileWriter? = null
-                try {
-                    localProcess = processFactory()
-                    synchronized(DevLogger::class.java) {
-                        if (!enabled || generation != captureGeneration) {
-                            localProcess.destroy()
-                            return@Thread
-                        }
-                        process = localProcess
-                    }
-                    reader = BufferedReader(InputStreamReader(localProcess.inputStream))
-                    writer = FileWriter(logcatFile!!, true)
-                    writer!!.write("\n=== Logcat capture started ===\n")
-                    writer!!.flush()
-                    var pendingLines = 0
-                    var line = reader.readLine()
-                    while (enabled && generation == captureGeneration && line != null) {
-                        writer!!.write(line)
-                        writer!!.write("\n")
-                        pendingLines++
-                        if (pendingLines >= 32) {
-                            writer!!.flush()
-                            pendingLines = 0
-                            // Check rotation in batches to avoid a filesystem stat per line.
-                            if (logcatFile!!.length() > MAX_LOG_SIZE) {
-                                writer!!.close()
-                                writer = null
-                                val bak = File(logcatFile!!.parent, "logcat_old.txt")
-                                if (bak.exists()) bak.delete()
-                                logcatFile!!.renameTo(bak)
-                                writer = FileWriter(logcatFile!!)
+            next =
+                Thread({
+                    var localProcess: Process? = null
+                    var reader: BufferedReader? = null
+                    var writer: FileWriter? = null
+                    try {
+                        localProcess = processFactory()
+                        synchronized(DevLogger::class.java) {
+                            if (!enabled || generation != captureGeneration) {
+                                localProcess.destroy()
+                                return@Thread
                             }
+                            process = localProcess
                         }
-                        line = reader.readLine()
+                        reader = BufferedReader(InputStreamReader(localProcess.inputStream))
+                        writer = FileWriter(logcatFile!!, true)
+                        writer!!.write("\n=== Logcat capture started ===\n")
+                        writer!!.flush()
+                        var pendingLines = 0
+                        var line = reader.readLine()
+                        while (enabled && generation == captureGeneration && line != null) {
+                            writer!!.write(line)
+                            writer!!.write("\n")
+                            pendingLines++
+                            if (pendingLines >= 32) {
+                                writer!!.flush()
+                                pendingLines = 0
+                                // Check rotation in batches to avoid a filesystem stat per line.
+                                if (logcatFile!!.length() > MAX_LOG_SIZE) {
+                                    writer!!.close()
+                                    writer = null
+                                    val bak = File(logcatFile!!.parent, "logcat_old.txt")
+                                    if (bak.exists()) bak.delete()
+                                    logcatFile!!.renameTo(bak)
+                                    writer = FileWriter(logcatFile!!)
+                                }
+                            }
+                            line = reader.readLine()
+                        }
+                    } catch (e: Exception) {
+                        if (enabled && generation == captureGeneration) {
+                            runCatching { Log.e(TAG, "Capture failed", e) }
+                        }
+                    } finally {
+                        reader?.let { runCatching { it.close() } }
+                        writer?.let { runCatching { it.close() } }
+                        localProcess?.destroy()
+                        synchronized(DevLogger::class.java) {
+                            if (process === localProcess) process = null
+                            if (captureThread === Thread.currentThread()) captureThread = null
+                        }
                     }
-                } catch (e: Exception) {
-                    if (enabled && generation == captureGeneration) {
-                        runCatching { Log.e(TAG, "Capture failed", e) }
-                    }
-                } finally {
-                    reader?.let { runCatching { it.close() } }
-                    writer?.let { runCatching { it.close() } }
-                    localProcess?.destroy()
-                    synchronized(DevLogger::class.java) {
-                        if (process === localProcess) process = null
-                        if (captureThread === Thread.currentThread()) captureThread = null
-                    }
-                }
-            }, "LogcatCapture")
+                }, "LogcatCapture")
             captureThread = next
         }
         awaitCaptureStop(previous)

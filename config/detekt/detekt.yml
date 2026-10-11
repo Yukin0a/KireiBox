@@ -1,0 +1,41 @@
+# KireiBox detekt configuration (planbook A8).
+#
+# Structural budgets from the planbook (section 3.1). The gate starts lenient and is tightened
+# stage by stage: the current repo is frozen via a baseline (config/detekt/baseline.xml), so only
+# newly introduced violations fail the build.
+build:
+  maxIssues: 0
+
+complexity:
+  LongMethod:
+    threshold: 80
+  LargeClass:
+    threshold: 400
+  TooManyFunctions:
+    thresholdInFiles: 20
+    thresholdInClasses: 20
+    thresholdInInterfaces: 20
+    thresholdInObjects: 20
+    thresholdInEnums: 20
+  ComplexMethod:
+    threshold: 15
+  NestedBlockDepth:
+    threshold: 4
+  LongParameterList:
+    functionThreshold: 6
+    constructorThreshold: 7
+
+style:
+  MagicNumber:
+    active: false
+  MaxLineLength:
+    maxLineLength: 200
+
+naming:
+  FunctionNaming:
+    ignoreAnnotated: ['Composable']
+
+# Embedded third-party engine sources and the JNI/reflection bridge are not ours to restyle.
+exceptions:
+  TooGenericExceptionCaught:
+    active: false

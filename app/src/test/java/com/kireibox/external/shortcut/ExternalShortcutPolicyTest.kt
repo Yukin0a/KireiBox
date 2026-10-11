@@ -10,8 +10,11 @@ import org.junit.Test
 
 class ExternalShortcutPolicyTest {
     @Test fun statusPolicySeparatesShellRootAndPermissionStates() {
-        fun status(granted: Boolean, uid: Int = 2000, rationale: Boolean = false) =
-            ShortcutServiceStatusPolicy.resolve(true, true, true, granted, rationale, uid, false, false)
+        fun status(
+            granted: Boolean,
+            uid: Int = 2000,
+            rationale: Boolean = false
+        ) = ShortcutServiceStatusPolicy.resolve(true, true, true, granted, rationale, uid, false, false)
         assertEquals(ShortcutServiceStatus.READY, status(true))
         assertEquals(ShortcutServiceStatus.UNSUPPORTED_IDENTITY, status(true, uid = 0))
         assertEquals(ShortcutServiceStatus.PERMISSION_REQUIRED, status(false))
@@ -66,13 +69,18 @@ class ExternalShortcutPolicyTest {
     @Test fun importedDirectRecipeNoLongerRequiresShizukuToLaunch() {
         val root = ExternalShortcutIdentity.rootUri(0, "com.xiaoji.egggame", "totsulover_chs")
         val oldCard = Game(engine = EngineType.ANDROID_APP, rootUri = root)
-        val directCard = oldCard.copy(
-            launchTarget = ExternalShortcutDirectLaunch.create("local_2FeqxFmUQBiqMenoyWYaeA")!!.encode(),
-        )
+        val directCard =
+            oldCard.copy(
+                launchTarget = ExternalShortcutDirectLaunch.create("local_2FeqxFmUQBiqMenoyWYaeA")!!.encode(),
+            )
         assertTrue(ExternalShortcutLaunchPolicy.requiresShizuku(oldCard))
         assertFalse(ExternalShortcutLaunchPolicy.requiresShizuku(directCard))
     }
 
-    private fun descriptor(packageName: String, id: String, pinned: Boolean, dynamic: Boolean = false) =
-        ExternalShortcutDescriptor(0, packageName, packageName, id, id, null, pinned, dynamic)
+    private fun descriptor(
+        packageName: String,
+        id: String,
+        pinned: Boolean,
+        dynamic: Boolean = false
+    ) = ExternalShortcutDescriptor(0, packageName, packageName, id, id, null, pinned, dynamic)
 }

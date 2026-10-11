@@ -1,7 +1,7 @@
 package com.kireibox.cover
 
 import com.kireibox.ui.KireiLayoutMode
-import com.yuki.yukihub.metadata.CoverSourceMode
+import com.yuki.yukihub.metadata.model.CoverSourceMode
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -24,9 +24,12 @@ class CoverTaskPresentationPolicyTest {
 
     @Test
     fun taskCenterSectionsAndChineseActionsAreExplicit() {
-        val tasks = listOf(
-            task(1, CoverTaskStatus.NEEDS_REVIEW), task(2, CoverTaskStatus.DOWNLOADING), task(3, CoverTaskStatus.CANCELLED)
-        )
+        val tasks =
+            listOf(
+                task(1, CoverTaskStatus.NEEDS_REVIEW),
+                task(2, CoverTaskStatus.DOWNLOADING),
+                task(3, CoverTaskStatus.CANCELLED)
+            )
         assertEquals(listOf("需要处理", "正在处理", "已完成"), CoverTaskPresentationPolicy.sections(tasks).map { it.title })
         assertEquals("撤销", CoverTaskPresentationPolicy.actionLabel(CoverTaskRowAction.UNDO))
         assertEquals("正在下载 50%", CoverTaskPresentationPolicy.phaseLabel(task(2, CoverTaskStatus.DOWNLOADING, 5, 10)))
@@ -46,15 +49,16 @@ class CoverTaskPresentationPolicyTest {
 
     @Test
     fun taskButtonStateKeepsTerminalRowsVisibleAndExposesDynamicCounts() {
-        val state = CoverTaskPresentationPolicy.buttonState(
-            listOf(
-                task(1, CoverTaskStatus.COMPLETED),
-                task(2, CoverTaskStatus.CANCELLED),
-                task(3, CoverTaskStatus.NEEDS_REVIEW),
-                task(4, CoverTaskStatus.FAILED),
-                task(5, CoverTaskStatus.DOWNLOADING, bytesRead = 5, totalBytes = 10),
-            ),
-        )
+        val state =
+            CoverTaskPresentationPolicy.buttonState(
+                listOf(
+                    task(1, CoverTaskStatus.COMPLETED),
+                    task(2, CoverTaskStatus.CANCELLED),
+                    task(3, CoverTaskStatus.NEEDS_REVIEW),
+                    task(4, CoverTaskStatus.FAILED),
+                    task(5, CoverTaskStatus.DOWNLOADING, bytesRead = 5, totalBytes = 10),
+                ),
+            )
 
         assertTrue(state.visible)
         assertEquals(1, state.completedCount)
@@ -62,12 +66,15 @@ class CoverTaskPresentationPolicyTest {
         assertEquals(2, state.pendingCount)
         assertTrue(state.hasFailure)
         assertFalse(state.showCompletionCheck)
-        assertEquals(0.9f, state.aggregateProgress, 0.0001f)
+        // Only the completed task and the running download count; the failed/cancelled/review rows
+        // are not finished work.
+        assertEquals(0.3f, state.aggregateProgress, 0.0001f)
         assertEquals("封面任务，已完成 1 / 5，待处理 2", state.contentDescription)
 
-        val terminal = CoverTaskPresentationPolicy.buttonState(
-            listOf(task(1, CoverTaskStatus.COMPLETED), task(2, CoverTaskStatus.CANCELLED)),
-        )
+        val terminal =
+            CoverTaskPresentationPolicy.buttonState(
+                listOf(task(1, CoverTaskStatus.COMPLETED), task(2, CoverTaskStatus.CANCELLED)),
+            )
         assertTrue(terminal.visible)
         assertTrue(terminal.showCompletionCheck)
         assertFalse(CoverTaskPresentationPolicy.buttonState(emptyList()).visible)
@@ -75,24 +82,26 @@ class CoverTaskPresentationPolicyTest {
 
     @Test
     fun anchoredContainerMetricsDeductFullSafeDrawingArea() {
-        val compact = CoverTaskPresentationPolicy.anchoredContainerMetrics(
-            windowWidthDp = 914f,
-            windowHeightDp = 411f,
-            safeTopDp = 24f,
-            safeRightDp = 48f,
-            safeBottomDp = 24f,
-        )
+        val compact =
+            CoverTaskPresentationPolicy.anchoredContainerMetrics(
+                windowWidthDp = 914f,
+                windowHeightDp = 411f,
+                safeTopDp = 24f,
+                safeRightDp = 48f,
+                safeBottomDp = 24f,
+            )
 
         assertEquals(360f, compact.widthDp, 0.001f)
         assertEquals(339f, compact.maxHeightDp, 0.001f)
 
-        val narrow = CoverTaskPresentationPolicy.anchoredContainerMetrics(
-            windowWidthDp = 320f,
-            windowHeightDp = 400f,
-            safeTopDp = 20f,
-            safeRightDp = 20f,
-            safeBottomDp = 30f,
-        )
+        val narrow =
+            CoverTaskPresentationPolicy.anchoredContainerMetrics(
+                windowWidthDp = 320f,
+                windowHeightDp = 400f,
+                safeTopDp = 20f,
+                safeRightDp = 20f,
+                safeBottomDp = 30f,
+            )
         assertEquals(276f, narrow.widthDp, 0.001f)
         assertEquals(326f, narrow.maxHeightDp, 0.001f)
     }
@@ -102,19 +111,62 @@ class CoverTaskPresentationPolicyTest {
         assertEquals("5 B / 10 B", CoverTaskPresentationPolicy.downloadBytesLabel(task(1, CoverTaskStatus.DOWNLOADING, 5, 10)))
         assertEquals("已下载 5 B", CoverTaskPresentationPolicy.downloadBytesLabel(task(1, CoverTaskStatus.DOWNLOADING, 5)))
     }
-    @Test
-    fun aggregateProgressCountsTerminalTasksAndKnownDownloadBytes() {
-        val state = CoverQueueUiState(
-            tasks = listOf(
-                task(1, CoverTaskStatus.COMPLETED),
-                task(2, CoverTaskStatus.NEEDS_REVIEW),
-                task(3, CoverTaskStatus.DOWNLOADING, bytesRead = 40, totalBytes = 80),
-                task(4, CoverTaskStatus.SEARCHING),
-            ),
-            queueStatus = CoverQueueStatus.RUNNING,
-        )
 
-        assertEquals(0.625f, CoverTaskPresentationPolicy.aggregateProgress(state), 0.0001f)
+    @Test
+    fun downloadByteLabelUsesKilobytesAndMegabytesWithOneDecimal() {
+        assertEquals("470.7 KB / 1.2 MB", CoverTaskPresentationPolicy.downloadBytesLabel(task(1, CoverTaskStatus.DOWNLOADING, 482_000, 1_240_000)))
+        assertEquals("已下载 2.0 MB", CoverTaskPresentationPolicy.downloadBytesLabel(task(1, CoverTaskStatus.DOWNLOADING, 2L * 1024 * 1024)))
+        assertEquals("1023 B", CoverTaskPresentationPolicy.formatBytes(1023))
+        assertEquals("1.0 KB", CoverTaskPresentationPolicy.formatBytes(1024))
+        assertEquals("1.5 GB", CoverTaskPresentationPolicy.formatBytes(1_610_612_736L))
+    }
+
+    @Test
+    fun downloadProgressIsNullUntilTheLengthIsKnown() {
+        assertEquals(0.5f, CoverTaskPresentationPolicy.downloadProgress(task(1, CoverTaskStatus.DOWNLOADING, 5, 10))!!, 0.0001f)
+        assertEquals(null, CoverTaskPresentationPolicy.downloadProgress(task(1, CoverTaskStatus.DOWNLOADING, 5)))
+        assertEquals(null, CoverTaskPresentationPolicy.downloadProgress(task(1, CoverTaskStatus.DOWNLOADING, 5, 0)))
+    }
+
+    @Test
+    fun chipLabelKeepsTheFailureReasonOffTheChip() {
+        assertEquals("正在下载 50%", CoverTaskPresentationPolicy.chipLabel(task(1, CoverTaskStatus.DOWNLOADING, 5, 10)))
+        assertEquals("等待确认", CoverTaskPresentationPolicy.chipLabel(task(2, CoverTaskStatus.NEEDS_REVIEW)))
+        assertEquals("匹配失败", CoverTaskPresentationPolicy.chipLabel(task(3, CoverTaskStatus.FAILED).copy(error = "网络连接超时")))
+    }
+
+    @Test
+    fun aggregateProgressCountsOnlyCompletedTasksAndKnownDownloadBytes() {
+        val state =
+            CoverQueueUiState(
+                tasks =
+                    listOf(
+                        task(1, CoverTaskStatus.COMPLETED),
+                        task(2, CoverTaskStatus.NEEDS_REVIEW),
+                        task(3, CoverTaskStatus.DOWNLOADING, bytesRead = 40, totalBytes = 80),
+                        task(4, CoverTaskStatus.SEARCHING),
+                    ),
+                queueStatus = CoverQueueStatus.RUNNING,
+            )
+
+        // 1 completed + half a download over 4 tasks; the review/search rows are not done.
+        assertEquals(0.375f, CoverTaskPresentationPolicy.aggregateProgress(state), 0.0001f)
+    }
+
+    @Test
+    fun aggregateProgressIgnoresFailedAndCancelledTasks() {
+        val state =
+            CoverQueueUiState(
+                tasks =
+                    listOf(
+                        task(1, CoverTaskStatus.FAILED),
+                        task(2, CoverTaskStatus.FAILED),
+                        task(3, CoverTaskStatus.CANCELLED),
+                    ),
+                queueStatus = CoverQueueStatus.RUNNING,
+            )
+
+        assertEquals("a batch that all failed is not 100% done", 0f, CoverTaskPresentationPolicy.aggregateProgress(state), 0.0001f)
     }
 
     @Test
@@ -130,26 +182,28 @@ class CoverTaskPresentationPolicyTest {
 
     @Test
     fun displayOrderPutsAttentionThenActiveThenTerminalWhileKeepingInputOrderInEachGroup() {
-        val ordered = CoverTaskPresentationPolicy.displayOrder(
-            listOf(
-                task(1, CoverTaskStatus.COMPLETED),
-                task(2, CoverTaskStatus.SEARCHING),
-                task(3, CoverTaskStatus.FAILED),
-                task(4, CoverTaskStatus.QUEUED),
-                task(5, CoverTaskStatus.NEEDS_REVIEW),
-                task(6, CoverTaskStatus.CANCELLED),
-                task(7, CoverTaskStatus.DOWNLOADING),
+        val ordered =
+            CoverTaskPresentationPolicy.displayOrder(
+                listOf(
+                    task(1, CoverTaskStatus.COMPLETED),
+                    task(2, CoverTaskStatus.SEARCHING),
+                    task(3, CoverTaskStatus.FAILED),
+                    task(4, CoverTaskStatus.QUEUED),
+                    task(5, CoverTaskStatus.NEEDS_REVIEW),
+                    task(6, CoverTaskStatus.CANCELLED),
+                    task(7, CoverTaskStatus.DOWNLOADING),
+                )
             )
-        )
 
         assertEquals(listOf(3L, 5L, 2L, 4L, 7L, 1L, 6L), ordered.map { it.gameId })
     }
 
     @Test
     fun badgeSummarizesReviewAndFailureTasks() {
-        val badge = CoverTaskPresentationPolicy.badge(
-            listOf(task(1, CoverTaskStatus.NEEDS_REVIEW), task(2, CoverTaskStatus.FAILED), task(3, CoverTaskStatus.SEARCHING))
-        )
+        val badge =
+            CoverTaskPresentationPolicy.badge(
+                listOf(task(1, CoverTaskStatus.NEEDS_REVIEW), task(2, CoverTaskStatus.FAILED), task(3, CoverTaskStatus.SEARCHING))
+            )
 
         assertEquals(2, badge.pendingCount)
         assertTrue(badge.hasFailure)

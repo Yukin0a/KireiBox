@@ -13,17 +13,18 @@ import org.json.JSONObject
  * 没有快照时使用全局 [OnsSettings]；清除快照后重新跟随全局设置。
  */
 object LauncherOnsGameSettingsBridge {
-
     private const val TAG = "OnsGameSettingsBridge"
     private const val PREF_NAME = "onsyuri_game_overrides"
     private const val KEY_PREFIX = "game_"
 
-    private fun prefs(context: Context): SharedPreferences =
-        context.applicationContext.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+    private fun prefs(context: Context): SharedPreferences = context.applicationContext.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
 
     /** 游戏是否存在自己的覆盖配置。 */
     @JvmStatic
-    fun hasOverride(context: Context?, gameId: Long): Boolean {
+    fun hasOverride(
+        context: Context?,
+        gameId: Long
+    ): Boolean {
         if (context == null || gameId <= 0) return false
         return prefs(context).contains(key(gameId))
     }
@@ -33,7 +34,10 @@ object LauncherOnsGameSettingsBridge {
      * gameId <= 0 时退化为全局设置。
      */
     @JvmStatic
-    fun load(context: Context?, gameId: Long): OnsSettings {
+    fun load(
+        context: Context?,
+        gameId: Long
+    ): OnsSettings {
         val settings = OnsSettings.load(context)
         if (context == null || gameId <= 0) return settings
         try {
@@ -49,7 +53,11 @@ object LauncherOnsGameSettingsBridge {
 
     /** 将传入设置作为该游戏的覆盖保存。 */
     @JvmStatic
-    fun save(context: Context?, gameId: Long, settings: OnsSettings) {
+    fun save(
+        context: Context?,
+        gameId: Long,
+        settings: OnsSettings
+    ) {
         if (context == null || gameId <= 0) return
         try {
             prefs(context).edit()
@@ -62,7 +70,10 @@ object LauncherOnsGameSettingsBridge {
 
     /** 删除该游戏的覆盖，回退到全局默认。 */
     @JvmStatic
-    fun clearOverride(context: Context?, gameId: Long) {
+    fun clearOverride(
+        context: Context?,
+        gameId: Long
+    ) {
         if (context == null || gameId <= 0) return
         prefs(context).edit().remove(key(gameId)).apply()
     }
@@ -90,7 +101,10 @@ object LauncherOnsGameSettingsBridge {
         return o
     }
 
-    private fun applyOverride(settings: OnsSettings, o: JSONObject?) {
+    private fun applyOverride(
+        settings: OnsSettings,
+        o: JSONObject?
+    ) {
         if (o == null) return
         // optBoolean/optString 在 key 缺失时返回默认值（false/""），会误覆盖；
         // 因此先 has() 再读，保证只覆盖实际写过的字段。

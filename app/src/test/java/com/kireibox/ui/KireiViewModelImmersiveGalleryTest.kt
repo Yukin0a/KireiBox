@@ -1,7 +1,9 @@
 package com.kireibox.ui
 
 import android.app.Application
+import com.yuki.yukihub.settings.ImmersiveFxPreset
 import com.yuki.yukihub.settings.ImmersiveGalleryAutoSource
+import com.yuki.yukihub.settings.ImmersiveVisualSettings
 import com.yuki.yukihub.settings.SpotlightSelectionMode
 import com.yuki.yukihub.settings.SpotlightSource
 import com.yuki.yukihub.settings.SpotlightStrategy
@@ -15,11 +17,12 @@ class KireiViewModelImmersiveGalleryTest {
     fun setImmersiveGalleryModeDelegatesToWriterAndTriggersReload() {
         var written: SpotlightSelectionMode? = null
         var reloadCount = 0
-        val vm = KireiViewModel(
-            Application(),
-            testReloadAction = { reloadCount++ },
-            testImmersiveGalleryModeWriter = { mode -> written = mode },
-        )
+        val vm =
+            KireiViewModel(
+                Application(),
+                testReloadAction = { reloadCount++ },
+                testImmersiveGalleryModeWriter = { mode -> written = mode },
+            )
         vm.setImmersiveGalleryMode(SpotlightSelectionMode.MANUAL)
         assertEquals(SpotlightSelectionMode.MANUAL, written)
         assertEquals(1, reloadCount)
@@ -29,11 +32,12 @@ class KireiViewModelImmersiveGalleryTest {
     fun setImmersiveGalleryIdsDelegatesOrderedIdsToWriter() {
         var written: List<Long>? = null
         var reloadCount = 0
-        val vm = KireiViewModel(
-            Application(),
-            testReloadAction = { reloadCount++ },
-            testImmersiveGalleryIdsWriter = { ids -> written = ids },
-        )
+        val vm =
+            KireiViewModel(
+                Application(),
+                testReloadAction = { reloadCount++ },
+                testImmersiveGalleryIdsWriter = { ids -> written = ids },
+            )
         vm.setImmersiveGalleryIds(listOf(5L, 3L, 1L))
         assertEquals(listOf(5L, 3L, 1L), written)
         assertEquals(1, reloadCount)
@@ -43,11 +47,12 @@ class KireiViewModelImmersiveGalleryTest {
     fun setImmersiveGalleryModeBackToAutomaticDelegatesCorrectly() {
         var written: SpotlightSelectionMode? = null
         var reloadCount = 0
-        val vm = KireiViewModel(
-            Application(),
-            testReloadAction = { reloadCount++ },
-            testImmersiveGalleryModeWriter = { mode -> written = mode },
-        )
+        val vm =
+            KireiViewModel(
+                Application(),
+                testReloadAction = { reloadCount++ },
+                testImmersiveGalleryModeWriter = { mode -> written = mode },
+            )
         vm.setImmersiveGalleryMode(SpotlightSelectionMode.AUTOMATIC)
         assertEquals(SpotlightSelectionMode.AUTOMATIC, written)
         assertEquals(1, reloadCount)
@@ -57,11 +62,12 @@ class KireiViewModelImmersiveGalleryTest {
     fun setImmersiveGalleryAutoSourceDelegatesToWriterAndTriggersReload() {
         var written: ImmersiveGalleryAutoSource? = null
         var reloadCount = 0
-        val vm = KireiViewModel(
-            Application(),
-            testReloadAction = { reloadCount++ },
-            testImmersiveGalleryAutoWriter = { source -> written = source },
-        )
+        val vm =
+            KireiViewModel(
+                Application(),
+                testReloadAction = { reloadCount++ },
+                testImmersiveGalleryAutoWriter = { source -> written = source },
+            )
         vm.setImmersiveGalleryAutoSource(ImmersiveGalleryAutoSource.FAVORITES)
         assertEquals(ImmersiveGalleryAutoSource.FAVORITES, written)
         assertEquals(1, reloadCount)
@@ -73,13 +79,14 @@ class KireiViewModelImmersiveGalleryTest {
         var strategy: SpotlightStrategy? = null
         var count: Int? = null
         var reloadCount = 0
-        val vm = KireiViewModel(
-            Application(),
-            testReloadAction = { reloadCount++ },
-            testImmersiveGallerySourceWriter = { source = it },
-            testImmersiveGalleryStrategyWriter = { strategy = it },
-            testImmersiveGalleryCountWriter = { count = it },
-        )
+        val vm =
+            KireiViewModel(
+                Application(),
+                testReloadAction = { reloadCount++ },
+                testImmersiveGallerySourceWriter = { source = it },
+                testImmersiveGalleryStrategyWriter = { strategy = it },
+                testImmersiveGalleryCountWriter = { count = it },
+            )
 
         vm.setImmersiveGallerySource(SpotlightSource.ALL)
         vm.setImmersiveGalleryStrategy(SpotlightStrategy.DAILY_RANDOM)
@@ -89,6 +96,27 @@ class KireiViewModelImmersiveGalleryTest {
         assertEquals(SpotlightStrategy.DAILY_RANDOM, strategy)
         assertEquals(5, count)
         assertEquals(3, reloadCount)
+    }
+
+    @Test
+    fun immersiveVisualSetterDelegatesOneSnapshotAndTriggersReload() {
+        var written: ImmersiveVisualSettings? = null
+        var reloadCount = 0
+        val vm =
+            KireiViewModel(
+                Application(),
+                // A constructor seam puts the VM in test mode before init runs (isTestMode needs
+                // testReloadAction AND one seam); the visual writer seam is set right after.
+                testHomePresentationWriter = {},
+                testReloadAction = { reloadCount++ },
+            )
+        vm.testImmersiveVisualWriter = { settings -> written = settings }
+
+        vm.setImmersiveVisual(ImmersiveVisualSettings.forPreset(ImmersiveFxPreset.RICH))
+
+        assertEquals(ImmersiveFxPreset.RICH, written?.preset)
+        assertEquals(true, written?.sheen)
+        assertEquals(1, reloadCount)
     }
 
     @Test

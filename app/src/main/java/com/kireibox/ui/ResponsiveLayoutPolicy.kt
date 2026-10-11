@@ -86,7 +86,10 @@ object ResponsiveLayoutPolicy {
      * intentionally wins over aspect/height heuristics so Pad split-screen and short windows
      * can never enter the phone compact-landscape hero path.
      */
-    fun isPad(smallestScreenWidthDp: Int, screenLayoutSize: Int): Boolean =
+    fun isPad(
+        smallestScreenWidthDp: Int,
+        screenLayoutSize: Int
+    ): Boolean =
         smallestScreenWidthDp >= PAD_MIN_SMALLEST_SCREEN_WIDTH_DP ||
             screenLayoutSize == Configuration.SCREENLAYOUT_SIZE_LARGE ||
             screenLayoutSize == Configuration.SCREENLAYOUT_SIZE_XLARGE
@@ -94,11 +97,12 @@ object ResponsiveLayoutPolicy {
     fun sizeClassFor(
         smallestScreenWidthDp: Int,
         screenLayoutSize: Int,
-    ): HomeSizeClass = if (isPad(smallestScreenWidthDp, screenLayoutSize)) {
-        HomeSizeClass.WIDE
-    } else {
-        HomeSizeClass.COMPACT
-    }
+    ): HomeSizeClass =
+        if (isPad(smallestScreenWidthDp, screenLayoutSize)) {
+            HomeSizeClass.WIDE
+        } else {
+            HomeSizeClass.COMPACT
+        }
 
     /**
      * Classifies the safe frame into phone/pad and portrait/landscape without consulting the
@@ -115,27 +119,30 @@ object ResponsiveLayoutPolicy {
         }
         val landscape = safeWidthDp > safeHeightDp
         return when (sizeClass) {
-            HomeSizeClass.COMPACT -> if (landscape) {
-                ResponsiveWindowClass.PHONE_LANDSCAPE
-            } else {
-                ResponsiveWindowClass.PHONE_PORTRAIT
-            }
-            HomeSizeClass.WIDE -> if (landscape) {
-                ResponsiveWindowClass.PAD_LANDSCAPE
-            } else {
-                ResponsiveWindowClass.PAD_PORTRAIT
-            }
+            HomeSizeClass.COMPACT ->
+                if (landscape) {
+                    ResponsiveWindowClass.PHONE_LANDSCAPE
+                } else {
+                    ResponsiveWindowClass.PHONE_PORTRAIT
+                }
+            HomeSizeClass.WIDE ->
+                if (landscape) {
+                    ResponsiveWindowClass.PAD_LANDSCAPE
+                } else {
+                    ResponsiveWindowClass.PAD_PORTRAIT
+                }
         }
     }
 
     fun resolveWindowClass(
         safeFrame: ResponsiveSafeFrame,
         sizeClass: HomeSizeClass,
-    ): ResponsiveWindowClass = resolveWindowClass(
-        safeWidthDp = safeFrame.safeWidthDp,
-        safeHeightDp = safeFrame.safeHeightDp,
-        sizeClass = sizeClass,
-    )
+    ): ResponsiveWindowClass =
+        resolveWindowClass(
+            safeWidthDp = safeFrame.safeWidthDp,
+            safeHeightDp = safeFrame.safeHeightDp,
+            sizeClass = sizeClass,
+        )
 
     /** Safe-frame overload for callers that already carry an absolute [HomeRect]. */
     fun resolveWindowClass(
@@ -152,22 +159,24 @@ object ResponsiveLayoutPolicy {
         safeHeightDp: Float,
         smallestScreenWidthDp: Int,
         screenLayoutSize: Int,
-    ): ResponsiveWindowClass = resolveWindowClass(
-        safeWidthDp = safeWidthDp,
-        safeHeightDp = safeHeightDp,
-        sizeClass = sizeClassFor(smallestScreenWidthDp, screenLayoutSize),
-    )
+    ): ResponsiveWindowClass =
+        resolveWindowClass(
+            safeWidthDp = safeWidthDp,
+            safeHeightDp = safeHeightDp,
+            sizeClass = sizeClassFor(smallestScreenWidthDp, screenLayoutSize),
+        )
 
     fun resolveWindowClass(
         window: ResponsiveSafeFrame,
         smallestScreenWidthDp: Int,
         screenLayoutSize: Int,
-    ): ResponsiveWindowClass = resolveWindowClass(
-        safeWidthDp = window.safeWidthDp,
-        safeHeightDp = window.safeHeightDp,
-        smallestScreenWidthDp = smallestScreenWidthDp,
-        screenLayoutSize = screenLayoutSize,
-    )
+    ): ResponsiveWindowClass =
+        resolveWindowClass(
+            safeWidthDp = window.safeWidthDp,
+            safeHeightDp = window.safeHeightDp,
+            smallestScreenWidthDp = smallestScreenWidthDp,
+            screenLayoutSize = screenLayoutSize,
+        )
 
     fun resolveDeviceClass(
         safeWidthDp: Float,
@@ -191,12 +200,13 @@ object ResponsiveLayoutPolicy {
         smallestScreenWidthDp: Int,
         screenLayoutSize: Int,
     ): KireiLayoutMode {
-        val windowClass = resolveWindowClass(
-            safeWidthDp = widthDp,
-            safeHeightDp = heightDp,
-            smallestScreenWidthDp = smallestScreenWidthDp,
-            screenLayoutSize = screenLayoutSize,
-        )
+        val windowClass =
+            resolveWindowClass(
+                safeWidthDp = widthDp,
+                safeHeightDp = heightDp,
+                smallestScreenWidthDp = smallestScreenWidthDp,
+                screenLayoutSize = screenLayoutSize,
+            )
         if (windowClass == ResponsiveWindowClass.PAD_PORTRAIT ||
             windowClass == ResponsiveWindowClass.PAD_LANDSCAPE
         ) {
@@ -212,7 +222,10 @@ object ResponsiveLayoutPolicy {
     }
 
     /** Compatibility overload: infers the smallest screen width from the window dimensions. */
-    fun resolveLayoutMode(widthDp: Float, heightDp: Float): KireiLayoutMode {
+    fun resolveLayoutMode(
+        widthDp: Float,
+        heightDp: Float
+    ): KireiLayoutMode {
         return resolveLayoutMode(
             widthDp = widthDp,
             heightDp = heightDp,
@@ -221,16 +234,19 @@ object ResponsiveLayoutPolicy {
         )
     }
 
-    fun dashboardPresentation(layoutMode: KireiLayoutMode): DashboardPresentation = when (layoutMode) {
-        KireiLayoutMode.PHONE_PORTRAIT -> DashboardPresentation(
-            DashboardProfile.COMPACT,
-            DashboardDensity.STANDARD,
-        )
-        KireiLayoutMode.WIDE -> DashboardPresentation(
-            DashboardProfile.WIDE,
-            DashboardDensity.STANDARD,
-        )
-    }
+    fun dashboardPresentation(layoutMode: KireiLayoutMode): DashboardPresentation =
+        when (layoutMode) {
+            KireiLayoutMode.PHONE_PORTRAIT ->
+                DashboardPresentation(
+                    DashboardProfile.COMPACT,
+                    DashboardDensity.STANDARD,
+                )
+            KireiLayoutMode.WIDE ->
+                DashboardPresentation(
+                    DashboardProfile.WIDE,
+                    DashboardDensity.STANDARD,
+                )
+        }
 
     /**
      * Height-aware presentation: a Pad/WIDE window below 600dp uses the compact height
@@ -239,20 +255,23 @@ object ResponsiveLayoutPolicy {
     fun dashboardPresentation(
         layoutMode: KireiLayoutMode,
         availableHeightDp: Float,
-    ): DashboardPresentation = when (layoutMode) {
-        KireiLayoutMode.PHONE_PORTRAIT -> DashboardPresentation(
-            DashboardProfile.COMPACT,
-            DashboardDensity.STANDARD,
-        )
-        KireiLayoutMode.WIDE -> DashboardPresentation(
-            DashboardProfile.WIDE,
-            if (availableHeightDp < WIDE_COMPACT_HEIGHT_DP) {
-                DashboardDensity.COMPACT_HEIGHT
-            } else {
-                DashboardDensity.STANDARD
-            },
-        )
-    }
+    ): DashboardPresentation =
+        when (layoutMode) {
+            KireiLayoutMode.PHONE_PORTRAIT ->
+                DashboardPresentation(
+                    DashboardProfile.COMPACT,
+                    DashboardDensity.STANDARD,
+                )
+            KireiLayoutMode.WIDE ->
+                DashboardPresentation(
+                    DashboardProfile.WIDE,
+                    if (availableHeightDp < WIDE_COMPACT_HEIGHT_DP) {
+                        DashboardDensity.COMPACT_HEIGHT
+                    } else {
+                        DashboardDensity.STANDARD
+                    },
+                )
+        }
 
     fun compactLibraryGridMetrics(
         widthDp: Float,
@@ -260,11 +279,12 @@ object ResponsiveLayoutPolicy {
         safeDrawingLeftDp: Float,
         safeDrawingRightDp: Float,
     ): CompactLibraryGridMetrics {
-        val contentPaddingDp = compactHorizontalContentPaddingDp(
-            horizontalPaddingDp = horizontalPaddingDp,
-            safeDrawingLeftDp = safeDrawingLeftDp,
-            safeDrawingRightDp = safeDrawingRightDp,
-        )
+        val contentPaddingDp =
+            compactHorizontalContentPaddingDp(
+                horizontalPaddingDp = horizontalPaddingDp,
+                safeDrawingLeftDp = safeDrawingLeftDp,
+                safeDrawingRightDp = safeDrawingRightDp,
+            )
         val contentWidthDp = (widthDp - contentPaddingDp * 2f).coerceAtLeast(0f)
         return CompactLibraryGridMetrics(
             contentLeftPaddingDp = contentPaddingDp,
@@ -278,12 +298,16 @@ object ResponsiveLayoutPolicy {
         horizontalPaddingDp: Float,
         safeDrawingLeftDp: Float,
         safeDrawingRightDp: Float,
-    ): Float = maxOf(
-        safeDrawingLeftDp.coerceAtLeast(0f),
-        safeDrawingRightDp.coerceAtLeast(0f),
-    ) + horizontalPaddingDp.coerceAtLeast(0f)
+    ): Float =
+        maxOf(
+            safeDrawingLeftDp.coerceAtLeast(0f),
+            safeDrawingRightDp.coerceAtLeast(0f),
+        ) + horizontalPaddingDp.coerceAtLeast(0f)
 
-    fun compactLibraryColumnCount(widthDp: Float, horizontalPaddingDp: Float): Int =
+    fun compactLibraryColumnCount(
+        widthDp: Float,
+        horizontalPaddingDp: Float
+    ): Int =
         compactLibraryGridMetrics(
             widthDp = widthDp,
             horizontalPaddingDp = horizontalPaddingDp,
@@ -291,27 +315,33 @@ object ResponsiveLayoutPolicy {
             safeDrawingRightDp = 0f,
         ).columnCount
 
-    fun dashboardProfile(layoutMode: KireiLayoutMode): DashboardProfile =
-        dashboardPresentation(layoutMode).profile
+    fun dashboardProfile(layoutMode: KireiLayoutMode): DashboardProfile = dashboardPresentation(layoutMode).profile
 
     fun dashboardDensity(
         layoutMode: KireiLayoutMode,
         availableHeightDp: Float = Float.POSITIVE_INFINITY,
     ): DashboardDensity = dashboardPresentation(layoutMode, availableHeightDp).density
 
-    fun useTwoPane(widthDp: Float, heightDp: Float): Boolean {
+    fun useTwoPane(
+        widthDp: Float,
+        heightDp: Float
+    ): Boolean {
         if (widthDp >= 840f) return true
         if (widthDp < 720f || heightDp <= 0f) return false
         return widthDp / heightDp >= .68f
     }
 
-    fun libraryGrid(widthDp: Float): LibraryGrid = when {
-        widthDp < 600f -> LibraryGrid.PHONE_TWO_COLUMNS
-        widthDp < 840f -> LibraryGrid.MEDIUM_ADAPTIVE
-        else -> LibraryGrid.WIDE_ADAPTIVE
-    }
+    fun libraryGrid(widthDp: Float): LibraryGrid =
+        when {
+            widthDp < 600f -> LibraryGrid.PHONE_TWO_COLUMNS
+            widthDp < 840f -> LibraryGrid.MEDIUM_ADAPTIVE
+            else -> LibraryGrid.WIDE_ADAPTIVE
+        }
 
-    fun heroHeightDp(availableHeightDp: Float, twoPane: Boolean): Float =
+    fun heroHeightDp(
+        availableHeightDp: Float,
+        twoPane: Boolean
+    ): Float =
         if (twoPane) {
             (availableHeightDp * .46f).coerceIn(300f, 410f)
         } else {

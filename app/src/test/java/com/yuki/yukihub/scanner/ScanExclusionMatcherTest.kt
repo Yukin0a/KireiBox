@@ -5,17 +5,18 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ScanExclusionMatcherTest {
-    private val patterns = listOf(
-        "backup",
-        "backups",
-        "bak",
-        "\u5907\u4efd",
-        "*\u5907\u4efd",
-        "\u5907\u4efd*",
-        "*\u526f\u672c",
-        "ai\u7ffb\u8bd1\u5907\u4efd",
-        "*.bak"
-    )
+    private val patterns =
+        listOf(
+            "backup",
+            "backups",
+            "bak",
+            "\u5907\u4efd",
+            "*\u5907\u4efd",
+            "\u5907\u4efd*",
+            "*\u526f\u672c",
+            "ai\u7ffb\u8bd1\u5907\u4efd",
+            "*.bak"
+        )
 
     @Test
     fun prunesCommonBackupDirectoriesCaseInsensitively() {

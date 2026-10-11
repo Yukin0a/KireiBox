@@ -29,32 +29,39 @@ object SpotlightSelector {
                 .mapNotNull(byId::get)
                 .take(spec.spotlightMaxPages.coerceIn(1, MAX_PAGES))
         }
-        val ordered = games.sortedWith(
-            compareByDescending<Game> { it.lastPlayedAt }
-                .thenBy { it.title.orEmpty() }
-                .thenBy { it.id },
-        )
-        val sourcePool = when (spec.spotlightSource) {
-            SpotlightSource.FIXED -> ordered.filter { it.id == spec.gameId }
-            // RECENT is intentionally empty until a real play session exists. ALL is the
-            // only source allowed to expose the whole library.
-            SpotlightSource.RECENT -> ordered.filter { it.lastPlayedAt > 0L }
-            SpotlightSource.FAVORITES -> ordered.filter { it.favorite }
-            SpotlightSource.ALL -> ordered
-        }
+        val ordered =
+            games.sortedWith(
+                compareByDescending<Game> { it.lastPlayedAt }
+                    .thenBy { it.title.orEmpty() }
+                    .thenBy { it.id },
+            )
+        val sourcePool =
+            when (spec.spotlightSource) {
+                SpotlightSource.FIXED -> ordered.filter { it.id == spec.gameId }
+                // RECENT is intentionally empty until a real play session exists. ALL is the
+                // only source allowed to expose the whole library.
+                SpotlightSource.RECENT -> ordered.filter { it.lastPlayedAt > 0L }
+                SpotlightSource.FAVORITES -> ordered.filter { it.favorite }
+                SpotlightSource.ALL -> ordered
+            }
         if (sourcePool.isEmpty()) return emptyList()
         val pool = sourcePool.filter { !it.coverUri.isNullOrBlank() }.ifEmpty { sourcePool }
-        val pages: List<Game> = when (spec.spotlightStrategy) {
-            SpotlightStrategy.FIRST -> pool
-            SpotlightStrategy.RANDOM_EACH_LAUNCH -> randomized(pool, spec.instanceId, sessionSeed)
-            SpotlightStrategy.DAILY_RANDOM -> randomized(pool, spec.instanceId, epochDay)
-        }
+        val pages: List<Game> =
+            when (spec.spotlightStrategy) {
+                SpotlightStrategy.FIRST -> pool
+                SpotlightStrategy.RANDOM_EACH_LAUNCH -> randomized(pool, spec.instanceId, sessionSeed)
+                SpotlightStrategy.DAILY_RANDOM -> randomized(pool, spec.instanceId, epochDay)
+            }
         return pages.take(spec.spotlightMaxPages.coerceIn(1, MAX_PAGES))
     }
 
     private const val MAX_PAGES = 5
 
-    private fun randomized(pool: List<Game>, instanceId: String, salt: Long): List<Game> =
+    private fun randomized(
+        pool: List<Game>,
+        instanceId: String,
+        salt: Long,
+    ): List<Game> =
         pool.sortedWith(
             compareBy<Game> { game -> mix64(salt xor instanceId.hashCode().toLong() xor game.id) }
                 .thenBy { it.id },

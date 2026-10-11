@@ -16,6 +16,7 @@ public final class OnsSettings {
     public static final String EXTRA_GAME_ARGS = "gameargs";
     public static final String EXTRA_GAME_URI = "gameuri";
     public static final String EXTRA_IGNORE_CUTOUT = "ignorecutout";
+    public static final String EXTRA_KEEP_SCREEN_ON = "keepscreenon";
 
     private static final String TAG = "OnsSettings";
     private static final String KEY_ENCODING_MIGRATED_GBK = "encoding_migrated_gbk_v2";
@@ -25,6 +26,7 @@ public final class OnsSettings {
     public boolean sharpness = false;
     public String sharpnessValue = "2";
     public boolean disableVideo = false;
+    public boolean keepScreenOn = true;
     // Tyranor / OnsYuri 对中文 ONS 更友好，默认按原 TY 行为走 GBK。
     public String encoding = "gbk";
     public boolean scopedSaveDir = true;
@@ -74,6 +76,7 @@ public final class OnsSettings {
         sharpness = o.optBoolean("sharpness", sharpness);
         sharpnessValue = o.optString("sharpness_value", sharpnessValue);
         disableVideo = o.optBoolean("disablevideo", disableVideo);
+        keepScreenOn = o.optBoolean("keepscreenon", keepScreenOn);
         encoding = normalizeEncoding(o.optString("encoding", encoding));
         scopedSaveDir = o.optBoolean("scopedsavedir", scopedSaveDir);
         allowEditArgs = o.optBoolean("alloweditargs", allowEditArgs);
@@ -87,6 +90,7 @@ public final class OnsSettings {
         o.put("sharpness", sharpness);
         o.put("sharpness_value", safeSharpness());
         o.put("disablevideo", disableVideo);
+        o.put("keepscreenon", keepScreenOn);
         o.put("encoding", normalizeEncoding(encoding));
         o.put("scopedsavedir", scopedSaveDir);
         o.put("alloweditargs", allowEditArgs);

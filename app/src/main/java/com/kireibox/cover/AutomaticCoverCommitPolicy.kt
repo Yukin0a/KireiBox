@@ -6,6 +6,5 @@ import com.yuki.yukihub.model.Game
 internal object AutomaticCoverCommitPolicy {
     private val eligibleBindingModes = setOf("", "NONE", "RETRY", "REVIEW")
 
-    fun canCommit(game: Game): Boolean =
-        game.coverUri.isNullOrBlank() && game.vndbBindingMode in eligibleBindingModes
+    fun canCommit(game: Game): Boolean = game.coverUri.isNullOrBlank() && game.vndbBindingMode in eligibleBindingModes
 }

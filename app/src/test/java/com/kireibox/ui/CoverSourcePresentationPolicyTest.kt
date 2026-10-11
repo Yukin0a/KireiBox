@@ -1,6 +1,6 @@
 package com.kireibox.ui
 
-import com.yuki.yukihub.metadata.CoverSourceMode
+import com.yuki.yukihub.metadata.model.CoverSourceMode
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -11,11 +11,11 @@ class CoverSourcePresentationPolicyTest {
     fun nonSelectedNonVndbSourcesAreMutedButRemainEnabledAndAccessible() {
         val selected = CoverSourceMode.VNDB
 
-        CoverSourceMode.entries.forEach { source ->
+        CoverSourceMode.active.forEach { source ->
             val presentation = CoverSourcePresentationPolicy.presentation(source, selected)
             assertTrue("${source.name} stays enabled", presentation.enabled)
             assertTrue("${source.name} stays accessible", presentation.accessible)
-            if (source == CoverSourceMode.VNDB) {
+            if (source == CoverSourceMode.VNDB || source == CoverSourceMode.BANGUMI) {
                 assertFalse(presentation.muted)
             } else {
                 assertTrue("${source.name} is visually muted", presentation.muted)
@@ -24,9 +24,9 @@ class CoverSourcePresentationPolicyTest {
     }
 
     @Test
-    fun optionsUseVndbAsTheFallbackAndHighlightOnlyTheSelectedSource() {
+    fun optionsUseBangumiAsTheFallbackAndHighlightOnlyTheSelectedSource() {
         val fallback = CoverSourcePresentationPolicy.options(null)
-        assertEquals(CoverSourceMode.entries.toList(), fallback.map { it.source })
+        assertEquals(CoverSourceMode.active, fallback.map { it.source })
         assertFalse(fallback.first().muted)
         assertTrue(fallback.first().isHighlighted)
 
@@ -34,25 +34,26 @@ class CoverSourcePresentationPolicyTest {
         val bySource = selected.associateBy { it.source }
         assertTrue(bySource.getValue(CoverSourceMode.BANGUMI).isHighlighted)
         assertFalse(bySource.getValue(CoverSourceMode.VNDB).isHighlighted)
-        assertFalse(bySource.getValue(CoverSourceMode.VNDB).muted)
-        assertTrue(bySource.getValue(CoverSourceMode.YMGAL).muted)
+        assertTrue(bySource.getValue(CoverSourceMode.VNDB).muted)
+        assertTrue(bySource.getValue(CoverSourceMode.NEXTMOE).muted)
     }
 
     @Test
     fun tokenVisibilityIsLimitedToTheBangumiFamily() {
         assertEquals(
-            listOf(false, true, true, false, false),
+            listOf(true, false, false, false, false, false),
             CoverSourceMode.entries.map(CoverSourcePresentationPolicy::tokenVisible),
         )
     }
 
     @Test
     fun switchingSourceClosesEditorWithoutClearingStoredToken() {
-        val before = CoverSourceEditorState(
-            selectedSource = CoverSourceMode.BANGUMI,
-            tokenEditorOpen = true,
-            storedToken = "keep-me",
-        )
+        val before =
+            CoverSourceEditorState(
+                selectedSource = CoverSourceMode.BANGUMI,
+                tokenEditorOpen = true,
+                storedToken = "keep-me",
+            )
 
         val after = CoverSourcePresentationPolicy.switchSource(before, CoverSourceMode.YMGAL)
 

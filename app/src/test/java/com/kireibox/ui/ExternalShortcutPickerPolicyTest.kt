@@ -21,7 +21,12 @@ class ExternalShortcutPickerPolicyTest {
         assertEquals(setOf(available.stableKey), ExternalShortcutPickerPolicy.toggleAll(listOf(available, imported), emptySet()))
     }
 
-    private fun entry(pkg: String, id: String, title: String, imported: Boolean) = ExternalShortcutPickerEntry(
+    private fun entry(
+        pkg: String,
+        id: String,
+        title: String,
+        imported: Boolean
+    ) = ExternalShortcutPickerEntry(
         ExternalShortcutDescriptor(0, pkg, pkg, id, title, null, pinned = true, dynamic = false),
         imported,
     )

@@ -22,15 +22,19 @@ class ExternalPlaySessionTimer(private val appContext: Context) {
     private val accumulator = ExternalPlayTimeAccumulator(nowElapsed = SystemClock::elapsedRealtime)
     private var receiverRegistered = false
 
-    private val screenStateReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) {
-            when (intent.action) {
-                Intent.ACTION_SCREEN_OFF -> accumulator.pause()
-                Intent.ACTION_SCREEN_ON -> if (!isDeviceLocked()) accumulator.resume()
-                Intent.ACTION_USER_PRESENT -> accumulator.resume()
+    private val screenStateReceiver =
+        object : BroadcastReceiver() {
+            override fun onReceive(
+                context: Context,
+                intent: Intent
+            ) {
+                when (intent.action) {
+                    Intent.ACTION_SCREEN_OFF -> accumulator.pause()
+                    Intent.ACTION_SCREEN_ON -> if (!isDeviceLocked()) accumulator.resume()
+                    Intent.ACTION_USER_PRESENT -> accumulator.resume()
+                }
             }
         }
-    }
 
     fun start() {
         registerReceiverOnce()
@@ -52,11 +56,12 @@ class ExternalPlaySessionTimer(private val appContext: Context) {
 
     private fun registerReceiverOnce() {
         if (receiverRegistered) return
-        val filter = IntentFilter().apply {
-            addAction(Intent.ACTION_SCREEN_OFF)
-            addAction(Intent.ACTION_SCREEN_ON)
-            addAction(Intent.ACTION_USER_PRESENT)
-        }
+        val filter =
+            IntentFilter().apply {
+                addAction(Intent.ACTION_SCREEN_OFF)
+                addAction(Intent.ACTION_SCREEN_ON)
+                addAction(Intent.ACTION_USER_PRESENT)
+            }
         try {
             ContextCompat.registerReceiver(
                 appContext,
@@ -70,10 +75,11 @@ class ExternalPlaySessionTimer(private val appContext: Context) {
         }
     }
 
-    private fun isDeviceLocked(): Boolean = try {
-        (appContext.getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager)?.isKeyguardLocked == true
-    } catch (_: SecurityException) {
-        // Treat restricted devices as unlocked so the timer keeps running.
-        false
-    }
+    private fun isDeviceLocked(): Boolean =
+        try {
+            (appContext.getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager)?.isKeyguardLocked == true
+        } catch (_: SecurityException) {
+            // Treat restricted devices as unlocked so the timer keeps running.
+            false
+        }
 }

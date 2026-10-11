@@ -1,7 +1,8 @@
 package com.yuki.yukihub.metadata
-
 import android.content.Context
 import com.yuki.yukihub.data.MetadataRepository
+import com.yuki.yukihub.metadata.model.CoverSourceMode
+import com.yuki.yukihub.metadata.model.VnMetadata
 
 /**
  * Compose-safe domain adapter for the YukiHub metadata controller.
@@ -16,19 +17,16 @@ class YukiMetadataController(context: Context) {
     private val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val repository = MetadataRepository(appContext)
 
-    fun source(): CoverSourceMode = CoverSourceMode.fromStored(
-        prefs.getString(KEY_METADATA_SOURCE, CoverSourceMode.VNDB.key)
-    )
+    fun source(): CoverSourceMode =
+        CoverSourceMode.selected(
+            prefs.getString(KEY_METADATA_SOURCE, CoverSourceMode.BANGUMI.key),
+        )
 
     fun setSource(source: CoverSourceMode) {
         prefs.edit().putString(KEY_METADATA_SOURCE, source.key).apply()
     }
 
-    fun bangumiToken(): String = prefs.getString(KEY_BANGUMI_TOKEN, "").orEmpty()
-
-    fun setBangumiToken(token: String) {
-        prefs.edit().putString(KEY_BANGUMI_TOKEN, token.trim()).apply()
-    }
+    fun bangumiToken(): String = com.yuki.yukihub.auth.CoverAccounts.get(appContext).accessToken(CoverSourceMode.BANGUMI)
 
     fun visibleSource(gameId: Long): CoverSourceMode? {
         if (gameId <= 0) return null
@@ -36,16 +34,26 @@ class YukiMetadataController(context: Context) {
         return raw?.takeIf { it.isNotBlank() }?.let(CoverSourceMode::fromStored)
     }
 
-    fun setVisibleSource(gameId: Long, source: CoverSourceMode?) {
+    fun setVisibleSource(
+        gameId: Long,
+        source: CoverSourceMode?,
+    ) {
         if (gameId <= 0) return
         val editor = prefs.edit()
-        if (source == null) editor.remove(KEY_VISIBLE_METADATA_SOURCE_PREFIX + gameId)
-        else editor.putString(KEY_VISIBLE_METADATA_SOURCE_PREFIX + gameId, source.key)
+        if (source == null) {
+            editor.remove(KEY_VISIBLE_METADATA_SOURCE_PREFIX + gameId)
+        } else {
+            editor.putString(KEY_VISIBLE_METADATA_SOURCE_PREFIX + gameId, source.key)
+        }
         editor.apply()
     }
 
-    fun metadata(gameId: Long, source: CoverSourceMode = visibleSource(gameId) ?: this.source()): VnMetadata? =
+    fun metadata(
+        gameId: Long,
+        source: CoverSourceMode = visibleSource(gameId) ?: this.source(),
+    ): VnMetadata? =
         when (source) {
+            CoverSourceMode.NEXTMOE -> repository.get(gameId, source)
             CoverSourceMode.VNDB -> repository.getVndb(gameId)
             CoverSourceMode.BANGUMI -> repository.getBangumi(gameId)
             CoverSourceMode.BANGUMI_MIRROR -> repository.getBangumiMirror(gameId)
@@ -53,8 +61,13 @@ class YukiMetadataController(context: Context) {
             CoverSourceMode.HIKARINAGI -> repository.getHikarinagi(gameId)
         }
 
-    fun saveMetadata(gameId: Long, source: CoverSourceMode, metadata: VnMetadata?) {
+    fun saveMetadata(
+        gameId: Long,
+        source: CoverSourceMode,
+        metadata: VnMetadata?,
+    ) {
         when (source) {
+            CoverSourceMode.NEXTMOE -> repository.saveNextmoe(gameId, metadata)
             CoverSourceMode.VNDB -> repository.saveVndb(gameId, metadata)
             CoverSourceMode.BANGUMI -> repository.saveBangumi(gameId, metadata)
             CoverSourceMode.BANGUMI_MIRROR -> repository.saveBangumiMirror(gameId, metadata)

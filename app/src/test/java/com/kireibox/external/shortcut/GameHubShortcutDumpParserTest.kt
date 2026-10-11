@@ -41,13 +41,14 @@ class GameHubShortcutDumpParserTest {
     }
 
     companion object {
-        private val ACTUAL_DUMP = """
+        private val ACTUAL_DUMP =
+            """
             ShortcutInfo {id=totsulover_chs, flags=0x8a [PinIc-fStr]
               packageName=com.xiaoji.egggame
               activity=ComponentInfo{com.xiaoji.egggame/com.xiaoji.egggame.MainActivity}
               shortLabel=totsulover_chs, resId=0[null]
               intents=[Intent { act=android.intent.action.VIEW flg=0x14000000 cmp=com.xiaoji.egggame/.DeepLinkActivity }/PersistableBundle[{app_nav_target=local_game_launch, app_nav_game_id=local_2FeqxFmUQBiqMenoyWYaeA}]]
               iconRes=0[null]}
-        """.trimIndent()
+            """.trimIndent()
     }
 }

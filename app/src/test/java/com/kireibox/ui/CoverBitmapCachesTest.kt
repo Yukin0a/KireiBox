@@ -40,14 +40,16 @@ class CoverBitmapCachesTest {
     fun toneCacheReturnsSameToneForSameKeyWithoutRecompute() {
         val cache = CoverToneCache()
         var computes = 0
-        val tone = cache.getOrCompute("cover|HERO|1024x1536") {
-            computes++
-            CoverTone(0xFF5B5AC8.toInt(), .4f, .3f, false)
-        }
-        val again = cache.getOrCompute("cover|HERO|1024x1536") {
-            computes++
-            CoverTone(0xFF5B5AC8.toInt(), .4f, .3f, false)
-        }
+        val tone =
+            cache.getOrCompute("cover|HERO|1024x1536") {
+                computes++
+                CoverTone(0xFF5B5AC8.toInt(), .4f, .3f, false)
+            }
+        val again =
+            cache.getOrCompute("cover|HERO|1024x1536") {
+                computes++
+                CoverTone(0xFF5B5AC8.toInt(), .4f, .3f, false)
+            }
         assertEquals(1, computes)
         assertEquals(tone, again)
     }
@@ -71,14 +73,33 @@ class CoverBitmapCachesTest {
     fun toneCacheEvictsLeastRecentlyUsedWhenBounded() {
         val cache = CoverToneCache(capacity = 2)
         var computes = 0
+
         fun tone(argb: Int) = CoverTone(argb, .3f, .3f, false)
-        cache.getOrCompute("a") { computes++; tone(1) }
-        cache.getOrCompute("b") { computes++; tone(2) }
-        cache.getOrCompute("a") { computes++; tone(1) }
-        cache.getOrCompute("c") { computes++; tone(3) }
-        cache.getOrCompute("a") { computes++; tone(1) }
+        cache.getOrCompute("a") {
+            computes++
+            tone(1)
+        }
+        cache.getOrCompute("b") {
+            computes++
+            tone(2)
+        }
+        cache.getOrCompute("a") {
+            computes++
+            tone(1)
+        }
+        cache.getOrCompute("c") {
+            computes++
+            tone(3)
+        }
+        cache.getOrCompute("a") {
+            computes++
+            tone(1)
+        }
         assertEquals(3, computes)
-        cache.getOrCompute("b") { computes++; tone(2) }
+        cache.getOrCompute("b") {
+            computes++
+            tone(2)
+        }
         assertEquals(4, computes)
     }
 
@@ -91,14 +112,15 @@ class CoverBitmapCachesTest {
         val slowTone = CoverTone(0xFF111111.toInt(), .1f, .1f, false)
         val fastTone = CoverTone(0xFF222222.toInt(), .2f, .2f, false)
 
-        val slowThread = Thread {
-            cache.getOrCompute("slow") {
-                slowStarted.countDown()
-                releaseSlow.await(10, TimeUnit.SECONDS)
-                slowTone
+        val slowThread =
+            Thread {
+                cache.getOrCompute("slow") {
+                    slowStarted.countDown()
+                    releaseSlow.await(10, TimeUnit.SECONDS)
+                    slowTone
+                }
+                slowFinished.countDown()
             }
-            slowFinished.countDown()
-        }
         slowThread.start()
         assertTrue(
             "slow compute must start before the fast key is requested",
@@ -108,9 +130,10 @@ class CoverBitmapCachesTest {
         val executor = Executors.newSingleThreadExecutor()
         var fast: CoverTone? = null
         try {
-            val fastFuture = executor.submit<CoverTone> {
-                cache.getOrCompute("fast") { fastTone }
-            }
+            val fastFuture =
+                executor.submit<CoverTone> {
+                    cache.getOrCompute("fast") { fastTone }
+                }
             fast = fastFuture.get(2, TimeUnit.SECONDS)
             // Deterministic: releaseSlow has not been counted down yet, so the
             // slow computation cannot have finished before the fast key returned.
@@ -139,21 +162,22 @@ class CoverBitmapCachesTest {
         val expected = CoverTone(0xFF33AA33.toInt(), .5f, .5f, false)
         val results = CopyOnWriteArrayList<CoverTone>()
         val failures = CopyOnWriteArrayList<Throwable>()
-        val workers = (0 until 8).map {
-            Thread {
-                start.await()
-                try {
-                    results.add(
-                        cache.getOrCompute("same") {
-                            Thread.sleep(50)
-                            expected
-                        },
-                    )
-                } catch (t: Throwable) {
-                    failures.add(t)
+        val workers =
+            (0 until 8).map {
+                Thread {
+                    start.await()
+                    try {
+                        results.add(
+                            cache.getOrCompute("same") {
+                                Thread.sleep(50)
+                                expected
+                            },
+                        )
+                    } catch (t: Throwable) {
+                        failures.add(t)
+                    }
                 }
             }
-        }
         workers.forEach { it.start() }
         start.countDown()
         workers.forEach { it.join(10_000) }
@@ -163,10 +187,11 @@ class CoverBitmapCachesTest {
         assertTrue("every caller must receive the computed tone", results.all { it == expected })
 
         var computes = 0
-        val cached = cache.getOrCompute("same") {
-            computes++
-            CoverTone(-1, 0f, 0f, false)
-        }
+        val cached =
+            cache.getOrCompute("same") {
+                computes++
+                CoverTone(-1, 0f, 0f, false)
+            }
         assertEquals(expected, cached)
         assertEquals("completed computation must be cached and reused", 0, computes)
     }

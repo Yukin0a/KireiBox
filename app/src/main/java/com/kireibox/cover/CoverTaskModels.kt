@@ -1,9 +1,15 @@
 package com.kireibox.cover
 
-import com.yuki.yukihub.metadata.CoverSourceMode
+import com.yuki.yukihub.metadata.model.CoverSourceMode
 
 enum class CoverTaskStatus {
-    QUEUED, SEARCHING, DOWNLOADING, NEEDS_REVIEW, FAILED, COMPLETED, CANCELLED,
+    QUEUED,
+    SEARCHING,
+    DOWNLOADING,
+    NEEDS_REVIEW,
+    FAILED,
+    COMPLETED,
+    CANCELLED,
 }
 
 enum class CoverQueueStatus { RUNNING, PAUSED }

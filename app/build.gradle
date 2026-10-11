@@ -4,6 +4,8 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.detekt)
+    alias(libs.plugins.ktlint)
 }
 
 def releaseSigningFile = rootProject.file("keystore.properties")
@@ -11,6 +13,16 @@ def releaseSigningProperties = new Properties()
 def releaseSigningConfigured = releaseSigningFile.isFile()
 if (releaseSigningConfigured) {
     releaseSigningProperties.load(new FileInputStream(releaseSigningFile))
+}
+
+// Local (uncommitted) configuration, mirroring core-yukihub/build.gradle. Used for the public
+// OAuth client ids and the debug-only update-test override. Environment variables win.
+def localConfig = new Properties()
+def localConfigFile = rootProject.file('local.properties')
+if (localConfigFile.exists()) localConfigFile.withInputStream { localConfig.load(it) }
+def escapedEnvironmentValue = { String name ->
+    def value = providers.environmentVariable(name).orElse(localConfig.getProperty(name, "")).get()
+    value.replace("\\", "\\\\").replace("\"", "\\\"")
 }
 
 android {
@@ -21,14 +33,20 @@ android {
 
     defaultConfig {
         applicationId "com.kireibox.app"
+        manifestPlaceholders = [appAuthRedirectScheme: "kireibox"]
         minSdk 26
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         // Android 10 (API 29) needs legacy external storage so the KRKR native
         // engine can write <game>/savedata. requestLegacyExternalStorage only
         // takes effect when targetSdk <= 29; Android 11+ still enforces scoped
         // storage and keeps using MANAGE_EXTERNAL_STORAGE instead.
         targetSdk 29
-        versionCode 24
-        versionName "0.5.0-alpha.16"
+        versionCode 25
+        versionName "0.5.0-alpha.18"
+
+        // Update-test override (see UpdateInstalledVersion): empty here, filled only by the debug build type.
+        buildConfigField "String", "DEBUG_OVERRIDE_VERSION_NAME", "\"\""
+        buildConfigField "int", "DEBUG_OVERRIDE_VERSION_CODE", "0"
 
         ndk {
             abiFilters 'arm64-v8a'
@@ -54,6 +72,11 @@ android {
         debug {
             applicationIdSuffix ".debug"
             versionNameSuffix "-debug"
+            buildConfigField "String", "DEBUG_OVERRIDE_VERSION_NAME",
+                "\"${escapedEnvironmentValue("KIREIBOX_DEBUG_INSTALLED_VERSION_NAME")}\""
+            def debugVersionCode = escapedEnvironmentValue("KIREIBOX_DEBUG_INSTALLED_VERSION_CODE")
+            buildConfigField "int", "DEBUG_OVERRIDE_VERSION_CODE",
+                "${debugVersionCode.isBlank() ? 0 : debugVersionCode.toInteger()}"
         }
         demo {
             initWith release
@@ -120,6 +143,14 @@ android {
             ]
         }
     }
+}
+
+// Static-analysis gate (planbook A8). Frozen with a baseline; tighten stage by stage.
+detekt {
+    config.setFrom(files("$rootDir/config/detekt/detekt.yml"))
+    baseline = file("$rootDir/config/detekt/app-baseline.xml")
+    buildUponDefaultConfig = true
+    parallel = true
 }
 
 tasks.register("verifyReleaseSigning") {
@@ -247,8 +278,26 @@ tasks.register("verifyLegacySqliteSyntax") {
     }
 }
 
+// Structural guard (planbook A8): no main-source file may exceed the 800-line hard limit.
+// engine/ is a separate third-party module and is intentionally not covered here.
+tasks.register("verifyFileSize") {
+    doLast {
+        def limit = 800
+        def offenders = fileTree("src/main") {
+            include "**/*.kt", "**/*.java"
+        }.files.findAll { it.readLines().size() > limit }
+        if (!offenders.isEmpty()) {
+            throw new GradleException(
+                "Source files over ${limit} lines: " +
+                    offenders.collect { "${it.name}(${it.readLines().size()})" }.join(", ")
+            )
+        }
+    }
+}
+
 tasks.named("preBuild").configure {
     dependsOn("verifyLegacySqliteSyntax")
+    dependsOn("verifyFileSize")
 }
 
 kotlin {
@@ -261,6 +310,7 @@ dependencies {
     implementation project(':core-yukihub')
     implementation project(':engine')
 
+    implementation "net.openid:appauth:0.11.1"
     implementation libs.appcompat
     implementation libs.activity
     implementation libs.activity.compose
@@ -284,6 +334,9 @@ dependencies {
     implementation libs.shizuku.provider
     debugImplementation libs.compose.ui.tooling
 
+    androidTestImplementation 'androidx.test:runner:1.6.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.2.1'
+    testImplementation libs.retrofit
     testImplementation libs.junit
     testImplementation libs.coroutines.test
     testImplementation 'com.squareup.okhttp3:mockwebserver:5.4.0'

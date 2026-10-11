@@ -1,5 +1,6 @@
 package com.yuki.yukihub.metadata
-
+import com.yuki.yukihub.metadata.model.CoverSourceMode
+import com.yuki.yukihub.metadata.policy.NsfwCoverPolicy
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test

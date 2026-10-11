@@ -1,0 +1,142 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>ComplexCondition:ImmersiveGallerySettingsPolicy.kt$ImmersiveGallerySettingsPolicy$value != null &amp;&amp; value &gt; 0L &amp;&amp; (validGameIds == null || value in validGameIds)</ID>
+    <ID>ComplexCondition:MetadataUtils.kt$MetadataUtils$"timeout" in message || "time out" in message || "timed out" in message || "time_out" in message</ID>
+    <ID>ComplexCondition:YukiDatabaseHelper.kt$YukiDatabaseHelper$(oldVersion == 15 &amp;&amp; newVersion == 14) || (oldVersion == 19 &amp;&amp; newVersion == 18) || (oldVersion == 20 &amp;&amp; newVersion == 19) || (oldVersion == 21 &amp;&amp; newVersion == 20)</ID>
+    <ID>CyclomaticComplexMethod:AccountCatalogClient.kt$AccountCatalogClient$private fun get( source: CoverSourceMode, endpoint: String, parameters: Map&lt;String, String&gt;, ): JSONObject</ID>
+    <ID>CyclomaticComplexMethod:AccountCatalogClient.kt$AccountCatalogClient.Companion$fun parseNextmoe(row: JSONObject): VnMetadata</ID>
+    <ID>CyclomaticComplexMethod:BangumiClient.kt$BangumiClient$private fun parseSubject(o: JSONObject): VnMetadata</ID>
+    <ID>CyclomaticComplexMethod:CoverAccounts.kt$CoverAccounts$fun accessToken( source: CoverSourceMode, forceRefresh: Boolean = false, rejectedToken: String? = null, ): String</ID>
+    <ID>CyclomaticComplexMethod:CoverWorkEvidence.kt$CoverWorkEvidence$@JvmStatic fun merge( candidates: List&lt;Pair&lt;CoverSourceMode, RankedCoverCandidate&gt;&gt;, query: String, ): List&lt;WorkMatch&gt;</ID>
+    <ID>CyclomaticComplexMethod:DashboardLayoutCodec.kt$DashboardLayoutCodec$fun decode( raw: String?, profile: DashboardProfile, ): DashboardLayout</ID>
+    <ID>CyclomaticComplexMethod:DashboardLayoutEngine.kt$DashboardLayoutEngine$fun firstFit( widgets: List&lt;DashboardWidgetSpec&gt;, profile: DashboardProfile, ): List&lt;DashboardPlacement&gt;</ID>
+    <ID>CyclomaticComplexMethod:DashboardLayoutEngine.kt$DashboardLayoutEngine$fun normalizeBase( layout: DashboardLayout, profile: DashboardProfile, ): DashboardLayout</ID>
+    <ID>CyclomaticComplexMethod:DevLogger.kt$DevLogger$private fun startCapture(processFactory: () -&gt; Process = { Runtime.getRuntime().exec("logcat -v threadtime") })</ID>
+    <ID>CyclomaticComplexMethod:EngineDetector.kt$EngineDetector$@JvmStatic fun detect( dir: StorageNode?, featureDepth: Int = 2, rootFiles: List&lt;StorageNode&gt;? = null, boundExe: ((StorageNode) -&gt; Boolean)? = null, ): Result</ID>
+    <ID>CyclomaticComplexMethod:EngineDetector.kt$EngineDetector$private fun collectFeatures( dir: StorageNode?, lowerPrefix: String, originalPrefix: String, level: Int, maxLevel: Int, state: FeatureState, knownFiles: List&lt;StorageNode&gt;?, )</ID>
+    <ID>CyclomaticComplexMethod:GameBackupCodec.kt$GameBackupCodec$@Throws(Exception::class) fun importGamesJson( db: SQLiteDatabase, arr: JSONArray?, ): Int</ID>
+    <ID>CyclomaticComplexMethod:GameBackupCodec.kt$GameBackupCodec$@Throws(Exception::class) fun importPlaySessionsJson( db: SQLiteDatabase, arr: JSONArray?, ): Int</ID>
+    <ID>CyclomaticComplexMethod:GameLocationPreflight.kt$GameLocationPreflight$fun verify( context: Context, repository: GameRepository, source: Game, ): Result</ID>
+    <ID>CyclomaticComplexMethod:GameScanner.kt$GameScanner$private fun scanDirectory( context: Context, directory: StorageNode, depth: Int, maxDepth: Int, traverseMatchedGames: Boolean, report: ScanReport, seenUris: MutableSet&lt;String&gt;, request: ScanRequest, )</ID>
+    <ID>CyclomaticComplexMethod:KrkrLaunchTargetScanner.kt$KrkrLaunchTargetScanner$@JvmStatic @JvmOverloads fun list( root: StorageNode?, maxDepth: Int = DEFAULT_MAX_DEPTH, extension: String = ".xp3", boundExe: ((StorageNode) -&gt; Boolean)? = null, ): List&lt;String&gt;</ID>
+    <ID>CyclomaticComplexMethod:MetadataRepository.kt$MetadataRepository$@Throws(Exception::class) fun importMetadataJson( db: SQLiteDatabase, arr: JSONArray?, ): Int</ID>
+    <ID>CyclomaticComplexMethod:SingleCoreMigration.kt$SingleCoreMigration$@Synchronized fun run(context: Context): Result</ID>
+    <ID>CyclomaticComplexMethod:VndbClient.kt$VndbClient$private fun parse(o: JSONObject): VnMetadata</ID>
+    <ID>CyclomaticComplexMethod:YukiDatabaseHelper.kt$YukiDatabaseHelper$override fun onUpgrade( db: SQLiteDatabase, oldVersion: Int, newVersion: Int, )</ID>
+    <ID>CyclomaticComplexMethod:YukiMetadataService.kt$YukiMetadataService$suspend fun searchHybridCancellable( keyword: String, gameId: Long = 0, sources: List&lt;CoverSourceMode&gt; = CoverSourceMode.active, connected: (CoverSourceMode) -&gt; Boolean = { accounts.canSearch(it) }, ): RankedCoverSearchResult</ID>
+    <ID>EmptyFunctionBlock:YukiSettingsStoreTest.kt$YukiSettingsStoreTest.&lt;no name provided&gt;${}</ID>
+    <ID>InstanceOfCheckForException:AccountCatalogClient.kt$AccountCatalogClient$error is HttpClient.HttpFailure</ID>
+    <ID>InstanceOfCheckForException:HttpClient.kt$HttpClient$error is HttpFailure</ID>
+    <ID>LargeClass:GameQueryRepository.kt$GameQueryRepository</ID>
+    <ID>LargeClass:PlaySessionRepository.kt$PlaySessionRepository</ID>
+    <ID>LargeClass:YukiDatabaseHelper.kt$YukiDatabaseHelper : SQLiteOpenHelper</ID>
+    <ID>LargeClass:YukiSettingsStore.kt$YukiSettingsStore</ID>
+    <ID>LargeClass:YukiSettingsStoreTest.kt$YukiSettingsStoreTest</ID>
+    <ID>LongMethod:AccountCatalogClient.kt$AccountCatalogClient.Companion$fun parseNextmoe(row: JSONObject): VnMetadata</ID>
+    <ID>LongMethod:DashboardLayoutCodec.kt$DashboardLayoutCodec$fun decode( raw: String?, profile: DashboardProfile, ): DashboardLayout</ID>
+    <ID>LongMethod:GameBackupCodec.kt$GameBackupCodec$@Throws(Exception::class) fun importGamesJson( db: SQLiteDatabase, arr: JSONArray?, ): Int</ID>
+    <ID>LongMethod:YukiDatabaseHelper.kt$YukiDatabaseHelper$private fun mergeDuplicateGame( db: SQLiteDatabase, canonicalId: Long, duplicateId: Long, )</ID>
+    <ID>LongMethod:YukiSettingsStore.kt$YukiSettingsStore$fun snapshot(): Snapshot</ID>
+    <ID>LongParameterList:CoverAccounts.kt$CoverAccounts$( source: CoverSourceMode, token: String, refresh: String, expiresIn: Long, epoch: Long, profile: String = "", )</ID>
+    <ID>LongParameterList:DashboardLayouts.kt$DashboardLayouts$( layout: DashboardLayout, profile: DashboardProfile, instanceId: String, metric: TrendMetric, range: TrendRange, visualStyle: TrendVisualStyle, )</ID>
+    <ID>LongParameterList:DashboardLayouts.kt$DashboardLayouts$( layout: DashboardLayout, profile: DashboardProfile, instanceId: String, source: SpotlightSource, strategy: SpotlightStrategy, maxPages: Int = MAX_SPOTLIGHT_PAGES, )</ID>
+    <ID>LongParameterList:EngineDetector.kt$EngineDetector$( dir: StorageNode?, lowerPrefix: String, originalPrefix: String, level: Int, maxLevel: Int, state: FeatureState, knownFiles: List&lt;StorageNode&gt;?, )</ID>
+    <ID>LongParameterList:GameScanner.kt$GameScanner$( context: Context, directory: StorageNode, depth: Int, maxDepth: Int, traverseMatchedGames: Boolean, report: ScanReport, seenUris: MutableSet&lt;String&gt;, request: ScanRequest, )</ID>
+    <ID>LoopWithTooManyJumpStatements:AccountCatalogClient.kt$AccountCatalogClient$while</ID>
+    <ID>LoopWithTooManyJumpStatements:BangumiClient.kt$BangumiClient$for</ID>
+    <ID>LoopWithTooManyJumpStatements:DashboardLayoutCodec.kt$DashboardLayoutCodec$for</ID>
+    <ID>LoopWithTooManyJumpStatements:EngineDetector.kt$EngineDetector$for</ID>
+    <ID>LoopWithTooManyJumpStatements:GameBackupCodec.kt$GameBackupCodec$for</ID>
+    <ID>LoopWithTooManyJumpStatements:GameQueryRepository.kt$GameQueryRepository$for</ID>
+    <ID>LoopWithTooManyJumpStatements:GameScanner.kt$GameScanner$for</ID>
+    <ID>LoopWithTooManyJumpStatements:KrkrLaunchTargetScanner.kt$KrkrLaunchTargetScanner$for</ID>
+    <ID>LoopWithTooManyJumpStatements:MetadataRepository.kt$MetadataRepository$for</ID>
+    <ID>LoopWithTooManyJumpStatements:VndbClient.kt$VndbClient$for</ID>
+    <ID>LoopWithTooManyJumpStatements:YukiCoreFacade.kt$YukiCoreFacade$for</ID>
+    <ID>LoopWithTooManyJumpStatements:YukiMetadataService.kt$YukiMetadataService$for</ID>
+    <ID>MemberNameEqualsClassName:GameIdentityKey.kt$GameIdentityKey$fun gameIdentityKey( rootUri: String?, entryKey: String?, ): String</ID>
+    <ID>MemberNameEqualsClassName:GameIdentityKey.kt$GameIdentityKey$fun gameIdentityKey(game: Game?): String</ID>
+    <ID>NestedBlockDepth:AccountCatalogClient.kt$AccountCatalogClient$private fun get( source: CoverSourceMode, endpoint: String, parameters: Map&lt;String, String&gt;, ): JSONObject</ID>
+    <ID>NestedBlockDepth:AccountCatalogClient.kt$AccountCatalogClient.Companion$fun parseNextmoe(row: JSONObject): VnMetadata</ID>
+    <ID>NestedBlockDepth:CoverWorkEvidence.kt$CoverWorkEvidence$@JvmStatic fun merge( candidates: List&lt;Pair&lt;CoverSourceMode, RankedCoverCandidate&gt;&gt;, query: String, ): List&lt;WorkMatch&gt;</ID>
+    <ID>NestedBlockDepth:GameBackupCodec.kt$GameBackupCodec$@Throws(Exception::class) fun importGamesJson( db: SQLiteDatabase, arr: JSONArray?, ): Int</ID>
+    <ID>NestedBlockDepth:PlaySessionRepository.kt$PlaySessionRepository$fun finishPlaySession( sessionId: Long, end: Long, minDuration: Long, maxDuration: Long, )</ID>
+    <ID>NestedBlockDepth:PlaySessionRepository.kt$PlaySessionRepository$fun finishPlaySessionWithDuration( sessionId: Long, end: Long, recordedDuration: Long, minDuration: Long, maxDuration: Long, ): Boolean</ID>
+    <ID>NestedBlockDepth:SingleCoreMigration.kt$SingleCoreMigration$@Synchronized fun run(context: Context): Result</ID>
+    <ID>NestedBlockDepth:VnMetadata.kt$VnMetadata.Companion$@JvmStatic fun fromJson(json: String?): VnMetadata?</ID>
+    <ID>NestedBlockDepth:VndbClient.kt$VndbClient$private fun parse(o: JSONObject): VnMetadata</ID>
+    <ID>NestedBlockDepth:YukiDatabaseHelper.kt$YukiDatabaseHelper$private fun upgradeCanonicalStorageIdentity(db: SQLiteDatabase): Map&lt;Long, Long&gt;</ID>
+    <ID>NestedBlockDepth:YukiDatabaseHelper.kt$YukiDatabaseHelper$private fun upgradeRootUriKeysAndIntegrity(db: SQLiteDatabase)</ID>
+    <ID>NestedBlockDepth:YukiMetadataService.kt$YukiMetadataService$suspend fun searchCancellable( source: CoverSourceMode, keyword: String, gameId: Long = 0, maxQueries: Int = DEFAULT_MAX_QUERIES, ): RankedCoverSearchResult</ID>
+    <ID>ReturnCount:AccountCatalogClient.kt$AccountCatalogClient$fun searchNextmoe( keyword: String, limit: Int, refs: String = "", ): List&lt;VnMetadata&gt;</ID>
+    <ID>ReturnCount:AccountCatalogClient.kt$HikarinagiImagePolicy$@JvmStatic fun absolute(raw: String?): String</ID>
+    <ID>ReturnCount:CoverImagePolicy.kt$CoverImagePolicy$@JvmStatic fun proxyUrl(url: String): String</ID>
+    <ID>ReturnCount:DashboardLayouts.kt$DashboardLayouts$fun move( layout: DashboardLayout, profile: DashboardProfile, instanceId: String, targetIndex: Int, ): DashboardLayout</ID>
+    <ID>ReturnCount:DevLogger.kt$DevLogger$@JvmStatic fun formatSize(b: Long): String</ID>
+    <ID>ReturnCount:EngineDetector.kt$EngineDetector$@JvmStatic fun detect( dir: StorageNode?, featureDepth: Int = 2, rootFiles: List&lt;StorageNode&gt;? = null, boundExe: ((StorageNode) -&gt; Boolean)? = null, ): Result</ID>
+    <ID>ReturnCount:GameIdentityKey.kt$GameIdentityKey$fun normalizeEntryKey(value: String?): String</ID>
+    <ID>ReturnCount:GameLocationPreflight.kt$GameLocationPreflight$fun verify( context: Context, repository: GameRepository, source: Game, ): Result</ID>
+    <ID>ReturnCount:GameMapper.kt$GameMapper$internal fun normalizePlayStatus(status: String?): String</ID>
+    <ID>ReturnCount:GameQueryRepository.kt$GameQueryRepository$fun findAnyByRootKey(rootUriKey: String?): Game?</ID>
+    <ID>ReturnCount:GameQueryRepository.kt$GameQueryRepository$fun findScannedMatch(scanned: Game?): Game?</ID>
+    <ID>ReturnCount:GameQueryRepository.kt$GameQueryRepository$internal fun findBySyncIdentity( db: SQLiteDatabase, o: JSONObject?, rootUri: String, entryKey: String = GameIdentityKey.normalizeEntryKey(o?.optString("entry_key", "")), ): Game?</ID>
+    <ID>ReturnCount:GameQueryRepository.kt$GameQueryRepository$private fun uniqueScannedMatch( games: List&lt;Game&gt;?, scanned: Game, key: String, byLeaf: Boolean, ): Game?</ID>
+    <ID>ReturnCount:GameScanner.kt$GameScanner$@JvmStatic fun scan( context: Context, rootUri: Uri, request: ScanRequest, ): ScanReport</ID>
+    <ID>ReturnCount:GameScanner.kt$GameScanner$private fun scanDirectory( context: Context, directory: StorageNode, depth: Int, maxDepth: Int, traverseMatchedGames: Boolean, report: ScanReport, seenUris: MutableSet&lt;String&gt;, request: ScanRequest, )</ID>
+    <ID>ReturnCount:HttpClient.kt$HttpClient$@JvmStatic fun parseHttpDate(dateStr: String?): Long</ID>
+    <ID>ReturnCount:ImmersiveGallerySettingsPolicy.kt$ImmersiveGallerySettingsPolicy$fun toggleManualId( ids: Iterable&lt;Long&gt;, gameId: Long, ): List&lt;Long&gt;</ID>
+    <ID>ReturnCount:KireiPresentationSettings.kt$MotionModePolicy$fun resolve( requested: MotionMode, inputs: MotionDecisionInputs, ): MotionMode</ID>
+    <ID>ReturnCount:MetadataRepository.kt$MetadataRepository$private fun findGameIdByIdentity( db: SQLiteDatabase, rootUri: String?, entryKey: String?, ): Long</ID>
+    <ID>ReturnCount:MetadataUtils.kt$MetadataUtils$@JvmStatic @JvmName("isTimeout") fun isTimeout(error: Throwable?): Boolean</ID>
+    <ID>ReturnCount:PlaySessionRepository.kt$PlaySessionRepository$fun finishPlaySession( sessionId: Long, end: Long, minDuration: Long, maxDuration: Long, )</ID>
+    <ID>ReturnCount:PlaySessionRepository.kt$PlaySessionRepository$fun finishPlaySessionWithDuration( sessionId: Long, end: Long, recordedDuration: Long, minDuration: Long, maxDuration: Long, ): Boolean</ID>
+    <ID>ReturnCount:PlaySessionRepository.kt$PlaySessionRepository$fun markPlaySessionLaunched( sessionId: Long, launchedAt: Long, ): Boolean</ID>
+    <ID>ReturnCount:ScanExclusionMatcher.kt$ScanExclusionMatcher$private fun glob( value: String, pattern: String, ): Boolean</ID>
+    <ID>ReturnCount:ScanReport.kt$ScanReport$@JvmName("tryVisit") internal fun tryVisit( request: ScanRequest, currentUri: String?, ): Boolean</ID>
+    <ID>ReturnCount:ScanReport.kt$ScanReport$private fun tryCheck(request: ScanRequest): Boolean</ID>
+    <ID>ReturnCount:SpotlightSelector.kt$SpotlightSelector$fun selectPages( spec: DashboardWidgetSpec, games: List&lt;Game&gt;, sessionSeed: Long, epochDay: Long, ): List&lt;Game&gt;</ID>
+    <ID>ReturnCount:StorageRootIdentity.kt$StorageRootIdentity$private fun fileKey(path: String): String</ID>
+    <ID>ReturnCount:TitleMatchScorer.kt$TitleMatchScorer$@JvmStatic fun isAutomaticMatch(ranked: List&lt;Match&gt;): Boolean</ID>
+    <ID>ReturnCount:TitleMatchScorer.kt$TitleMatchScorer$@JvmStatic fun score( query: String?, candidate: String?, ): Double</ID>
+    <ID>ReturnCount:TitleMatchScorer.kt$TitleMatchScorer$@JvmStatic fun shouldAutoBind(ranked: List&lt;EvidenceMatch&gt;): Boolean</ID>
+    <ID>ReturnCount:TitleMatchScorer.kt$TitleMatchScorer$private fun episodeAdjustment( base: Double, queries: List&lt;String&gt;, metadata: VnMetadata, ): EpisodeAdjustment</ID>
+    <ID>ReturnCount:TitleQueryPlanner.kt$TitleQueryPlanner$@JvmStatic fun stripEngineDecorations(raw: String?): String</ID>
+    <ID>ReturnCount:TitleQueryPlanner.kt$TitleQueryPlanner$private fun stripAttachedLatinEngineVariant(value: String): String?</ID>
+    <ID>ReturnCount:Xp3EntrySelector.kt$Xp3EntrySelector$@JvmStatic @JvmOverloads fun select( entries: List&lt;Entry&gt;, folderName: String? = null, gameTitle: String? = null, ): String?</ID>
+    <ID>ReturnCount:Xp3EntrySelector.kt$Xp3EntrySelector$private fun matchesContains( stem: String, reference: String?, ): Boolean</ID>
+    <ID>ReturnCount:YukiMetadataService.kt$YukiMetadataService$fun searchRankedStaged( source: CoverSourceMode, keyword: String, limit: Int = 8, maxQueries: Int = 3, ): RankedCoverSearchResult</ID>
+    <ID>ReturnCount:YukiMetadataService.kt$YukiMetadataService$private suspend fun resolveNextmoeBridge( sources: List&lt;CoverSourceMode&gt;, keyword: String, lexical: List&lt;Pair&lt;CoverSourceMode, RankedCoverCandidate&gt;&gt;, timeoutMs: Long, ): List&lt;Pair&lt;CoverSourceMode, RankedCoverCandidate&gt;&gt;</ID>
+    <ID>ReturnCount:YukiMetadataService.kt$YukiMetadataService$suspend fun searchHybridCancellable( keyword: String, gameId: Long = 0, sources: List&lt;CoverSourceMode&gt; = CoverSourceMode.active, connected: (CoverSourceMode) -&gt; Boolean = { accounts.canSearch(it) }, ): RankedCoverSearchResult</ID>
+    <ID>ReturnCount:YukiSettingsStore.kt$YukiSettingsStore$fun removeScanRoot(uri: String): ScanRootChange?</ID>
+    <ID>SwallowedException:DevLogger.kt$DevLogger$e: Exception</ID>
+    <ID>ThrowsCount:AccountCatalogClient.kt$AccountCatalogClient$private fun get( source: CoverSourceMode, endpoint: String, parameters: Map&lt;String, String&gt;, ): JSONObject</ID>
+    <ID>ThrowsCount:GameBackupCodec.kt$GameBackupCodec$@Throws(Exception::class) fun importGamesJson( db: SQLiteDatabase, arr: JSONArray?, ): Int</ID>
+    <ID>ThrowsCount:HttpClient.kt$HttpClient$@JvmStatic @Throws(IOException::class) fun executeWithRetry( callFactory: CallFactory, maxRetries: Int, baseDelayMs: Long, ): String</ID>
+    <ID>ThrowsCount:PlaySessionRepository.kt$PlaySessionRepository$fun finishPlaySession( sessionId: Long, end: Long, minDuration: Long, maxDuration: Long, )</ID>
+    <ID>ThrowsCount:PlaySessionRepository.kt$PlaySessionRepository$fun finishPlaySessionWithDuration( sessionId: Long, end: Long, recordedDuration: Long, minDuration: Long, maxDuration: Long, ): Boolean</ID>
+    <ID>TooManyFunctions:DashboardLayouts.kt$DashboardLayouts</ID>
+    <ID>TooManyFunctions:GameQueryRepository.kt$GameQueryRepository</ID>
+    <ID>TooManyFunctions:GameRepository.kt$GameRepository</ID>
+    <ID>TooManyFunctions:ImmersiveGallerySettingsPolicy.kt$ImmersiveGallerySettingsPolicy</ID>
+    <ID>TooManyFunctions:MetadataRepository.kt$MetadataRepository</ID>
+    <ID>TooManyFunctions:TitleMatchScorer.kt$TitleMatchScorer</ID>
+    <ID>TooManyFunctions:YukiSettingsStore.kt$YukiSettingsStore</ID>
+    <ID>UnusedPrivateMember:MetadataRepository.kt$MetadataRepository$private fun findGameIdByRootUri( db: SQLiteDatabase, rootUri: String?, ): Long</ID>
+    <ID>UnusedPrivateProperty:PlaySessionRepository.kt$PlaySessionRepository$/** SQLiteDatabase access for callers that already opened a transaction. */ private val writable get() = helper.writableDatabase</ID>
+    <ID>UseCheckOrError:GameBackupCodec.kt$GameBackupCodec$throw IllegalStateException("并发合并云端游戏失败: ${g.title}")</ID>
+    <ID>UseCheckOrError:GameBackupCodec.kt$GameBackupCodec$throw IllegalStateException("并发插入后无法找到云端游戏: ${g.title}")</ID>
+    <ID>UseCheckOrError:GameBackupCodec.kt$GameBackupCodec$throw IllegalStateException("插入云端游戏失败: ${g.title}")</ID>
+    <ID>UseCheckOrError:GameBackupCodec.kt$GameBackupCodec$throw IllegalStateException("插入云端游玩记录失败: $uuid")</ID>
+    <ID>UseCheckOrError:GameBackupCodec.kt$GameBackupCodec$throw IllegalStateException("更新云端游戏失败: ${g.id}")</ID>
+    <ID>UseCheckOrError:GameBackupCodec.kt$GameBackupCodec$throw IllegalStateException("更新云端游玩记录失败: $uuid")</ID>
+    <ID>UseCheckOrError:MetadataRepository.kt$MetadataRepository$throw IllegalStateException("导入元数据失败: game=$gameId, source=$source")</ID>
+    <ID>UseCheckOrError:PlaySessionRepository.kt$PlaySessionRepository$throw IllegalStateException("保留短时启动记录失败: $sessionId")</ID>
+    <ID>UseCheckOrError:PlaySessionRepository.kt$PlaySessionRepository$throw IllegalStateException("写入手动总时长记录失败: $gameId")</ID>
+    <ID>UseCheckOrError:PlaySessionRepository.kt$PlaySessionRepository$throw IllegalStateException("写入手动游玩记录失败: $gameId")</ID>
+    <ID>UseCheckOrError:PlaySessionRepository.kt$PlaySessionRepository$throw IllegalStateException("删除无效游玩会话失败: $sessionId")</ID>
+    <ID>UseCheckOrError:PlaySessionRepository.kt$PlaySessionRepository$throw IllegalStateException("结算游玩会话失败: $sessionId")</ID>
+    <ID>UseCheckOrError:PlaySessionRepository.kt$PlaySessionRepository$throw IllegalStateException("设置手动总时长时找不到游戏: $gameId")</ID>
+  </CurrentIssues>
+</SmellBaseline>

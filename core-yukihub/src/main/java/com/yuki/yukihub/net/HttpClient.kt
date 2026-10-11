@@ -20,33 +20,55 @@ import java.util.concurrent.TimeUnit
  * - `@Throws(IOException::class)` 保留字节码签名上的 checked exception 声明。
  */
 object HttpClient {
-
-    private const val USER_AGENT = "KireiBox/0.5.0-alpha.1"
+    private const val USER_AGENT = "KireiBox (https://github.com/Yukin0a/KireiBox)"
 
     /** Raw response shape used by the original YukiHub metadata clients. */
     data class ResponseResult(
         @JvmField val code: Int,
-        @JvmField val body: String
+        @JvmField val body: String,
     ) {
         fun isSuccessful(): Boolean = code in 200..299
     }
 
-    private val HTTP_DATE_FORMATS = arrayOf(
-        "EEE, dd MMM yyyy HH:mm:ss z",
-        "EEEE, dd-MMM-yy HH:mm:ss z",
-        "EEE MMM dd HH:mm:ss yyyy"
-    )
+    private val rateLimits = java.util.concurrent.ConcurrentHashMap<String, Long>()
+
+    class HttpFailure(val status: Int, message: String) : IOException(message)
+
+    @JvmStatic fun checkRateLimit(host: String) {
+        val remaining = (rateLimits[host] ?: 0L) - System.currentTimeMillis()
+        if (remaining > 0) throw HttpFailure(429, "请求受限，请在 ${(remaining + 999) / 1000} 秒后重试")
+    }
+
+    @JvmStatic fun recordRateLimit(
+        host: String,
+        header: String?,
+    ) {
+        val now = System.currentTimeMillis()
+        val until =
+            header?.toLongOrNull()?.coerceIn(1, 86400)?.let { now + it * 1000 }
+                ?: parseHttpDate(header).takeIf { it > now } ?: (now + 60_000)
+        rateLimits.merge(host, until, ::maxOf)
+    }
+
+    private val HTTP_DATE_FORMATS =
+        arrayOf(
+            "EEE, dd MMM yyyy HH:mm:ss z",
+            "EEEE, dd-MMM-yy HH:mm:ss z",
+            "EEE MMM dd HH:mm:ss yyyy",
+        )
 
     /**
-     * 创建一个通用的 OkHttpClient Builder，预设了合理的超时和 User-Agent。
-     * 调用方可在此基础上追加 Interceptor（如 Auth）或修改超时。
+     * Creates a builder for **metadata API** calls. The connect timeout is deliberately short:
+     * a blocked or black-holed host (e.g. Bangumi on some networks) must fail fast so it cannot
+     * stall a search, while still leaving room for a normal TLS handshake.
      */
     @JvmStatic
     fun okHttpClientBuilder(): OkHttpClient.Builder =
         OkHttpClient.Builder()
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
-            .writeTimeout(30, TimeUnit.SECONDS)
+            .connectTimeout(3, TimeUnit.SECONDS)
+            .callTimeout(20, TimeUnit.SECONDS)
+            .readTimeout(15, TimeUnit.SECONDS)
+            .writeTimeout(15, TimeUnit.SECONDS)
             .retryOnConnectionFailure(false)
             .followRedirects(true)
             .followSslRedirects(true)
@@ -56,11 +78,17 @@ object HttpClient {
     fun defaultBuilder(): OkHttpClient.Builder =
         okHttpClientBuilder()
             .addInterceptor { chain ->
-                val original = chain.request()
-                val request = original.newBuilder()
-                    .header("User-Agent", USER_AGENT)
-                    .build()
-                chain.proceed(request)
+                MetadataRequests.track(chain.call()) {
+                    val original = chain.request()
+                    checkRateLimit(original.url.host)
+                    val request =
+                        original.newBuilder()
+                            .header("User-Agent", USER_AGENT)
+                            .build()
+                    chain.proceed(request).also { response ->
+                        if (response.code == 429) recordRateLimit(original.url.host, response.header("Retry-After"))
+                    }
+                }
             }
 
     /**
@@ -70,7 +98,10 @@ object HttpClient {
      * @param client  已配置好的 OkHttpClient
      */
     @JvmStatic
-    fun retrofit(baseUrl: String, client: OkHttpClient): Retrofit =
+    fun retrofit(
+        baseUrl: String,
+        client: OkHttpClient,
+    ): Retrofit =
         Retrofit.Builder()
             .baseUrl(baseUrl)
             .client(client)
@@ -93,11 +124,12 @@ object HttpClient {
     fun executeForStringWithCode(call: Call<ResponseBody>): ResponseResult {
         val response = call.execute()
         return try {
-            val body = if (response.isSuccessful) {
-                response.body()?.string().orEmpty()
-            } else {
-                response.errorBody()?.string().orEmpty()
-            }
+            val body =
+                if (response.isSuccessful) {
+                    response.body()?.string().orEmpty()
+                } else {
+                    response.errorBody()?.string().orEmpty()
+                }
             ResponseResult(response.code(), body)
         } finally {
             closeQuietly(response)
@@ -114,41 +146,41 @@ object HttpClient {
      */
     @JvmStatic
     @Throws(IOException::class)
-    fun executeWithRetry(callFactory: CallFactory, maxRetries: Int, baseDelayMs: Long): String {
+    fun executeWithRetry(
+        callFactory: CallFactory,
+        maxRetries: Int,
+        baseDelayMs: Long,
+    ): String {
         var lastError: IOException? = null
-        for (attempt in 0..maxRetries) {
-            var response: Response<ResponseBody>? = null
+        val attempts = maxRetries.coerceIn(0, 1)
+        for (attempt in 0..attempts) {
+            if (Thread.currentThread().isInterrupted) throw java.util.concurrent.CancellationException()
+            val response =
+                try {
+                    callFactory.create().execute()
+                } catch (error: IOException) {
+                    if (Thread.currentThread().isInterrupted) throw java.util.concurrent.CancellationException()
+                    if (error is HttpFailure) throw error
+                    lastError = error
+                    if (attempt == attempts) throw error
+                    sleep(baseDelayMs)
+                    continue
+                }
             try {
-                response = callFactory.create().execute()
-                if (response.isSuccessful) {
-                    return response.body()?.string() ?: ""
-                }
+                if (response.isSuccessful) return response.body()?.string().orEmpty()
                 val code = response.code()
-                val err = response.errorBody()?.string() ?: ""
-                val msg = "HTTP $code" + if (err.isEmpty()) "" else ": $err"
-
-                if ((code == 429 || code >= 500) && attempt < maxRetries) {
-                    lastError = IOException(msg)
-                    closeQuietly(response)
-                    response = null
-                    sleep(baseDelayMs * (attempt + 1))
-                    continue
+                if (code == 429) {
+                    val seconds = response.headers()["Retry-After"]?.toLongOrNull()?.coerceAtLeast(1) ?: 60
+                    throw HttpFailure(429, "请求受限，请在 $seconds 秒后重试")
                 }
-                throw IOException(msg)
-            } catch (e: IOException) {
-                if (attempt < maxRetries) {
-                    lastError = e
-                    closeQuietly(response)
-                    response = null
-                    sleep(baseDelayMs * (attempt + 1))
-                    continue
-                }
-                throw e
+                if (code < 500 || attempt == attempts) throw HttpFailure(code, "搜索失败（HTTP $code）")
+                lastError = IOException("服务暂时不可用（HTTP $code）")
             } finally {
                 closeQuietly(response)
             }
+            sleep(baseDelayMs)
         }
-        throw lastError ?: IOException("unreachable")
+        throw lastError ?: IOException("请求失败")
     }
 
     /**
@@ -164,7 +196,8 @@ object HttpClient {
         for (fmt in HTTP_DATE_FORMATS) {
             try {
                 return SimpleDateFormat(fmt, Locale.US).parse(dateStr)?.time ?: 0
-            } catch (_: Exception) { }
+            } catch (_: Exception) {
+            }
         }
         return 0
     }
@@ -181,7 +214,8 @@ object HttpClient {
             body?.close()
             val errBody = response.errorBody()
             if (errBody != null && errBody !== body) errBody.close()
-        } catch (_: Exception) { }
+        } catch (_: Exception) {
+        }
     }
 
     private fun sleep(ms: Long) {
@@ -189,6 +223,7 @@ object HttpClient {
             Thread.sleep(maxOf(0L, ms))
         } catch (_: InterruptedException) {
             Thread.currentThread().interrupt()
+            throw java.util.concurrent.CancellationException("请求已取消")
         }
     }
 }

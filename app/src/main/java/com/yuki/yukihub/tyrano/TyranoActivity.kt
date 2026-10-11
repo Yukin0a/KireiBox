@@ -2,8 +2,8 @@ package com.yuki.yukihub.tyrano
 
 import android.app.Activity
 import android.app.AlertDialog
-import android.content.Context
 import android.content.Intent
+import android.content.pm.ActivityInfo
 import android.graphics.Color
 import android.net.Uri
 import android.os.Build
@@ -11,9 +11,9 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
-import android.view.Gravity
 import android.view.WindowManager
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
@@ -25,13 +25,12 @@ import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
-import android.widget.Toast
+import com.yuki.yukihub.engine.EngineStorageProbe
+import org.tvp.kirikiri2.EnginePlaySessionJournal
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
-import com.yuki.yukihub.engine.EngineStorageProbe
-import org.tvp.kirikiri2.EnginePlaySessionJournal
 
 /** Tyrano WebView 宿主；资源服务与存档沙箱分别由独立组件负责。 */
 class TyranoActivity : Activity() {
@@ -50,7 +49,14 @@ class TyranoActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         playSessionJournal = EnginePlaySessionJournal.attach(this, intent)
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        if (intent.getBooleanExtra(EXTRA_KEEP_SCREEN_ON, true)) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        if (intent.getBooleanExtra(EXTRA_IGNORE_CUTOUT, false) && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            window.attributes =
+                window.attributes.apply {
+                    layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                }
+        }
+        requestedOrientation = intent.getIntExtra(EXTRA_ORIENTATION, ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE)
         enterFullscreen()
 
         gameDir = resolveGameDir(intent)
@@ -106,25 +112,28 @@ class TyranoActivity : Activity() {
         try {
             val hook = assets.open(TYRANO_HOOK_ASSET).buffered().use { it.readBytes() }
             Log.i(TAG, "asset loaded $TYRANO_HOOK_ASSET bytes=${hook.size}")
-            localServer = if (gameUsesAsar) {
-                TyranoLocalHttpServer(gameRoot, asarArchive, hook)
-            } else {
-                TyranoLocalHttpServer(gameRoot, hook)
-            }.also { it.start() }
+            localServer =
+                if (gameUsesAsar) {
+                    TyranoLocalHttpServer(gameRoot, asarArchive, hook)
+                } else {
+                    TyranoLocalHttpServer(gameRoot, hook)
+                }.also { it.start() }
         } catch (error: Throwable) {
             Log.e(TAG, "start local server failed", error)
             failLaunch("Tyrano 启动失败：本地服务器启动失败")
             return
         }
 
-        val root = FrameLayout(this).apply {
-            setBackgroundColor(Color.BLACK)
-            layoutParams = ViewGroup.LayoutParams(-1, -1)
-        }
-        val browser = WebView(this).apply {
-            layoutParams = ViewGroup.LayoutParams(-1, -1)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) defaultFocusHighlightEnabled = false
-        }
+        val root =
+            FrameLayout(this).apply {
+                setBackgroundColor(Color.BLACK)
+                layoutParams = ViewGroup.LayoutParams(-1, -1)
+            }
+        val browser =
+            WebView(this).apply {
+                layoutParams = ViewGroup.LayoutParams(-1, -1)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) defaultFocusHighlightEnabled = false
+            }
         webView = browser
         root.addView(browser)
         setContentView(root)
@@ -140,33 +149,39 @@ class TyranoActivity : Activity() {
         Log.e(TAG, message)
         if (isFinishing || isDestroyed) return
         val density = resources.displayMetrics.density
-        val root = FrameLayout(this).apply {
-            setBackgroundColor(Color.BLACK)
-            layoutParams = ViewGroup.LayoutParams(-1, -1)
-        }
-        val messageText = TextView(this).apply {
-            setText(message)
-            setTextColor(Color.WHITE)
-            textSize = 14f
-            setLineSpacing(0f, 1.15f)
-            setPadding(
-                (24 * density).toInt(), (24 * density).toInt(),
-                (24 * density).toInt(), (12 * density).toInt(),
-            )
-        }
-        val close = TextView(this).apply {
-            text = "返回"
-            setTextColor(Color.rgb(120, 170, 255))
-            textSize = 16f
-            gravity = Gravity.CENTER
-            setPadding(0, (12 * density).toInt(), 0, (24 * density).toInt())
-            setOnClickListener { finish() }
-        }
-        val column = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            addView(messageText)
-            addView(close)
-        }
+        val root =
+            FrameLayout(this).apply {
+                setBackgroundColor(Color.BLACK)
+                layoutParams = ViewGroup.LayoutParams(-1, -1)
+            }
+        val messageText =
+            TextView(this).apply {
+                setText(message)
+                setTextColor(Color.WHITE)
+                textSize = 14f
+                setLineSpacing(0f, 1.15f)
+                setPadding(
+                    (24 * density).toInt(),
+                    (24 * density).toInt(),
+                    (24 * density).toInt(),
+                    (12 * density).toInt(),
+                )
+            }
+        val close =
+            TextView(this).apply {
+                text = "返回"
+                setTextColor(Color.rgb(120, 170, 255))
+                textSize = 16f
+                gravity = Gravity.CENTER
+                setPadding(0, (12 * density).toInt(), 0, (24 * density).toInt())
+                setOnClickListener { finish() }
+            }
+        val column =
+            LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                addView(messageText)
+                addView(close)
+            }
         root.addView(column)
         setContentView(root)
     }
@@ -177,28 +192,38 @@ class TyranoActivity : Activity() {
         runCatching { browser.clearCache(true) }
         runCatching { browser.setLayerType(View.LAYER_TYPE_HARDWARE, null) }
         browser.setBackgroundColor(Color.BLACK)
-        browser.webViewClient = object : WebViewClient() {
-            override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
-                return handleNavigation(request?.url?.toString(), request?.isForMainFrame != false)
+        browser.webViewClient =
+            object : WebViewClient() {
+                override fun shouldOverrideUrlLoading(
+                    view: WebView?,
+                    request: WebResourceRequest?
+                ): Boolean {
+                    return handleNavigation(request?.url?.toString(), request?.isForMainFrame != false)
+                }
+
+                @Suppress("DEPRECATION")
+                override fun shouldOverrideUrlLoading(
+                    view: WebView?,
+                    url: String?
+                ): Boolean = handleNavigation(url, true)
+
+                override fun shouldInterceptRequest(
+                    view: WebView?,
+                    request: WebResourceRequest?,
+                ): WebResourceResponse? =
+                    request?.url
+                        ?.takeUnless(::isAllowedGameResource)
+                        ?.let { blockedResponse() }
+
+                @Suppress("DEPRECATION")
+                override fun shouldInterceptRequest(
+                    view: WebView?,
+                    url: String?
+                ): WebResourceResponse? {
+                    val uri = url?.let(Uri::parse)
+                    return uri?.takeUnless(::isAllowedGameResource)?.let { blockedResponse() }
+                }
             }
-
-            @Suppress("DEPRECATION")
-            override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean =
-                handleNavigation(url, true)
-
-            override fun shouldInterceptRequest(
-                view: WebView?,
-                request: WebResourceRequest?,
-            ): WebResourceResponse? = request?.url
-                ?.takeUnless(::isAllowedGameResource)
-                ?.let { blockedResponse() }
-
-            @Suppress("DEPRECATION")
-            override fun shouldInterceptRequest(view: WebView?, url: String?): WebResourceResponse? {
-                val uri = url?.let(Uri::parse)
-                return uri?.takeUnless(::isAllowedGameResource)?.let { blockedResponse() }
-            }
-        }
         browser.webChromeClient = WebChromeClient()
         browser.settings.apply {
             userAgentString = "$userAgentString;tyranoplayer-android-1.0;yukihub-internal-tyrano"
@@ -221,7 +246,10 @@ class TyranoActivity : Activity() {
         }
     }
 
-    private fun handleNavigation(url: String?, mainFrame: Boolean): Boolean {
+    private fun handleNavigation(
+        url: String?,
+        mainFrame: Boolean
+    ): Boolean {
         if (url == null) return true
         if (handleSpecialScheme(url)) return true
         val uri = runCatching { Uri.parse(url) }.getOrNull() ?: return true
@@ -237,22 +265,28 @@ class TyranoActivity : Activity() {
             uri?.port == server.port
     }
 
-    private fun isAllowedGameResource(uri: Uri): Boolean = isLocalGameUri(uri) ||
-        uri.scheme.equals("data", ignoreCase = true) ||
-        uri.scheme.equals("blob", ignoreCase = true) ||
-        uri.scheme.equals("about", ignoreCase = true)
+    private fun isAllowedGameResource(uri: Uri): Boolean =
+        isLocalGameUri(uri) ||
+            uri.scheme.equals("data", ignoreCase = true) ||
+            uri.scheme.equals("blob", ignoreCase = true) ||
+            uri.scheme.equals("about", ignoreCase = true)
 
-    private fun blockedResponse() = WebResourceResponse(
-        "text/plain",
-        "UTF-8",
-        ByteArrayInputStream(ByteArray(0)),
-    )
+    private fun blockedResponse() =
+        WebResourceResponse(
+            "text/plain",
+            "UTF-8",
+            ByteArrayInputStream(ByteArray(0)),
+        )
 
     private fun openExternalHttpUrl(uri: Uri?) {
         if (uri == null ||
-            (!uri.scheme.equals("http", ignoreCase = true) &&
-                !uri.scheme.equals("https", ignoreCase = true))
-        ) return
+            (
+                !uri.scheme.equals("http", ignoreCase = true) &&
+                    !uri.scheme.equals("https", ignoreCase = true)
+            )
+        ) {
+            return
+        }
         try {
             startActivity(Intent(Intent.ACTION_VIEW, uri))
         } catch (error: Throwable) {
@@ -262,15 +296,16 @@ class TyranoActivity : Activity() {
 
     private fun resolveGameDir(source: Intent?): String? {
         source ?: return null
-        val path = uriToFilePath(
-            firstNonEmpty(
-                source.getStringExtra("path"),
-                source.getStringExtra("gamePath"),
-                source.getStringExtra("projectRoot"),
-                source.getStringExtra("gamedir"),
-                source.getStringExtra("rootUri"),
-            ),
-        ) ?: return null
+        val path =
+            uriToFilePath(
+                firstNonEmpty(
+                    source.getStringExtra("path"),
+                    source.getStringExtra("gamePath"),
+                    source.getStringExtra("projectRoot"),
+                    source.getStringExtra("gamedir"),
+                    source.getStringExtra("rootUri"),
+                ),
+            ) ?: return null
         val file = File(path).let { if (it.isFile) it.parentFile else it }
         return file?.absolutePath
     }
@@ -294,8 +329,7 @@ class TyranoActivity : Activity() {
         return raw
     }
 
-    private fun firstNonEmpty(vararg values: String?): String? =
-        values.firstOrNull { !it.isNullOrBlank() }?.trim()
+    private fun firstNonEmpty(vararg values: String?): String? = values.firstOrNull { !it.isNullOrBlank() }?.trim()
 
     private fun handleSpecialScheme(url: String): Boolean {
         val lower = url.lowercase(Locale.ROOT)
@@ -306,10 +340,11 @@ class TyranoActivity : Activity() {
                     true
                 }
                 lower.startsWith("tyranoplayer-web://") -> {
-                    val target = Uri.decode(
-                        queryParam(url, "url")?.takeIf(String::isNotBlank)
-                            ?: url.removePrefix("tyranoplayer-web://"),
-                    )
+                    val target =
+                        Uri.decode(
+                            queryParam(url, "url")?.takeIf(String::isNotBlank)
+                                ?: url.removePrefix("tyranoplayer-web://"),
+                        )
                     target?.takeIf(String::isNotBlank)?.let { openExternalHttpUrl(Uri.parse(it.trim())) }
                     true
                 }
@@ -352,7 +387,10 @@ class TyranoActivity : Activity() {
         }
     }
 
-    private fun queryParam(url: String?, key: String?): String? {
+    private fun queryParam(
+        url: String?,
+        key: String?
+    ): String? {
         if (url == null || key == null) return null
         val queryStart = url.indexOf('?')
         if (queryStart < 0 || queryStart + 1 >= url.length) return null
@@ -402,7 +440,9 @@ class TyranoActivity : Activity() {
         super.onResume()
         playSessionJournal?.resume()
         enterFullscreen()
-        if (firstResume) firstResume = false else {
+        if (firstResume) {
+            firstResume = false
+        } else {
             runCatching { webView?.loadUrl("javascript:if(window._tyrano_player){_tyrano_player.resumeAllAudio();}") }
         }
         runCatching { webView?.onResume() }
@@ -431,19 +471,24 @@ class TyranoActivity : Activity() {
 
     @Suppress("DEPRECATION")
     private fun enterFullscreen() {
-        val flags = View.SYSTEM_UI_FLAG_LAYOUT_STABLE or
-            View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or
-            View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
-            View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
-            View.SYSTEM_UI_FLAG_FULLSCREEN or
-            View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+        val flags =
+            View.SYSTEM_UI_FLAG_LAYOUT_STABLE or
+                View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or
+                View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
+                View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+                View.SYSTEM_UI_FLAG_FULLSCREEN or
+                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
         runCatching { window.decorView.systemUiVisibility = flags }
     }
 
-    private fun resolveSaveDirectory(source: Intent?, gameRoot: File?): File? {
+    private fun resolveSaveDirectory(
+        source: Intent?,
+        gameRoot: File?
+    ): File? {
         if (source?.getBooleanExtra(EXTRA_SCOPED_SAVE_DIR, false) == true) {
-            val explicit = source.getStringExtra(EXTRA_SCOPED_SAVE_ROOT)?.takeIf(String::isNotBlank)
-                ?: return null
+            val explicit =
+                source.getStringExtra(EXTRA_SCOPED_SAVE_ROOT)?.takeIf(String::isNotBlank)
+                    ?: return null
             return try {
                 val external = getExternalFilesDir(null) ?: return null
                 val namespace = File(File(external, "save"), "tyrano").canonicalFile
@@ -468,18 +513,23 @@ class TyranoActivity : Activity() {
         fun getStorage(key: String?): String = TyranoStorage.read(saveDirectory, key)
 
         @JavascriptInterface
-        fun setStorage(key: String?, value: String?) = TyranoStorage.write(saveDirectory, key, value)
+        fun setStorage(
+            key: String?,
+            value: String?
+        ) = TyranoStorage.write(saveDirectory, key, value)
 
         @JavascriptInterface
-        fun openUrl(url: String?) = runOnUiThread {
-            try {
-                openExternalHttpUrl(Uri.parse(url))
-            } catch (error: Throwable) {
-                Log.w(TAG, "invalid external URL", error)
+        fun openUrl(url: String?) =
+            runOnUiThread {
+                try {
+                    openExternalHttpUrl(Uri.parse(url))
+                } catch (error: Throwable) {
+                    Log.w(TAG, "invalid external URL", error)
+                }
             }
-        }
 
         @JavascriptInterface fun stopMovie() = Unit
+
         @JavascriptInterface fun audio(value: String?) = Unit
     }
 
@@ -488,14 +538,17 @@ class TyranoActivity : Activity() {
         private const val TYRANO_HOOK_ASSET = "__tyrano__.js"
         private const val JS_BRIDGE_NAME = "appJsInterface"
         private const val EXTRA_SCOPED_SAVE_DIR = "scopedSaveDir"
+        private const val EXTRA_ORIENTATION = "orientation"
+        private const val EXTRA_KEEP_SCREEN_ON = "keepScreenOn"
+        private const val EXTRA_IGNORE_CUTOUT = "ignoreCutout"
         private const val EXTRA_SCOPED_SAVE_ROOT = "scopedSaveRoot"
         private const val PROCESS_EXIT_DELAY_MS = 500L
 
-
-
         @JvmStatic
         @Throws(Exception::class)
-        fun resolveStorageFile(directory: File?, key: String?): File? =
-            TyranoStorage.resolveFile(directory, key)
+        fun resolveStorageFile(
+            directory: File?,
+            key: String?
+        ): File? = TyranoStorage.resolveFile(directory, key)
     }
 }

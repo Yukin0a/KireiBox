@@ -15,12 +15,14 @@ import org.junit.Test
 
 class DashboardTrendEditorPolicyTest {
     @Test fun playTrendRemainsAvailableAfterItHasBeenAddedButOtherUniqueTypesDoNot() {
-        val layout = DashboardLayout(
-            widgets = listOf(
-                DashboardWidgetSpec("trend", DashboardWidgetType.PLAY_TREND, DashboardWidgetSize(1, 1)),
-                DashboardWidgetSpec("overview", DashboardWidgetType.LIBRARY_OVERVIEW, DashboardWidgetSize(1, 1)),
+        val layout =
+            DashboardLayout(
+                widgets =
+                    listOf(
+                        DashboardWidgetSpec("trend", DashboardWidgetType.PLAY_TREND, DashboardWidgetSize(1, 1)),
+                        DashboardWidgetSpec("overview", DashboardWidgetType.LIBRARY_OVERVIEW, DashboardWidgetSize(1, 1)),
+                    )
             )
-        )
 
         val available = DashboardTrendEditorPolicy.availableTypes(layout)
 
@@ -29,12 +31,17 @@ class DashboardTrendEditorPolicyTest {
     }
 
     @Test fun completeCommitsOnlyTheTargetTrendDraftAndCancelLeavesDashboardDraftUnchanged() {
-        val layout = DashboardLayout(widgets = listOf(
-            DashboardWidgetSpec("first", DashboardWidgetType.PLAY_TREND, DashboardWidgetSize(1, 1)),
-            DashboardWidgetSpec("second", DashboardWidgetType.PLAY_TREND, DashboardWidgetSize(1, 1)),
-        ))
-        val panel = DashboardTrendEditorPolicy.begin(layout, "second")
-            .copy(metric = TrendMetric.GAME_OPENS, range = TrendRange.DAYS_30, visualStyle = TrendVisualStyle.AREA)
+        val layout =
+            DashboardLayout(
+                widgets =
+                    listOf(
+                        DashboardWidgetSpec("first", DashboardWidgetType.PLAY_TREND, DashboardWidgetSize(1, 1)),
+                        DashboardWidgetSpec("second", DashboardWidgetType.PLAY_TREND, DashboardWidgetSize(1, 1)),
+                    )
+            )
+        val panel =
+            DashboardTrendEditorPolicy.begin(layout, "second")
+                .copy(metric = TrendMetric.GAME_OPENS, range = TrendRange.DAYS_30, visualStyle = TrendVisualStyle.AREA)
 
         val committed = DashboardTrendEditorPolicy.complete(layout, DashboardProfile.COMPACT, "second", panel)
 

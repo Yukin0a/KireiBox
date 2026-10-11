@@ -28,19 +28,21 @@ class DirectoryAutoRefreshPolicyTest {
 
     @Test
     fun singleNewGameNoticeIncludesItsTitle() {
-        val notice = DirectoryAutoRefreshPolicy.notice(
-            ScanImportSummary(addedGames = listOf(Game(id = 7L, title = "星空列车"))),
-            failedDirectoryCount = 0,
-        )
+        val notice =
+            DirectoryAutoRefreshPolicy.notice(
+                ScanImportSummary(addedGames = listOf(Game(id = 7L, title = "星空列车"))),
+                failedDirectoryCount = 0,
+            )
         assertEquals("自动更新：发现并添加 1 个新游戏：星空列车", notice)
     }
 
     @Test
     fun partialFailureNoticeRetainsSuccessfulAddedCount() {
-        val notice = DirectoryAutoRefreshPolicy.notice(
-            ScanImportSummary(addedGames = listOf(Game(id = 1L), Game(id = 2L))),
-            failedDirectoryCount = 1,
-        )
+        val notice =
+            DirectoryAutoRefreshPolicy.notice(
+                ScanImportSummary(addedGames = listOf(Game(id = 1L), Game(id = 2L))),
+                failedDirectoryCount = 1,
+            )
         assertEquals("自动更新：添加 2 个新游戏，1 个目录扫描失败", notice)
     }
 

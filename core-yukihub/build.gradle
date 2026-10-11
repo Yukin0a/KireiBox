@@ -3,14 +3,30 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.detekt)
+    alias(libs.plugins.ktlint)
 }
 
+def localConfig = new Properties()
+def localConfigFile = rootProject.file('local.properties')
+if (localConfigFile.exists()) localConfigFile.withInputStream { localConfig.load(it) }
 def escapedEnvironmentValue = { String name ->
     providers.environmentVariable(name)
-        .orElse("")
+        .orElse(localConfig.getProperty(name, ""))
         .get()
         .replace("\\", "\\\\")
         .replace("\"", "\\\"")
+}
+
+// Public OAuth client ids are non-secret identifiers: both providers require a PKCE
+// public client with no client_secret, so shipping the id is safe (RFC 8252).
+// The NextMoe client below is KireiBox's own registered app ("Kireibox"): its
+// user-login flow is enabled with the loopback callback http://127.0.0.1/callback and
+// the openid/profile/catalog:read scopes. Environment variables and local.properties
+// still override these defaults.
+def publicClientId = { String name, String fallback ->
+    def value = escapedEnvironmentValue(name)
+    value.isBlank() ? fallback : value
 }
 
 android {
@@ -19,14 +35,10 @@ android {
 
     defaultConfig {
         minSdk 26
-        buildConfigField "String", "YMGAL_CLIENT_ID",
-            "\"${escapedEnvironmentValue("KIREIBOX_YMGAL_CLIENT_ID")}\""
-        buildConfigField "String", "YMGAL_CLIENT_SECRET",
-            "\"${escapedEnvironmentValue("KIREIBOX_YMGAL_CLIENT_SECRET")}\""
+        buildConfigField "String", "NEXTMOE_CLIENT_ID",
+            "\"${publicClientId("KIREIBOX_NEXTMOE_CLIENT_ID", "580bd6339a2f9006f3b9a9e6b83d2ca8")}\""
         buildConfigField "String", "HIKARINAGI_CLIENT_ID",
             "\"${escapedEnvironmentValue("KIREIBOX_HIKARINAGI_CLIENT_ID")}\""
-        buildConfigField "String", "HIKARINAGI_CLIENT_SECRET",
-            "\"${escapedEnvironmentValue("KIREIBOX_HIKARINAGI_CLIENT_SECRET")}\""
     }
 
     compileOptions {
@@ -52,4 +64,32 @@ dependencies {
     implementation libs.coroutines.android
     implementation libs.kotlin.stdlib
     testImplementation libs.junit
+}
+
+// Static-analysis gate (planbook A8). Frozen with a baseline; tighten stage by stage.
+detekt {
+    config.setFrom(files("$rootDir/config/detekt/detekt.yml"))
+    baseline = file("$rootDir/config/detekt/core-yukihub-baseline.xml")
+    buildUponDefaultConfig = true
+    parallel = true
+}
+
+// Structural guard (planbook A8): no main-source file may exceed the 800-line hard limit.
+tasks.register("verifyFileSize") {
+    doLast {
+        def limit = 800
+        def offenders = fileTree("src/main") {
+            include "**/*.kt", "**/*.java"
+        }.files.findAll { it.readLines().size() > limit }
+        if (!offenders.isEmpty()) {
+            throw new GradleException(
+                "Source files over ${limit} lines: " +
+                    offenders.collect { "${it.name}(${it.readLines().size()})" }.join(", ")
+            )
+        }
+    }
+}
+
+tasks.named("preBuild").configure {
+    dependsOn("verifyFileSize")
 }

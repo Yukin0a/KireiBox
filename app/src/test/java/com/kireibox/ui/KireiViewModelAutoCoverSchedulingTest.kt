@@ -1,6 +1,6 @@
 package com.kireibox.ui
 
-import com.yuki.yukihub.metadata.CoverSourceMode
+import com.yuki.yukihub.metadata.model.CoverSourceMode
 import com.yuki.yukihub.model.Game
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -8,7 +8,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class KireiViewModelAutoCoverSchedulingTest {
-
     private fun game(id: Long) = Game(id = id, title = "Game $id")
 
     @Test

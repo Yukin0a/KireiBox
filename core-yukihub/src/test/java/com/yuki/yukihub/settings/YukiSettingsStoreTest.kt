@@ -13,52 +13,128 @@ class YukiSettingsStoreTest {
         val store = mutableMapOf<String, Any?>()
         return object : SharedPreferences {
             override fun getAll(): Map<String, *> = store.toMap()
-            override fun getString(key: String?, defValue: String?): String? = store[key] as? String ?: defValue
+
+            override fun getString(
+                key: String?,
+                defValue: String?,
+            ): String? = store[key] as? String ?: defValue
+
             @Suppress("UNCHECKED_CAST")
-            override fun getStringSet(key: String?, defValues: MutableSet<String>?): MutableSet<String>? =
-                store[key] as? MutableSet<String> ?: defValues
-            override fun getInt(key: String?, defValue: Int): Int = store[key] as? Int ?: defValue
-            override fun getLong(key: String?, defValue: Long): Long = store[key] as? Long ?: defValue
-            override fun getFloat(key: String?, defValue: Float): Float = store[key] as? Float ?: defValue
-            override fun getBoolean(key: String?, defValue: Boolean): Boolean = store[key] as? Boolean ?: defValue
+            override fun getStringSet(
+                key: String?,
+                defValues: MutableSet<String>?,
+            ): MutableSet<String>? = store[key] as? MutableSet<String> ?: defValues
+
+            override fun getInt(
+                key: String?,
+                defValue: Int,
+            ): Int = store[key] as? Int ?: defValue
+
+            override fun getLong(
+                key: String?,
+                defValue: Long,
+            ): Long = store[key] as? Long ?: defValue
+
+            override fun getFloat(
+                key: String?,
+                defValue: Float,
+            ): Float = store[key] as? Float ?: defValue
+
+            override fun getBoolean(
+                key: String?,
+                defValue: Boolean,
+            ): Boolean = store[key] as? Boolean ?: defValue
+
             override fun contains(key: String?): Boolean = store.containsKey(key)
+
             override fun edit(): SharedPreferences.Editor {
                 val edits = mutableMapOf<String, Any?>()
                 return object : SharedPreferences.Editor {
-                    override fun putString(key: String?, value: String?): SharedPreferences.Editor {
-                        if (key != null) edits[key] = value; return this
+                    override fun putString(
+                        key: String?,
+                        value: String?,
+                    ): SharedPreferences.Editor {
+                        if (key != null) edits[key] = value
+                        return this
                     }
-                    override fun putStringSet(key: String?, values: MutableSet<String>?): SharedPreferences.Editor {
-                        if (key != null) edits[key] = values; return this
+
+                    override fun putStringSet(
+                        key: String?,
+                        values: MutableSet<String>?,
+                    ): SharedPreferences.Editor {
+                        if (key != null) edits[key] = values
+                        return this
                     }
-                    override fun putInt(key: String?, value: Int): SharedPreferences.Editor {
-                        if (key != null) edits[key] = value; return this
+
+                    override fun putInt(
+                        key: String?,
+                        value: Int,
+                    ): SharedPreferences.Editor {
+                        if (key != null) edits[key] = value
+                        return this
                     }
-                    override fun putLong(key: String?, value: Long): SharedPreferences.Editor {
-                        if (key != null) edits[key] = value; return this
+
+                    override fun putLong(
+                        key: String?,
+                        value: Long,
+                    ): SharedPreferences.Editor {
+                        if (key != null) edits[key] = value
+                        return this
                     }
-                    override fun putFloat(key: String?, value: Float): SharedPreferences.Editor {
-                        if (key != null) edits[key] = value; return this
+
+                    override fun putFloat(
+                        key: String?,
+                        value: Float,
+                    ): SharedPreferences.Editor {
+                        if (key != null) edits[key] = value
+                        return this
                     }
-                    override fun putBoolean(key: String?, value: Boolean): SharedPreferences.Editor {
-                        if (key != null) edits[key] = value; return this
+
+                    override fun putBoolean(
+                        key: String?,
+                        value: Boolean,
+                    ): SharedPreferences.Editor {
+                        if (key != null) edits[key] = value
+                        return this
                     }
+
                     override fun remove(key: String?): SharedPreferences.Editor {
-                        if (key != null) edits[key] = null; return this
+                        if (key != null) edits[key] = null
+                        return this
                     }
-                    override fun clear(): SharedPreferences.Editor { edits.clear(); return this }
-                    override fun commit(): Boolean { store.putAll(edits); return true }
-                    override fun apply() { store.putAll(edits) }
+
+                    override fun clear(): SharedPreferences.Editor {
+                        edits.clear()
+                        return this
+                    }
+
+                    override fun commit(): Boolean {
+                        store.putAll(edits)
+                        return true
+                    }
+
+                    override fun apply() {
+                        store.putAll(edits)
+                    }
                 }
             }
-            override fun registerOnSharedPreferenceChangeListener(
-                listener: SharedPreferences.OnSharedPreferenceChangeListener?) {}
-            override fun unregisterOnSharedPreferenceChangeListener(
-                listener: SharedPreferences.OnSharedPreferenceChangeListener?) {}
+
+            override fun registerOnSharedPreferenceChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener?) {}
+
+            override fun unregisterOnSharedPreferenceChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener?) {}
         }
     }
 
     // --- Snapshot data class default-value tests ---
+
+    @Test fun activeMetadataSelectionsSurviveAndOnlyRetiredSourcesFallBack() {
+        listOf("vndb", "bangumi", "nextmoe", "hikarinagi").forEach {
+            assertEquals(it, YukiSettingsStore.normalizeMetadataSource(it))
+        }
+        listOf(null, "ymgal", "bangumi_mirror", "unknown").forEach {
+            assertEquals("bangumi", YukiSettingsStore.normalizeMetadataSource(it))
+        }
+    }
 
     @Test
     fun `nsfw blur defaults on and persists global changes`() {
@@ -70,6 +146,57 @@ class YukiSettingsStoreTest {
         assertFalse(YukiSettingsStore(prefs).snapshot().nsfwBlurEnabled)
         store.setNsfwBlurEnabled(true)
         assertTrue(YukiSettingsStore(prefs).snapshot().nsfwBlurEnabled)
+    }
+
+    @Test
+    fun `cover hybrid auto match defaults on and round-trips through the persisted key`() {
+        val prefs = fakePrefs()
+        val store = YukiSettingsStore(prefs)
+
+        assertTrue(store.snapshot().coverHybridAutoMatch)
+        store.setCoverHybridAutoMatch(false)
+        assertFalse(YukiSettingsStore(prefs).snapshot().coverHybridAutoMatch)
+        assertEquals(false, prefs.getBoolean("cover_hybrid_auto_match", true))
+        store.setCoverHybridAutoMatch(true)
+        assertTrue(YukiSettingsStore(prefs).snapshot().coverHybridAutoMatch)
+    }
+
+    @Test
+    fun `strict l2 defaults off and round-trips through the persisted key`() {
+        val prefs = fakePrefs()
+        val store = YukiSettingsStore(prefs)
+
+        assertFalse(store.coverStrictL2())
+        assertFalse(store.snapshot().coverStrictL2)
+        store.setCoverStrictL2(true)
+        assertTrue(YukiSettingsStore(prefs).coverStrictL2())
+        assertTrue(YukiSettingsStore(prefs).snapshot().coverStrictL2)
+        assertEquals(true, prefs.getBoolean("cover_strict_l2", false))
+    }
+
+    @Test
+    fun `wifi only auto match defaults off and round-trips through the persisted key`() {
+        val prefs = fakePrefs()
+        val store = YukiSettingsStore(prefs)
+
+        assertFalse(store.coverAutoMatchWifiOnly())
+        assertFalse(store.snapshot().coverAutoMatchWifiOnly)
+        store.setCoverAutoMatchWifiOnly(true)
+        assertTrue(YukiSettingsStore(prefs).coverAutoMatchWifiOnly())
+        assertTrue(YukiSettingsStore(prefs).snapshot().coverAutoMatchWifiOnly)
+        assertEquals(true, prefs.getBoolean("cover_auto_match_wifi_only", false))
+    }
+
+    @Test
+    fun `no match store defaults empty and round-trips the raw payload`() {
+        val prefs = fakePrefs()
+        val store = YukiSettingsStore(prefs)
+
+        assertEquals("", store.coverNoMatchStore())
+        assertEquals("", store.snapshot().coverNoMatchStore)
+        store.setCoverNoMatchStore("[\"7:123\"]")
+        assertEquals("[\"7:123\"]", YukiSettingsStore(prefs).coverNoMatchStore())
+        assertEquals("[\"7:123\"]", YukiSettingsStore(prefs).snapshot().coverNoMatchStore)
     }
 
     @Test
@@ -87,58 +214,60 @@ class YukiSettingsStoreTest {
 
     @Test
     fun `snapshot homePresentationMode defaults to immersive`() {
-        val snap = YukiSettingsStore.Snapshot(
-            scanRoots = emptyList(),
-            scanRootEnabled = emptyList(),
-            useBuiltinFileChooser = false,
-            startupScanDepth = 1,
-            autoScanOnStartup = false,
-            sortMode = "",
-            engineLabelPosition = "",
-            metadataSource = "",
-            bangumiToken = "",
-            krEngineVersion = "",
-            krCompatMode = false,
-            krSkipStartupInfoDialog = false,
-            artemisScopedSaveDir = false,
-            tyranoScopedSaveDir = false,
-            darkMode = false,
-            motionMode = MotionMode.AUTO,
-            reducedMotion = false,
-            reducedTransparency = false,
-            increasedContrast = false,
-            dashboardCompact = DashboardLayouts.default(DashboardProfile.COMPACT),
-            dashboardWide = DashboardLayouts.default(DashboardProfile.WIDE),
-        )
+        val snap =
+            YukiSettingsStore.Snapshot(
+                scanRoots = emptyList(),
+                scanRootEnabled = emptyList(),
+                useBuiltinFileChooser = false,
+                startupScanDepth = 1,
+                autoScanOnStartup = false,
+                sortMode = "",
+                engineLabelPosition = "",
+                metadataSource = "",
+                bangumiToken = "",
+                krEngineVersion = "",
+                krCompatMode = false,
+                krSkipStartupInfoDialog = false,
+                artemisScopedSaveDir = false,
+                tyranoScopedSaveDir = false,
+                darkMode = false,
+                motionMode = MotionMode.AUTO,
+                reducedMotion = false,
+                reducedTransparency = false,
+                increasedContrast = false,
+                dashboardCompact = DashboardLayouts.default(DashboardProfile.COMPACT),
+                dashboardWide = DashboardLayouts.default(DashboardProfile.WIDE),
+            )
         assertEquals(HomePresentationMode.IMMERSIVE, snap.homePresentationMode)
     }
 
     @Test
     fun `snapshot explicit homePresentationMode is stored`() {
-        val snap = YukiSettingsStore.Snapshot(
-            scanRoots = emptyList(),
-            scanRootEnabled = emptyList(),
-            useBuiltinFileChooser = false,
-            startupScanDepth = 1,
-            autoScanOnStartup = false,
-            sortMode = "",
-            engineLabelPosition = "",
-            metadataSource = "",
-            bangumiToken = "",
-            krEngineVersion = "",
-            krCompatMode = false,
-            krSkipStartupInfoDialog = false,
-            artemisScopedSaveDir = false,
-            tyranoScopedSaveDir = false,
-            darkMode = false,
-            motionMode = MotionMode.AUTO,
-            reducedMotion = false,
-            reducedTransparency = false,
-            increasedContrast = false,
-            dashboardCompact = DashboardLayouts.default(DashboardProfile.COMPACT),
-            dashboardWide = DashboardLayouts.default(DashboardProfile.WIDE),
-            homePresentationMode = HomePresentationMode.COMPONENTS,
-        )
+        val snap =
+            YukiSettingsStore.Snapshot(
+                scanRoots = emptyList(),
+                scanRootEnabled = emptyList(),
+                useBuiltinFileChooser = false,
+                startupScanDepth = 1,
+                autoScanOnStartup = false,
+                sortMode = "",
+                engineLabelPosition = "",
+                metadataSource = "",
+                bangumiToken = "",
+                krEngineVersion = "",
+                krCompatMode = false,
+                krSkipStartupInfoDialog = false,
+                artemisScopedSaveDir = false,
+                tyranoScopedSaveDir = false,
+                darkMode = false,
+                motionMode = MotionMode.AUTO,
+                reducedMotion = false,
+                reducedTransparency = false,
+                increasedContrast = false,
+                dashboardCompact = DashboardLayouts.default(DashboardProfile.COMPACT),
+                dashboardWide = DashboardLayouts.default(DashboardProfile.WIDE),
+                homePresentationMode = HomePresentationMode.COMPONENTS,
+            )
         assertEquals(HomePresentationMode.COMPONENTS, snap.homePresentationMode)
     }
 
@@ -449,9 +578,10 @@ class YukiSettingsStoreTest {
     fun `file and SAF aliases replace one scan root in place`() {
         val store = YukiSettingsStore(fakePrefs())
         store.addOrReplaceScanRoot("file:///storage/emulated/0/Games")
-        val change = store.addOrReplaceScanRoot(
-            "content://com.android.externalstorage.documents/tree/primary%3AGames",
-        )
+        val change =
+            store.addOrReplaceScanRoot(
+                "content://com.android.externalstorage.documents/tree/primary%3AGames",
+            )
 
         assertEquals(true, change?.replaced)
         assertEquals(
@@ -490,9 +620,10 @@ class YukiSettingsStoreTest {
             listOf(false, true),
         )
 
-        val removed = store.removeScanRoot(
-            "content://com.android.externalstorage.documents/tree/primary%3AGames",
-        )
+        val removed =
+            store.removeScanRoot(
+                "content://com.android.externalstorage.documents/tree/primary%3AGames",
+            )
 
         assertEquals(0, removed?.index)
         assertEquals(listOf("file:///sdcard/Other"), store.scanRoots())
@@ -521,5 +652,42 @@ class YukiSettingsStoreTest {
             store.scanRoots(),
         )
         assertEquals(listOf(true, false), store.scanRootEnabled())
+    }
+
+    @Test
+    fun `immersive visual settings default to standard and round trip through dedicated keys`() {
+        val prefs = fakePrefs()
+        val store = YukiSettingsStore(prefs)
+
+        assertEquals(ImmersiveFxPreset.STANDARD, store.snapshot().immersiveVisual.preset)
+        // r5 (user decision, supersedes r4's 氛围色): the standard preset paints 封面氛围 — the
+        // enlarged current cover under the theme color, the look of the versions before alpha.17.
+        assertEquals(ImmersiveBackdropStyle.COVER_ZOOM, store.snapshot().immersiveVisual.backdrop)
+        assertTrue(store.snapshot().immersiveVisual.dynamicTint)
+
+        val rich = ImmersiveVisualSettings.forPreset(ImmersiveFxPreset.RICH)
+        store.setImmersiveVisual(rich)
+
+        assertEquals(rich, YukiSettingsStore(prefs).snapshot().immersiveVisual)
+        assertEquals(
+            "rich",
+            prefs.getString(ImmersiveVisualSettingsStore.KEY_PRESET, null),
+        )
+        assertEquals(
+            "aurora",
+            prefs.getString(ImmersiveVisualSettingsStore.KEY_BACKDROP, null),
+        )
+    }
+
+    @Test
+    fun `editing a preset detail promotes it to custom`() {
+        val prefs = fakePrefs()
+        val store = YukiSettingsStore(prefs)
+
+        store.setImmersiveVisual(ImmersiveVisualSettings().copy(glow = false))
+
+        val visual = store.snapshot().immersiveVisual
+        assertEquals(ImmersiveFxPreset.CUSTOM, visual.preset)
+        assertFalse(visual.glow)
     }
 }

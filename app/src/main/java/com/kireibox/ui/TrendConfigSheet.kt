@@ -1,15 +1,11 @@
 package com.kireibox.ui
-
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
@@ -24,7 +20,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.apps.theme.AppleTypography
+import com.kireibox.designsystem.AppleTypography
+import com.kireibox.designsystem.KireiColors
 import com.yuki.yukihub.data.PlayTrendPoint
 import com.yuki.yukihub.settings.DashboardWidgetSpec
 import com.yuki.yukihub.settings.TrendMetric
@@ -45,18 +42,33 @@ internal fun TrendConfigSheet(
         mutableStateOf(TrendConfigDraft(spec.trendMetric, spec.trendRange, spec.trendVisualStyle))
     }
     KireiActionSheet("趋势图设置", colors, onDismiss, expanded = true) {
-        TrendConfigSection("指标", colors, listOf(
-            TrendMetric.PLAY_TIME to "游玩时长",
-            TrendMetric.GAME_OPENS to "打开游戏数",
-        ), draft.metric) { draft = draft.copy(metric = it) }
-        TrendConfigSection("范围", colors, listOf(
-            TrendRange.DAYS_7 to "7 天",
-            TrendRange.DAYS_30 to "30 天",
-        ), draft.range) { draft = draft.copy(range = it) }
-        TrendConfigSection("外观", colors, listOf(
-            TrendVisualStyle.LINE to "折线",
-            TrendVisualStyle.AREA to "面积折线",
-        ), draft.visualStyle) { draft = draft.copy(visualStyle = it) }
+        TrendConfigSection(
+            "指标",
+            colors,
+            listOf(
+                TrendMetric.PLAY_TIME to "游玩时长",
+                TrendMetric.GAME_OPENS to "打开游戏数",
+            ),
+            draft.metric
+        ) { draft = draft.copy(metric = it) }
+        TrendConfigSection(
+            "范围",
+            colors,
+            listOf(
+                TrendRange.DAYS_7 to "7 天",
+                TrendRange.DAYS_30 to "30 天",
+            ),
+            draft.range
+        ) { draft = draft.copy(range = it) }
+        TrendConfigSection(
+            "外观",
+            colors,
+            listOf(
+                TrendVisualStyle.LINE to "折线",
+                TrendVisualStyle.AREA to "面积折线",
+            ),
+            draft.visualStyle
+        ) { draft = draft.copy(visualStyle = it) }
         Text("预览", color = colors.secondary, style = AppleTypography.bodySmall, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
         DashboardTrendWidget(
             points = points,

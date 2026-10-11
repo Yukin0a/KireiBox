@@ -1,6 +1,6 @@
 package com.kireibox.ui
 
-import com.yuki.yukihub.metadata.CoverSourceMode
+import com.yuki.yukihub.metadata.model.CoverSourceMode
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Test
@@ -12,7 +12,7 @@ class KireiPublicCopyTest {
             """Rinne Mobile的分支版本 QwQ
 开源地址:
 https://github.com/Yukin0a/KireiBox""",
-            KireiPublicCopy.aboutText,
+            KireiPublicCopy.ABOUT_TEXT,
         )
     }
 
@@ -21,8 +21,8 @@ https://github.com/Yukin0a/KireiBox""",
         val ymgal = KireiPublicCopy.coverSourceDescription(CoverSourceMode.YMGAL)
         val hikarinagi = KireiPublicCopy.coverSourceDescription(CoverSourceMode.HIKARINAGI)
 
-        assertEquals("月幕 Gal 公开服务 · 用户无需 Token。", ymgal)
-        assertEquals("Hikarinagi 公开服务 · 用户无需 Token。", hikarinagi)
+        assertEquals("历史资料来源，已停止联网", ymgal)
+        assertEquals("需登录 Hikarinagi 账号", hikarinagi)
         assertFalse(ymgal.contains("构建者"))
         assertFalse(hikarinagi.contains("构建者"))
     }

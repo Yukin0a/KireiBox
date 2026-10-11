@@ -26,20 +26,22 @@ class ExternalSessionRecoveryPolicyTest {
     }
 
     @Test fun deadProcessPastGraceRecoversWallClockTime() {
-        val duration = ExternalSessionRecoveryPolicy.recoveredDurationMs(
-            processAlive = false,
-            startedAtWallMs = 1_000L,
-            nowWallMs = 1_000L + 20L * 60L * 1000L,
-        )
+        val duration =
+            ExternalSessionRecoveryPolicy.recoveredDurationMs(
+                processAlive = false,
+                startedAtWallMs = 1_000L,
+                nowWallMs = 1_000L + 20L * 60L * 1000L,
+            )
         assertEquals(20L * 60L * 1000L, duration)
     }
 
     @Test fun recoveredDurationIsCappedAtThirtyMinutes() {
-        val duration = ExternalSessionRecoveryPolicy.recoveredDurationMs(
-            processAlive = false,
-            startedAtWallMs = 1_000L,
-            nowWallMs = 1_000L + 6L * 60L * 60L * 1000L,
-        )
+        val duration =
+            ExternalSessionRecoveryPolicy.recoveredDurationMs(
+                processAlive = false,
+                startedAtWallMs = 1_000L,
+                nowWallMs = 1_000L + 6L * 60L * 60L * 1000L,
+            )
         assertEquals(ExternalSessionRecoveryPolicy.MAX_RECOVERED_PLAY_SESSION_MS, duration)
     }
 }

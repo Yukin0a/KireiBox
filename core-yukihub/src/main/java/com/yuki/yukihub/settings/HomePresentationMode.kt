@@ -2,7 +2,8 @@
 
 enum class HomePresentationMode(val storedValue: String, val displayName: String) {
     IMMERSIVE("immersive", "沉浸式"),
-    COMPONENTS("components", "组件模式");
+    COMPONENTS("components", "组件模式"),
+    ;
 
     companion object {
         fun fromStored(value: String?): HomePresentationMode {

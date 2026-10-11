@@ -36,28 +36,32 @@ internal object EngineSaveLocations {
         return try {
             when (engine) {
                 EngineType.KIRIKIRI -> {
-                    val location = KrkrLauncher.resolveSaveLocation(
-                        context,
-                        rootUri,
-                        launchTarget,
-                    )
+                    val location =
+                        KrkrLauncher.resolveSaveLocation(
+                            context,
+                            rootUri,
+                            launchTarget,
+                        )
                     Location(location.directory, location.description, location.available)
                 }
 
                 EngineType.ARTEMIS -> {
-                    val rootPath = ScriptEngineLaunchers.stripFileScheme(
-                        ArtemisLauncher.resolveGamePath(rootUri, launchTarget),
-                    )
-                    val scoped = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                        .getBoolean("artemis_scoped_save_dir", true)
+                    val rootPath =
+                        ScriptEngineLaunchers.stripFileScheme(
+                            ArtemisLauncher.resolveGamePath(rootUri, launchTarget),
+                        )
+                    val scoped =
+                        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                            .getBoolean("artemis_scoped_save_dir", true)
                     val location = ArtemisLauncher.resolveSaveLocation(context, rootPath, scoped)
                     Location(location.directory, location.description, location.available)
                 }
 
                 EngineType.ONS -> {
-                    val requestedRoot = ScriptEngineLaunchers.stripFileScheme(
-                        ScriptEngineLaunchers.uriToFilePath(rootUri),
-                    )
+                    val requestedRoot =
+                        ScriptEngineLaunchers.stripFileScheme(
+                            ScriptEngineLaunchers.uriToFilePath(rootUri),
+                        )
                     val rootPath = ScriptEngineLaunchers.resolveOnsGameDirectory(requestedRoot)
                     val scoped = LauncherOnsGameSettingsBridge.load(context, gameId).scopedSaveDir
                     val location = ScriptEngineLaunchers.resolveOnsSaveLocation(context, rootPath, scoped)
@@ -65,16 +69,19 @@ internal object EngineSaveLocations {
                 }
 
                 EngineType.TYRANO -> {
-                    val gameDirectory = ScriptEngineLaunchers.stripFileScheme(
-                        ScriptEngineLaunchers.resolveTyranoGameDirectory(rootUri, launchTarget),
-                    )
-                    val scoped = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                        .getBoolean("tyrano_scoped_save_dir", true)
-                    val location = ScriptEngineLaunchers.resolveTyranoSaveLocation(
-                        context,
-                        gameDirectory,
-                        scoped,
-                    )
+                    val gameDirectory =
+                        ScriptEngineLaunchers.stripFileScheme(
+                            ScriptEngineLaunchers.resolveTyranoGameDirectory(rootUri, launchTarget),
+                        )
+                    val scoped =
+                        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                            .getBoolean("tyrano_scoped_save_dir", true)
+                    val location =
+                        ScriptEngineLaunchers.resolveTyranoSaveLocation(
+                            context,
+                            gameDirectory,
+                            scoped,
+                        )
                     Location(location.directory, location.description, location.available)
                 }
 
@@ -111,7 +118,10 @@ internal object EngineSaveLocations {
         return output.values.toList()
     }
 
-    private fun logWarn(message: String, error: Throwable) {
+    private fun logWarn(
+        message: String,
+        error: Throwable
+    ) {
         runCatching { Log.w(TAG, message, error) }
     }
 }

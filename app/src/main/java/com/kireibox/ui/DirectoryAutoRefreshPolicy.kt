@@ -3,10 +3,16 @@ package com.kireibox.ui
 import com.yuki.yukihub.data.ScanImportSummary
 
 internal object DirectoryAutoRefreshPolicy {
-    fun enabledRoots(roots: List<String>, enabled: List<Boolean>): List<String> =
-        roots.filterIndexed { index, _ -> enabled.getOrElse(index) { true } }
+    fun enabledRoots(
+        roots: List<String>,
+        enabled: List<Boolean>
+    ): List<String> = roots.filterIndexed { index, _ -> enabled.getOrElse(index) { true } }
 
-    fun notice(summary: ScanImportSummary, failedDirectoryCount: Int, prunedCount: Int = 0): String? {
+    fun notice(
+        summary: ScanImportSummary,
+        failedDirectoryCount: Int,
+        prunedCount: Int = 0
+    ): String? {
         val added = summary.addedCount
         if (added == 0 && failedDirectoryCount == 0 && prunedCount == 0) return null
         val parts = ArrayList<String>(4)
@@ -21,6 +27,18 @@ internal object DirectoryAutoRefreshPolicy {
         if (failedDirectoryCount > 0) parts += "$failedDirectoryCount 个目录扫描失败"
         return "自动更新：" + parts.joinToString("，")
     }
+
+    /** Tone of [notice]: a refresh that also changed the library is a warning when some directory failed. */
+    fun noticeTone(
+        summary: ScanImportSummary,
+        failedDirectoryCount: Int,
+        prunedCount: Int = 0,
+    ): NoticeTone =
+        when {
+            failedDirectoryCount == 0 -> NoticeTone.SUCCESS
+            summary.addedCount > 0 || prunedCount > 0 -> NoticeTone.WARNING
+            else -> NoticeTone.ERROR
+        }
 }
 
 internal class ForegroundRefreshGate {

@@ -8,7 +8,6 @@ import android.content.SharedPreferences
  * 涉及键值与 MainActivity / SyncManager 完全一致，保证 Launcher 修改后主项目立即可见。
  */
 object LauncherKrkrBridge {
-
     private const val APP_PREFS = "yukihub_prefs"
     private const val KEY_KR_ENGINE_VERSION = "kr_engine_version"
     private const val KEY_KR_STARTUP_DIALOG_POLICY = "kr_startup_dialog_policy"
@@ -23,8 +22,7 @@ object LauncherKrkrBridge {
     const val DIALOG_POLICY_SHOW_ALL = "SHOW_ALL"
     const val DIALOG_POLICY_SKIP_SINGLE_BUTTON_STARTUP_INFO = "SKIP_SINGLE_BUTTON_STARTUP_INFO"
 
-    private fun prefs(context: Context): SharedPreferences =
-        context.applicationContext.getSharedPreferences(APP_PREFS, Context.MODE_PRIVATE)
+    private fun prefs(context: Context): SharedPreferences = context.applicationContext.getSharedPreferences(APP_PREFS, Context.MODE_PRIVATE)
 
     @JvmStatic
     fun getEngineVersion(context: Context?): String {
@@ -34,7 +32,10 @@ object LauncherKrkrBridge {
     }
 
     @JvmStatic
-    fun setEngineVersion(context: Context?, version: String?) {
+    fun setEngineVersion(
+        context: Context?,
+        version: String?
+    ) {
         if (context == null) return
         prefs(context).edit()
             .putString(KEY_KR_ENGINE_VERSION, normalizeEngineVersion(version))
@@ -50,7 +51,10 @@ object LauncherKrkrBridge {
     }
 
     @JvmStatic
-    fun setStartupDialogPolicy(context: Context?, policy: String?) {
+    fun setStartupDialogPolicy(
+        context: Context?,
+        policy: String?
+    ) {
         if (context == null) return
         prefs(context).edit()
             .putString(KEY_KR_STARTUP_DIALOG_POLICY, normalizeStartupDialogPolicy(policy))
@@ -58,11 +62,15 @@ object LauncherKrkrBridge {
     }
 
     @JvmStatic
-    fun isCompatMode(context: Context?): Boolean = context != null &&
-        prefs(context).getBoolean(KEY_KR_COMPAT_MODE, false)
+    fun isCompatMode(context: Context?): Boolean =
+        context != null &&
+            prefs(context).getBoolean(KEY_KR_COMPAT_MODE, false)
 
     @JvmStatic
-    fun setCompatMode(context: Context?, enabled: Boolean) {
+    fun setCompatMode(
+        context: Context?,
+        enabled: Boolean
+    ) {
         if (context == null) return
         prefs(context).edit().putBoolean(KEY_KR_COMPAT_MODE, enabled).apply()
     }
@@ -84,7 +92,10 @@ object LauncherKrkrBridge {
     }
 
     @JvmStatic
-    fun setArtemisScopedSaveDir(context: Context?, enabled: Boolean) {
+    fun setArtemisScopedSaveDir(
+        context: Context?,
+        enabled: Boolean
+    ) {
         if (context == null) return
         prefs(context).edit().putBoolean(KEY_ARTEMIS_SCOPED_SAVE_DIR, enabled).apply()
     }
@@ -96,7 +107,10 @@ object LauncherKrkrBridge {
     }
 
     @JvmStatic
-    fun setTyranoScopedSaveDir(context: Context?, enabled: Boolean) {
+    fun setTyranoScopedSaveDir(
+        context: Context?,
+        enabled: Boolean
+    ) {
         if (context == null) return
         prefs(context).edit().putBoolean(KEY_TYRANO_SCOPED_SAVE_DIR, enabled).apply()
     }

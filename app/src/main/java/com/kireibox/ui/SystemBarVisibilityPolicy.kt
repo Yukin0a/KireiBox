@@ -28,17 +28,17 @@ object SystemBarVisibilityPolicy {
     fun resolve(
         windowClass: ResponsiveWindowClass,
         orientation: HomeOrientation,
-    ): SystemBarVisibilitySpec = SystemBarVisibilitySpec(
-        windowClass = windowClass,
-        orientation = orientation,
-        hideStatusBar = shouldHideStatusBar(windowClass),
-        hideNavigationBar = shouldHideNavigationBars(windowClass, orientation),
-        cutoutMode = cutoutMode(),
-    )
+    ): SystemBarVisibilitySpec =
+        SystemBarVisibilitySpec(
+            windowClass = windowClass,
+            orientation = orientation,
+            hideStatusBar = shouldHideStatusBar(windowClass),
+            hideNavigationBar = shouldHideNavigationBars(windowClass, orientation),
+            cutoutMode = cutoutMode(),
+        )
 
     /** Only the compact phone landscape class is status-bar immersive. */
-    fun shouldHideStatusBar(windowClass: ResponsiveWindowClass): Boolean =
-        windowClass == ResponsiveWindowClass.PHONE_LANDSCAPE
+    fun shouldHideStatusBar(windowClass: ResponsiveWindowClass): Boolean = windowClass == ResponsiveWindowClass.PHONE_LANDSCAPE
 
     /** Compatibility overload for callers that already carry the four-way class. */
     fun shouldHideStatusBar(
@@ -56,16 +56,18 @@ object SystemBarVisibilityPolicy {
         safeHeightDp: Float,
         sizeClass: HomeSizeClass,
     ): SystemBarVisibilitySpec {
-        val windowClass = ResponsiveLayoutPolicy.resolveWindowClass(
-            safeWidthDp = safeWidthDp,
-            safeHeightDp = safeHeightDp,
-            sizeClass = sizeClass,
-        )
-        val orientation = if (safeWidthDp > safeHeightDp) {
-            HomeOrientation.LANDSCAPE
-        } else {
-            HomeOrientation.PORTRAIT
-        }
+        val windowClass =
+            ResponsiveLayoutPolicy.resolveWindowClass(
+                safeWidthDp = safeWidthDp,
+                safeHeightDp = safeHeightDp,
+                sizeClass = sizeClass,
+            )
+        val orientation =
+            if (safeWidthDp > safeHeightDp) {
+                HomeOrientation.LANDSCAPE
+            } else {
+                HomeOrientation.PORTRAIT
+            }
         return resolve(windowClass, orientation)
     }
 
@@ -77,17 +79,19 @@ object SystemBarVisibilityPolicy {
         screenLayoutSize: Int,
         orientation: Int,
     ): SystemBarVisibilitySpec {
-        val windowClass = ResponsiveLayoutPolicy.resolveWindowClass(
-            safeWidthDp = widthDp,
-            safeHeightDp = heightDp,
-            smallestScreenWidthDp = smallestScreenWidthDp,
-            screenLayoutSize = screenLayoutSize,
-        )
-        val resolvedOrientation = if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
-            HomeOrientation.LANDSCAPE
-        } else {
-            HomeOrientation.PORTRAIT
-        }
+        val windowClass =
+            ResponsiveLayoutPolicy.resolveWindowClass(
+                safeWidthDp = widthDp,
+                safeHeightDp = heightDp,
+                smallestScreenWidthDp = smallestScreenWidthDp,
+                screenLayoutSize = screenLayoutSize,
+            )
+        val resolvedOrientation =
+            if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
+                HomeOrientation.LANDSCAPE
+            } else {
+                HomeOrientation.PORTRAIT
+            }
         return resolve(windowClass, resolvedOrientation)
     }
 
@@ -114,13 +118,14 @@ object SystemBarVisibilityPolicy {
         smallestScreenWidthDp: Int,
         screenLayoutSize: Int,
         orientation: Int,
-    ): Boolean = resolvePolicy(
-        widthDp = widthDp,
-        heightDp = heightDp,
-        smallestScreenWidthDp = smallestScreenWidthDp,
-        screenLayoutSize = screenLayoutSize,
-        orientation = orientation,
-    ).hideStatusBar
+    ): Boolean =
+        resolvePolicy(
+            widthDp = widthDp,
+            heightDp = heightDp,
+            smallestScreenWidthDp = smallestScreenWidthDp,
+            screenLayoutSize = screenLayoutSize,
+            orientation = orientation,
+        ).hideStatusBar
 
     /** Same matrix as [resolvePolicy], exposed without the legacy Boolean return type. */
     fun visibilitySpec(
@@ -129,13 +134,14 @@ object SystemBarVisibilityPolicy {
         smallestScreenWidthDp: Int,
         screenLayoutSize: Int,
         orientation: Int,
-    ): SystemBarVisibilitySpec = resolvePolicy(
-        widthDp = widthDp,
-        heightDp = heightDp,
-        smallestScreenWidthDp = smallestScreenWidthDp,
-        screenLayoutSize = screenLayoutSize,
-        orientation = orientation,
-    )
+    ): SystemBarVisibilitySpec =
+        resolvePolicy(
+            widthDp = widthDp,
+            heightDp = heightDp,
+            smallestScreenWidthDp = smallestScreenWidthDp,
+            screenLayoutSize = screenLayoutSize,
+            orientation = orientation,
+        )
 
     /** Device/orientation overload for code that has already classified the window. */
     fun visibilitySpec(

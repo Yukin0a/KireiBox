@@ -9,11 +9,12 @@ import org.junit.Test
 
 class GameLibraryOrderingTest {
     @Test fun favoritesLeadEverySortAndUseConfiguredOrderInsideGroup() {
-        val games = listOf(
-            Game(id = 1, title = "Zulu", favorite = false, lastPlayedAt = 900, createdAt = 900),
-            Game(id = 2, title = "Beta", favorite = true, lastPlayedAt = 100, createdAt = 300),
-            Game(id = 3, title = "Alpha", favorite = true, lastPlayedAt = 200, createdAt = 200)
-        )
+        val games =
+            listOf(
+                Game(id = 1, title = "Zulu", favorite = false, lastPlayedAt = 900, createdAt = 900),
+                Game(id = 2, title = "Beta", favorite = true, lastPlayedAt = 100, createdAt = 300),
+                Game(id = 3, title = "Alpha", favorite = true, lastPlayedAt = 200, createdAt = 200)
+            )
         assertEquals(listOf(3L, 2L, 1L), GameLibraryOrdering.sorted(games, YukiSettingsStore.SORT_RECENT).map { it.id })
         assertEquals(listOf(2L, 3L, 1L), GameLibraryOrdering.sorted(games, YukiSettingsStore.SORT_NEWEST).map { it.id })
         assertEquals(listOf(3L, 2L, 1L), GameLibraryOrdering.sorted(games, YukiSettingsStore.SORT_NAME).map { it.id })
@@ -33,12 +34,13 @@ class GameLibraryOrderingTest {
     }
 
     @Test fun manualOrderKeepsFavoritesFirstAndOrdersInsideEachGroup() {
-        val games = listOf(
-            Game(id = 1, title = "Regular first", favorite = false, manualOrder = 10),
-            Game(id = 2, title = "Favorite second", favorite = true, manualOrder = 20),
-            Game(id = 3, title = "Favorite first", favorite = true, manualOrder = 10),
-            Game(id = 4, title = "Regular second", favorite = false, manualOrder = 20),
-        )
+        val games =
+            listOf(
+                Game(id = 1, title = "Regular first", favorite = false, manualOrder = 10),
+                Game(id = 2, title = "Favorite second", favorite = true, manualOrder = 20),
+                Game(id = 3, title = "Favorite first", favorite = true, manualOrder = 10),
+                Game(id = 4, title = "Regular second", favorite = false, manualOrder = 20),
+            )
 
         assertEquals(
             listOf(3L, 2L, 1L, 4L),

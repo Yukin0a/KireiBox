@@ -1,7 +1,7 @@
 package com.kireibox.cover
 
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import mockwebserver3.MockResponse
@@ -23,75 +23,80 @@ import java.util.concurrent.TimeUnit
 
 class CoverDownloaderTest {
     @Test
-    fun knownLengthReportsMonotonicProgressAndFinalTotal() = withServer { server ->
-        val bytes = "known-length-cover".encodeToByteArray()
-        server.enqueue(MockResponse.Builder().body(Buffer().write(bytes)).build())
-        val target = temporaryFile()
-        val progress = mutableListOf<CoverDownloadProgress>()
+    fun knownLengthReportsMonotonicProgressAndFinalTotal() =
+        withServer { server ->
+            val bytes = "known-length-cover".encodeToByteArray()
+            server.enqueue(MockResponse.Builder().body(Buffer().write(bytes)).build())
+            val target = temporaryFile()
+            val progress = mutableListOf<CoverDownloadProgress>()
 
-        val result = runBlocking { downloader().download(server.url("/cover").toString(), target) { progress += it } }
+            val result = runBlocking { downloader().download(server.url("/cover").toString(), target) { progress += it } }
 
-        assertTrue(result.isSuccess)
-        assertEquals(bytes.toList(), target.readBytes().toList())
-        assertTrue(progress.zipWithNext().all { (before, after) -> after.bytesRead >= before.bytesRead })
-        assertEquals(bytes.size.toLong(), progress.last().bytesRead)
-        assertEquals(bytes.size.toLong(), progress.last().totalBytes)
-    }
-
-    @Test
-    fun unknownLengthKeepsTotalNull() = withServer { server ->
-        server.enqueue(MockResponse.Builder().chunkedBody(Buffer().writeUtf8("streamed-cover"), 3).build())
-        val target = temporaryFile()
-        val progress = mutableListOf<CoverDownloadProgress>()
-
-        val result = runBlocking { downloader().download(server.url("/cover").toString(), target) { progress += it } }
-
-        assertTrue(result.isSuccess)
-        assertTrue(progress.isNotEmpty())
-        assertTrue(progress.all { it.totalBytes == null })
-    }
-
-    @Test
-    fun responseLargerThanTwentyMiBIsRejectedAndPartFileIsDeleted() = withServer { server ->
-        server.enqueue(MockResponse.Builder().body(Buffer().write(ByteArray(20 * 1024 * 1024 + 1))).build())
-        val target = temporaryFile()
-
-        val result = runBlocking { downloader().download(server.url("/cover").toString(), target) {} }
-
-        assertTrue(result.isFailure)
-        assertFalse(target.exists())
-    }
-
-    @Test
-    fun httpFailureDeletesPartFile() = withServer { server ->
-        server.enqueue(MockResponse.Builder().code(404).build())
-        val target = temporaryFile()
-
-        val result = runBlocking { downloader().download(server.url("/missing").toString(), target) {} }
-
-        assertTrue(result.isFailure)
-        assertFalse(target.exists())
-    }
-
-    @Test
-    fun coroutineCancellationCancelsDownloadAndDeletesPartFile() = withServer { server ->
-        server.enqueue(
-            MockResponse.Builder()
-                .body(Buffer().write(ByteArray(256 * 1024)))
-                .throttleBody(1024, 100, TimeUnit.MILLISECONDS)
-                .build()
-        )
-        val target = temporaryFile()
-
-        runBlocking {
-            val job = launch { downloader().download(server.url("/slow").toString(), target) {} }
-            while (!target.exists() || target.length() == 0L) delay(10)
-            job.cancel()
-            job.join()
+            assertTrue(result.isSuccess)
+            assertEquals(bytes.toList(), target.readBytes().toList())
+            assertTrue(progress.zipWithNext().all { (before, after) -> after.bytesRead >= before.bytesRead })
+            assertEquals(bytes.size.toLong(), progress.last().bytesRead)
+            assertEquals(bytes.size.toLong(), progress.last().totalBytes)
         }
 
-        assertFalse(target.exists())
-    }
+    @Test
+    fun unknownLengthKeepsTotalNull() =
+        withServer { server ->
+            server.enqueue(MockResponse.Builder().chunkedBody(Buffer().writeUtf8("streamed-cover"), 3).build())
+            val target = temporaryFile()
+            val progress = mutableListOf<CoverDownloadProgress>()
+
+            val result = runBlocking { downloader().download(server.url("/cover").toString(), target) { progress += it } }
+
+            assertTrue(result.isSuccess)
+            assertTrue(progress.isNotEmpty())
+            assertTrue(progress.all { it.totalBytes == null })
+        }
+
+    @Test
+    fun responseLargerThanTwentyMiBIsRejectedAndPartFileIsDeleted() =
+        withServer { server ->
+            server.enqueue(MockResponse.Builder().body(Buffer().write(ByteArray(20 * 1024 * 1024 + 1))).build())
+            val target = temporaryFile()
+
+            val result = runBlocking { downloader().download(server.url("/cover").toString(), target) {} }
+
+            assertTrue(result.isFailure)
+            assertFalse(target.exists())
+        }
+
+    @Test
+    fun httpFailureDeletesPartFile() =
+        withServer { server ->
+            server.enqueue(MockResponse.Builder().code(404).build())
+            val target = temporaryFile()
+
+            val result = runBlocking { downloader().download(server.url("/missing").toString(), target) {} }
+
+            assertTrue(result.isFailure)
+            assertFalse(target.exists())
+        }
+
+    @Test
+    fun coroutineCancellationCancelsDownloadAndDeletesPartFile() =
+        withServer { server ->
+            server.enqueue(
+                MockResponse.Builder()
+                    .body(Buffer().write(ByteArray(256 * 1024)))
+                    .throttleBody(1024, 100, TimeUnit.MILLISECONDS)
+                    .build()
+            )
+            val target = temporaryFile()
+
+            runBlocking {
+                val job = launch { downloader().download(server.url("/slow").toString(), target) {} }
+                while (!target.exists() || target.length() == 0L) delay(10)
+                job.cancel()
+                job.join()
+            }
+
+            assertFalse(target.exists())
+        }
 
     @Test
     fun cancellationObservedImmediatelyAfterReadDeletesPartFileAfterStreamsClose() {
@@ -100,9 +105,10 @@ class CoverDownloaderTest {
         val client = cancellationAfterFirstReadClient { downloadJob.cancel() }
 
         runBlocking {
-            downloadJob = launch {
-                CoverDownloader(client).download("https://covers.invalid/race", target) {}
-            }
+            downloadJob =
+                launch {
+                    CoverDownloader(client).download("https://covers.invalid/race", target) {}
+                }
             downloadJob.join()
         }
 
@@ -119,22 +125,30 @@ class CoverDownloaderTest {
                 .protocol(Protocol.HTTP_1_1)
                 .code(200)
                 .message("OK")
-                .body(object : ResponseBody() {
-                    override fun contentLength(): Long = 1L
-                    override fun contentType() = null
-                    override fun source(): BufferedSource = object : ForwardingSource(Buffer().writeUtf8("x")) {
-                        private var cancelled = false
+                .body(
+                    object : ResponseBody() {
+                        override fun contentLength(): Long = 1L
 
-                        override fun read(sink: Buffer, byteCount: Long): Long {
-                            val count = super.read(sink, byteCount)
-                            if (count > 0L && !cancelled) {
-                                cancelled = true
-                                onFirstReadReturned()
-                            }
-                            return count
-                        }
-                    }.buffer()
-                })
+                        override fun contentType() = null
+
+                        override fun source(): BufferedSource =
+                            object : ForwardingSource(Buffer().writeUtf8("x")) {
+                                private var cancelled = false
+
+                                override fun read(
+                                    sink: Buffer,
+                                    byteCount: Long
+                                ): Long {
+                                    val count = super.read(sink, byteCount)
+                                    if (count > 0L && !cancelled) {
+                                        cancelled = true
+                                        onFirstReadReturned()
+                                    }
+                                    return count
+                                }
+                            }.buffer()
+                    }
+                )
                 .build()
         }.build()
 

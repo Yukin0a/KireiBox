@@ -6,20 +6,24 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
-import android.os.IBinder
 import android.os.Build
+import android.os.IBinder
 import android.os.Process
 import com.yuki.yukihub.BuildConfig
+import rikka.shizuku.Shizuku
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
-import rikka.shizuku.Shizuku
 
 class ShizukuShortcutGateway(context: Context) {
     private val app = context.applicationContext
     private val bindLock = Any()
+
     @Volatile private var activeConnection: ServiceConnection? = null
+
     @Volatile private var activeService: IShortcutShellService? = null
+
     @Volatile private var binding = false
+
     @Volatile private var connectionLost = false
 
     fun status(): ShortcutServiceStatus {
@@ -28,12 +32,16 @@ class ShizukuShortcutGateway(context: Context) {
         return ShortcutServiceStatusPolicy.resolve(
             installed = installed,
             running = running,
-            supportedVersion = running && runCatching {
-                !Shizuku.isPreV11() && Shizuku.getVersion() >= MIN_SHIZUKU_API
-            }.getOrDefault(false),
-            permissionGranted = running && runCatching {
-                Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
-            }.getOrDefault(false),
+            supportedVersion =
+                running &&
+                    runCatching {
+                        !Shizuku.isPreV11() && Shizuku.getVersion() >= MIN_SHIZUKU_API
+                    }.getOrDefault(false),
+            permissionGranted =
+                running &&
+                    runCatching {
+                        Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
+                    }.getOrDefault(false),
             rationale = running && runCatching { Shizuku.shouldShowRequestPermissionRationale() }.getOrDefault(false),
             uid = if (running) runCatching { Shizuku.getUid() }.getOrDefault(-1) else -1,
             binding = binding,
@@ -41,105 +49,119 @@ class ShizukuShortcutGateway(context: Context) {
         )
     }
 
-    fun requestPermission(requestCode: Int = PERMISSION_REQUEST_CODE): Result<Unit> = runCatching {
-        when (status()) {
-            ShortcutServiceStatus.READY -> Unit
-            ShortcutServiceStatus.PERMISSION_REQUIRED -> Shizuku.requestPermission(requestCode)
-            ShortcutServiceStatus.PERMISSION_DENIED -> error("Shizuku 已拒绝 KireiBox，请在 Shizuku 的授权应用中重新允许。")
-            ShortcutServiceStatus.NOT_INSTALLED -> error("请先安装 Shizuku。")
-            ShortcutServiceStatus.NOT_RUNNING -> error("请先在 Shizuku 中完成无线调试配对并启动服务。")
-            ShortcutServiceStatus.UNSUPPORTED_VERSION -> error("需要 Shizuku 13.1.5 或更新版本。")
-            ShortcutServiceStatus.UNSUPPORTED_IDENTITY -> error("快捷方式功能只支持无线调试启动的 Shizuku（shell 模式）。")
-            else -> error("Shizuku 快捷方式服务暂不可用。")
+    fun requestPermission(requestCode: Int = PERMISSION_REQUEST_CODE): Result<Unit> =
+        runCatching {
+            when (status()) {
+                ShortcutServiceStatus.READY -> Unit
+                ShortcutServiceStatus.PERMISSION_REQUIRED -> Shizuku.requestPermission(requestCode)
+                ShortcutServiceStatus.PERMISSION_DENIED -> error("Shizuku 已拒绝 KireiBox，请在 Shizuku 的授权应用中重新允许。")
+                ShortcutServiceStatus.NOT_INSTALLED -> error("请先安装 Shizuku。")
+                ShortcutServiceStatus.NOT_RUNNING -> error("请先在 Shizuku 中完成无线调试配对并启动服务。")
+                ShortcutServiceStatus.UNSUPPORTED_VERSION -> error("需要 Shizuku 13.1.5 或更新版本。")
+                ShortcutServiceStatus.UNSUPPORTED_IDENTITY -> error("快捷方式功能只支持无线调试启动的 Shizuku（shell 模式）。")
+                else -> error("Shizuku 快捷方式服务暂不可用。")
+            }
         }
-    }
 
-    fun bind(): Result<Unit> = runCatching {
-        ensureReady()
-        check(service().canReadPinnedShortcuts(currentUserId())) {
-            "当前系统没有授予 shell 读取桌面快捷方式的权限。"
+    fun bind(): Result<Unit> =
+        runCatching {
+            ensureReady()
+            check(service().canReadPinnedShortcuts(currentUserId())) {
+                "当前系统没有授予 shell 读取桌面快捷方式的权限。"
+            }
         }
-    }
 
-    fun scan(userId: Int = currentUserId()): Result<List<ExternalShortcutDescriptor>> = withRemote { remote ->
-        if (!remote.canReadPinnedShortcuts(userId)) {
-            error("当前系统没有授予 shell 读取桌面快捷方式的权限。")
+    fun scan(userId: Int = currentUserId()): Result<List<ExternalShortcutDescriptor>> =
+        withRemote { remote ->
+            if (!remote.canReadPinnedShortcuts(userId)) {
+                error("当前系统没有授予 shell 读取桌面快捷方式的权限。")
+            }
+            val values =
+                remote.scan(userId).mapNotNull { bundle ->
+                    val packageName = bundle.getString(ShortcutShellUserService.KEY_PACKAGE)?.trim().orEmpty()
+                    val shortcutId = bundle.getString(ShortcutShellUserService.KEY_ID).orEmpty()
+                    if (packageName.isEmpty() || shortcutId.isEmpty()) return@mapNotNull null
+                    ExternalShortcutDescriptor(
+                        userId = bundle.getInt(ShortcutShellUserService.KEY_USER_ID, userId),
+                        packageName = packageName,
+                        appName =
+                            bundle.getString(ShortcutShellUserService.KEY_APP_NAME)?.trim().orEmpty()
+                                .ifEmpty { packageName },
+                        shortcutId = shortcutId,
+                        title =
+                            bundle.getString(ShortcutShellUserService.KEY_TITLE)?.trim().orEmpty()
+                                .ifEmpty { shortcutId },
+                        activityName =
+                            bundle.getString(ShortcutShellUserService.KEY_ACTIVITY)?.trim()
+                                ?.takeIf(String::isNotEmpty),
+                        pinned = bundle.getBoolean(ShortcutShellUserService.KEY_PINNED),
+                        dynamic = bundle.getBoolean(ShortcutShellUserService.KEY_DYNAMIC),
+                        directLaunchTarget =
+                            bundle.getString(ShortcutShellUserService.KEY_DIRECT_LAUNCH_TARGET)
+                                ?.trim()?.takeIf(String::isNotEmpty),
+                    )
+                }
+            ExternalShortcutPolicy.descriptors(values, app.packageName)
         }
-        val values = remote.scan(userId).mapNotNull { bundle ->
-            val packageName = bundle.getString(ShortcutShellUserService.KEY_PACKAGE)?.trim().orEmpty()
-            val shortcutId = bundle.getString(ShortcutShellUserService.KEY_ID).orEmpty()
-            if (packageName.isEmpty() || shortcutId.isEmpty()) return@mapNotNull null
-            ExternalShortcutDescriptor(
-                userId = bundle.getInt(ShortcutShellUserService.KEY_USER_ID, userId),
-                packageName = packageName,
-                appName = bundle.getString(ShortcutShellUserService.KEY_APP_NAME)?.trim().orEmpty()
-                    .ifEmpty { packageName },
-                shortcutId = shortcutId,
-                title = bundle.getString(ShortcutShellUserService.KEY_TITLE)?.trim().orEmpty()
-                    .ifEmpty { shortcutId },
-                activityName = bundle.getString(ShortcutShellUserService.KEY_ACTIVITY)?.trim()
-                    ?.takeIf(String::isNotEmpty),
-                pinned = bundle.getBoolean(ShortcutShellUserService.KEY_PINNED),
-                dynamic = bundle.getBoolean(ShortcutShellUserService.KEY_DYNAMIC),
-                directLaunchTarget = bundle.getString(ShortcutShellUserService.KEY_DIRECT_LAUNCH_TARGET)
-                    ?.trim()?.takeIf(String::isNotEmpty),
-            )
-        }
-        ExternalShortcutPolicy.descriptors(values, app.packageName)
-    }
 
-    fun exists(identity: ExternalShortcutIdentity.Parsed): Boolean = withRemote { remote ->
-        remote.canReadPinnedShortcuts(identity.userId) &&
-            remote.exists(identity.userId, identity.packageName, identity.shortcutId)
-    }.getOrDefault(false)
+    fun exists(identity: ExternalShortcutIdentity.Parsed): Boolean =
+        withRemote { remote ->
+            remote.canReadPinnedShortcuts(identity.userId) &&
+                remote.exists(identity.userId, identity.packageName, identity.shortcutId)
+        }.getOrDefault(false)
 
-    fun launch(identity: ExternalShortcutIdentity.Parsed): Result<Unit> = withRemote { remote ->
-        if (!remote.canReadPinnedShortcuts(identity.userId)) {
-            error("当前系统没有授予 shell 启动桌面快捷方式的权限。")
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val launchIntent = remote.launchIntent(
-                identity.userId,
-                identity.packageName,
-                identity.shortcutId,
-            ) ?: error("快捷方式已失效，请重新扫描。")
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                val options = ActivityOptions.makeBasic().apply {
-                    pendingIntentBackgroundActivityStartMode =
-                        ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED
-                }.toBundle()
-                launchIntent.send(app, 0, null, null, null, null, options)
+    fun launch(identity: ExternalShortcutIdentity.Parsed): Result<Unit> =
+        withRemote { remote ->
+            if (!remote.canReadPinnedShortcuts(identity.userId)) {
+                error("当前系统没有授予 shell 启动桌面快捷方式的权限。")
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val launchIntent =
+                    remote.launchIntent(
+                        identity.userId,
+                        identity.packageName,
+                        identity.shortcutId,
+                    ) ?: error("快捷方式已失效，请重新扫描。")
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    val options =
+                        ActivityOptions.makeBasic().apply {
+                            pendingIntentBackgroundActivityStartMode =
+                                ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED
+                        }.toBundle()
+                    launchIntent.send(app, 0, null, null, null, null, options)
+                } else {
+                    launchIntent.send()
+                }
             } else {
-                launchIntent.send()
+                check(remote.launch(identity.userId, identity.packageName, identity.shortcutId)) {
+                    "快捷方式已失效，请重新扫描。"
+                }
             }
-        } else {
-            check(remote.launch(identity.userId, identity.packageName, identity.shortcutId)) {
-                "快捷方式已失效，请重新扫描。"
+        }.recoverCatching { error ->
+            if (error is PendingIntent.CanceledException) {
+                throw IllegalStateException("快捷方式已失效，请重新扫描。", error)
             }
+            throw error
         }
-    }.recoverCatching { error ->
-        if (error is PendingIntent.CanceledException) {
-            throw IllegalStateException("快捷方式已失效，请重新扫描。", error)
-        }
-        throw error
-    }
 
     fun release() {
-        val connection = synchronized(bindLock) {
-            val value = activeConnection
-            activeConnection = null
-            activeService = null
-            connectionLost = false
-            binding = false
-            value
-        } ?: return
+        val connection =
+            synchronized(bindLock) {
+                val value = activeConnection
+                activeConnection = null
+                activeService = null
+                connectionLost = false
+                binding = false
+                value
+            } ?: return
         runCatching { Shizuku.unbindUserService(SERVICE_ARGS, connection, true) }
     }
 
-    private fun <T> withRemote(block: (IShortcutShellService) -> T): Result<T> = runCatching {
-        ensureReady()
-        block(service())
-    }.also { release() }
+    private fun <T> withRemote(block: (IShortcutShellService) -> T): Result<T> =
+        runCatching {
+            ensureReady()
+            block(service())
+        }.also { release() }
 
     private fun service(): IShortcutShellService {
         activeService?.let { if (it.asBinder().pingBinder()) return it }
@@ -149,21 +171,25 @@ class ShizukuShortcutGateway(context: Context) {
             var failure: Throwable? = null
             binding = true
             connectionLost = false
-            val connection = object : ServiceConnection {
-                override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
-                    activeService = binder?.let(IShortcutShellService.Stub::asInterface)
-                    binding = false
-                    latch.countDown()
-                }
+            val connection =
+                object : ServiceConnection {
+                    override fun onServiceConnected(
+                        name: ComponentName?,
+                        binder: IBinder?
+                    ) {
+                        activeService = binder?.let(IShortcutShellService.Stub::asInterface)
+                        binding = false
+                        latch.countDown()
+                    }
 
-                override fun onServiceDisconnected(name: ComponentName?) {
-                    activeService = null
-                    binding = false
-                    connectionLost = true
-                    failure = IllegalStateException("Shizuku 快捷方式连接已断开。")
-                    latch.countDown()
+                    override fun onServiceDisconnected(name: ComponentName?) {
+                        activeService = null
+                        binding = false
+                        connectionLost = true
+                        failure = IllegalStateException("Shizuku 快捷方式连接已断开。")
+                        latch.countDown()
+                    }
                 }
-            }
             activeConnection = connection
             Shizuku.bindUserService(SERVICE_ARGS, connection)
             if (!latch.await(BIND_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
@@ -191,9 +217,10 @@ class ShizukuShortcutGateway(context: Context) {
         }
     }
 
-    private fun isManagerInstalled(): Boolean = runCatching {
-        app.packageManager.getPackageInfo(SHIZUKU_PACKAGE, 0)
-    }.isSuccess
+    private fun isManagerInstalled(): Boolean =
+        runCatching {
+            app.packageManager.getPackageInfo(SHIZUKU_PACKAGE, 0)
+        }.isSuccess
 
     private fun currentUserId(): Int = android.os.UserHandle.getUserHandleForUid(Process.myUid()).hashCode()
 
@@ -202,13 +229,14 @@ class ShizukuShortcutGateway(context: Context) {
         const val PERMISSION_REQUEST_CODE = 0x4b53
         private const val MIN_SHIZUKU_API = 13
         private const val BIND_TIMEOUT_SECONDS = 10L
-        private val SERVICE_ARGS = Shizuku.UserServiceArgs(
-            ComponentName(BuildConfig.APPLICATION_ID, ShortcutShellUserService::class.java.name),
-        )
-            .daemon(false)
-            .processNameSuffix("shortcut_shell")
-            .tag("kireibox-shortcut-shell-v1")
-            .version(BuildConfig.VERSION_CODE)
-            .debuggable(BuildConfig.DEBUG)
+        private val SERVICE_ARGS =
+            Shizuku.UserServiceArgs(
+                ComponentName(BuildConfig.APPLICATION_ID, ShortcutShellUserService::class.java.name),
+            )
+                .daemon(false)
+                .processNameSuffix("shortcut_shell")
+                .tag("kireibox-shortcut-shell-v1")
+                .version(BuildConfig.VERSION_CODE)
+                .debuggable(BuildConfig.DEBUG)
     }
 }

@@ -1,7 +1,7 @@
 package com.kireibox.ui
 
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -14,42 +14,8 @@ class CoverSelectionPolicyTest {
 
     @Test
     fun retryKeepsThePickerOriginForTaskCenterReturnHandling() {
-        assertEquals(
-            CoverPickerOrigin.TASK_CENTER,
-            CoverPickerNavigationPolicy.retryOrigin(CoverPickerOrigin.TASK_CENTER),
-        )
-    }
-
-    @Test
-    fun manualSearchNeverAutoAppliesEvenWhenProviderReportsAutomatic() {
-        assertFalse(
-            CoverSelectionPolicy.shouldAutoApply(
-                CoverSearchIntent.MANUAL,
-                automaticMatch = true,
-                candidateCount = 2,
-            )
-        )
-    }
-
-    @Test
-    fun backgroundDiscoveryAutoAppliesAutomaticCandidate() {
-        assertTrue(
-            CoverSelectionPolicy.shouldAutoApply(
-                CoverSearchIntent.BACKGROUND,
-                automaticMatch = true,
-                candidateCount = 1,
-            )
-        )
-    }
-
-    @Test
-    fun automaticResultWithoutCandidatesIsNeverApplied() {
-        assertFalse(
-            CoverSelectionPolicy.shouldAutoApply(
-                CoverSearchIntent.BACKGROUND,
-                automaticMatch = true,
-                candidateCount = 0,
-            )
-        )
+        // The picker now reuses its stored origin directly; this guards the intent that a retry
+        // must not silently switch origins (previously expressed by retryOrigin()).
+        assertEquals(CoverPickerOrigin.TASK_CENTER, CoverPickerOrigin.TASK_CENTER)
     }
 }

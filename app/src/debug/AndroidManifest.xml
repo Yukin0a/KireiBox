@@ -8,5 +8,11 @@
             android:maxAspectRatio="2.4"
             android:screenOrientation="unspecified"
             android:theme="@style/Theme.YukiHub.Launcher" />
+        <activity
+            android:name="com.kireibox.ui.UiShowcaseActivity"
+            android:exported="true"
+            android:resizeableActivity="true"
+            android:screenOrientation="unspecified"
+            android:theme="@style/Theme.YukiHub.Launcher" />
     </application>
 </manifest>

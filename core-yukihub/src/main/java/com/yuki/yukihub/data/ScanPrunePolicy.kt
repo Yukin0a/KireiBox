@@ -6,6 +6,9 @@ package com.yuki.yukihub.data
  * hidden is a deliberate in-app removal and must survive refresh.
  */
 internal object ScanPrunePolicy {
-    fun shouldPrune(seen: Boolean, resolves: Boolean, hidden: Boolean): Boolean =
-        !hidden && !seen && !resolves
+    fun shouldPrune(
+        seen: Boolean,
+        resolves: Boolean,
+        hidden: Boolean,
+    ): Boolean = !hidden && !seen && !resolves
 }

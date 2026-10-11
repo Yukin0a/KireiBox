@@ -79,42 +79,97 @@ class DevLoggerTest {
         private val input = ByteArrayInputStream(text.toByteArray())
 
         override fun getOutputStream(): OutputStream = ByteArrayOutputStream()
+
         override fun getInputStream(): InputStream = input
+
         override fun getErrorStream(): InputStream = ByteArrayInputStream(ByteArray(0))
+
         override fun waitFor(): Int = 0
+
         override fun exitValue(): Int = 0
+
         override fun destroy() = Unit
     }
 
     private class BooleanPreferences(private val enabled: Boolean?) : SharedPreferences {
-        override fun getBoolean(key: String?, defaultValue: Boolean): Boolean = enabled ?: defaultValue
+        override fun getBoolean(
+            key: String?,
+            defaultValue: Boolean,
+        ): Boolean = enabled ?: defaultValue
+
         override fun getAll(): Map<String, *> = emptyMap<String, Any>()
-        override fun getString(key: String?, defaultValue: String?): String? = defaultValue
-        override fun getStringSet(key: String?, defaultValues: MutableSet<String>?): MutableSet<String>? =
-            defaultValues
-        override fun getInt(key: String?, defaultValue: Int): Int = defaultValue
-        override fun getLong(key: String?, defaultValue: Long): Long = defaultValue
-        override fun getFloat(key: String?, defaultValue: Float): Float = defaultValue
+
+        override fun getString(
+            key: String?,
+            defaultValue: String?,
+        ): String? = defaultValue
+
+        override fun getStringSet(
+            key: String?,
+            defaultValues: MutableSet<String>?,
+        ): MutableSet<String>? = defaultValues
+
+        override fun getInt(
+            key: String?,
+            defaultValue: Int,
+        ): Int = defaultValue
+
+        override fun getLong(
+            key: String?,
+            defaultValue: Long,
+        ): Long = defaultValue
+
+        override fun getFloat(
+            key: String?,
+            defaultValue: Float,
+        ): Float = defaultValue
+
         override fun contains(key: String?): Boolean = enabled != null
+
         override fun edit(): SharedPreferences.Editor = NoOpEditor
-        override fun registerOnSharedPreferenceChangeListener(
-            listener: SharedPreferences.OnSharedPreferenceChangeListener?,
-        ) = Unit
-        override fun unregisterOnSharedPreferenceChangeListener(
-            listener: SharedPreferences.OnSharedPreferenceChangeListener?,
-        ) = Unit
+
+        override fun registerOnSharedPreferenceChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener?) = Unit
+
+        override fun unregisterOnSharedPreferenceChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener?) = Unit
     }
 
     private object NoOpEditor : SharedPreferences.Editor {
-        override fun putString(key: String?, value: String?): SharedPreferences.Editor = this
-        override fun putStringSet(key: String?, values: MutableSet<String>?): SharedPreferences.Editor = this
-        override fun putInt(key: String?, value: Int): SharedPreferences.Editor = this
-        override fun putLong(key: String?, value: Long): SharedPreferences.Editor = this
-        override fun putFloat(key: String?, value: Float): SharedPreferences.Editor = this
-        override fun putBoolean(key: String?, value: Boolean): SharedPreferences.Editor = this
+        override fun putString(
+            key: String?,
+            value: String?,
+        ): SharedPreferences.Editor = this
+
+        override fun putStringSet(
+            key: String?,
+            values: MutableSet<String>?,
+        ): SharedPreferences.Editor = this
+
+        override fun putInt(
+            key: String?,
+            value: Int,
+        ): SharedPreferences.Editor = this
+
+        override fun putLong(
+            key: String?,
+            value: Long,
+        ): SharedPreferences.Editor = this
+
+        override fun putFloat(
+            key: String?,
+            value: Float,
+        ): SharedPreferences.Editor = this
+
+        override fun putBoolean(
+            key: String?,
+            value: Boolean,
+        ): SharedPreferences.Editor = this
+
         override fun remove(key: String?): SharedPreferences.Editor = this
+
         override fun clear(): SharedPreferences.Editor = this
+
         override fun commit(): Boolean = true
+
         override fun apply() = Unit
     }
 }

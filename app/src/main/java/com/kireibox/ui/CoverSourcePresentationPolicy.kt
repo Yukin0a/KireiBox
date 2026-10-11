@@ -1,6 +1,6 @@
 package com.kireibox.ui
 
-import com.yuki.yukihub.metadata.CoverSourceMode
+import com.yuki.yukihub.metadata.model.CoverSourceMode
 
 internal data class CoverSourceEditorState(
     val selectedSource: CoverSourceMode,
@@ -23,26 +23,30 @@ internal object CoverSourcePresentationPolicy {
     const val NORMAL_ALPHA = 1f
     const val MUTED_ALPHA = .58f
 
-    fun presentation(source: CoverSourceMode, selectedSource: CoverSourceMode?): CoverSourcePresentation {
-        val isSelected = source == (selectedSource ?: CoverSourceMode.VNDB)
-        val muted = source != CoverSourceMode.VNDB && !isSelected
+    fun presentation(
+        source: CoverSourceMode,
+        selectedSource: CoverSourceMode?
+    ): CoverSourcePresentation {
+        val isSelected = source == (selectedSource ?: CoverSourceMode.BANGUMI)
+        val muted = source != CoverSourceMode.BANGUMI && !isSelected
         return CoverSourcePresentation(
             source = source,
             isSelected = isSelected,
             isHighlighted = isSelected,
             muted = muted,
-            enabled = true,
+            enabled = source.isActive,
             accessible = true,
             alpha = if (muted) MUTED_ALPHA else NORMAL_ALPHA,
-            tokenVisible = source.isBangumiFamily,
+            tokenVisible = source == CoverSourceMode.BANGUMI,
         )
     }
 
-    fun options(selectedSource: CoverSourceMode?): List<CoverSourcePresentation> =
-        CoverSourceMode.entries.map { source -> presentation(source, selectedSource) }
+    fun options(selectedSource: CoverSourceMode?): List<CoverSourcePresentation> = CoverSourceMode.active.map { source -> presentation(source, selectedSource) }
 
-    fun tokenVisible(source: CoverSourceMode): Boolean = source.isBangumiFamily
+    fun tokenVisible(source: CoverSourceMode): Boolean = source == CoverSourceMode.BANGUMI
 
-    fun switchSource(state: CoverSourceEditorState, source: CoverSourceMode): CoverSourceEditorState =
-        state.copy(selectedSource = source, tokenEditorOpen = false)
+    fun switchSource(
+        state: CoverSourceEditorState,
+        source: CoverSourceMode
+    ): CoverSourceEditorState = state.copy(selectedSource = source, tokenEditorOpen = false)
 }

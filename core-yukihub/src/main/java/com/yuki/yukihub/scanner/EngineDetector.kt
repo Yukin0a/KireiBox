@@ -2,6 +2,7 @@ package com.yuki.yukihub.scanner
 
 import android.util.Log
 import androidx.documentfile.provider.DocumentFile
+import com.yuki.yukihub.launch.ExeEntrySelector
 import com.yuki.yukihub.launch.Xp3EntrySelector
 import com.yuki.yukihub.model.EngineType
 import com.yuki.yukihub.storage.StorageNode
@@ -14,8 +15,11 @@ object EngineDetector {
 
     class Result {
         @JvmField var engine: EngineType = EngineType.UNKNOWN
+
         @JvmField var confidence: Int = 0
+
         @JvmField var launchTarget: String = ""
+
         @JvmField var xp3Candidates: MutableList<String> = ArrayList()
     }
 
@@ -23,20 +27,36 @@ object EngineDetector {
     fun detect(dir: DocumentFile?): Result = detect(dir, 2)
 
     @JvmStatic
-    fun detect(dir: DocumentFile?, featureDepth: Int): Result = detect(dir, featureDepth, null)
+    fun detect(
+        dir: DocumentFile?,
+        featureDepth: Int,
+    ): Result = detect(dir, featureDepth, null)
 
     @JvmStatic
-    fun detect(dir: DocumentFile?, featureDepth: Int, rootFiles: Array<DocumentFile>?): Result {
+    fun detect(
+        dir: DocumentFile?,
+        featureDepth: Int,
+        rootFiles: Array<DocumentFile>?,
+    ): Result {
         if (dir == null) return Result()
         return detect(
             StorageNodes.fromDocument(dir),
             featureDepth,
-            rootFiles?.map { StorageNodes.fromDocument(it) }
+            rootFiles?.map { StorageNodes.fromDocument(it) },
         )
     }
 
+    /**
+     * [boundExe] tells whether a root-level exe carries its own XP3 archive (a KRKR 汉化 or
+     * single-exe build); such an exe makes the folder a KRKR game and becomes its launch file.
+     */
     @JvmStatic
-    fun detect(dir: StorageNode?, featureDepth: Int = 2, rootFiles: List<StorageNode>? = null): Result {
+    fun detect(
+        dir: StorageNode?,
+        featureDepth: Int = 2,
+        rootFiles: List<StorageNode>? = null,
+        boundExe: ((StorageNode) -> Boolean)? = null,
+    ): Result {
         val result = Result()
         if (dir == null) return result
         val features = FeatureState()
@@ -45,38 +65,47 @@ object EngineDetector {
 
         features.xp3Files.sortWith(String.CASE_INSENSITIVE_ORDER)
         val firstXp3 = selectFirstXp3(features, dir.name)
+        val krkrExes by lazy { boundExes(features, dir.name, boundExe) }
 
-        val tyranoRuntime = features.hasTyranoDir || features.hasDataDir ||
-            "tyrano.css" in features.names || "tyrano.base.js" in features.names ||
-            "tyrano/tyrano.css" in features.relativeNames ||
-            "tyrano/tyrano.base.js" in features.relativeNames
-        val electronWrapper = features.hasResourcesDir &&
-            (features.hasAppAsar || features.hasPackageJson || features.hasElectronPak)
-        val artemisRuntime = (features.hasSystemIni && features.hasFirstIet) ||
-            features.hasRootPfs || features.hasAnyPfsFile
+        val tyranoRuntime =
+            features.hasTyranoDir || features.hasDataDir ||
+                "tyrano.css" in features.names || "tyrano.base.js" in features.names ||
+                "tyrano/tyrano.css" in features.relativeNames ||
+                "tyrano/tyrano.base.js" in features.relativeNames
+        val electronWrapper =
+            features.hasResourcesDir &&
+                (features.hasAppAsar || features.hasPackageJson || features.hasElectronPak)
+        val artemisRuntime =
+            (features.hasSystemIni && features.hasFirstIet) ||
+                features.hasRootPfs || features.hasAnyPfsFile
 
         when {
             features.hasIndex && tyranoRuntime -> score(result, EngineType.TYRANO, 96, "[游戏目录]")
             features.hasAppAsar -> score(result, EngineType.TYRANO, 82, "[游戏目录]")
             features.hasIndex && !electronWrapper -> score(result, EngineType.TYRANO, 70, "[游戏目录]")
-            artemisRuntime -> score(
-                result,
-                EngineType.ARTEMIS,
-                if ((features.hasSystemIni && features.hasFirstIet) || features.hasRootPfs) 95 else 90,
-                "[游戏目录]"
-            )
-            firstXp3 != null || features.hasStartupTjs || features.hasConfigTjs -> {
-                score(result, EngineType.KIRIKIRI, if (firstXp3 != null) 95 else 80, firstXp3 ?: "[游戏目录]")
-                if (features.dataXp3 == null && features.xp3Files.size > 1) {
-                    result.xp3Candidates.addAll(features.xp3Files)
+            artemisRuntime ->
+                score(
+                    result,
+                    EngineType.ARTEMIS,
+                    if ((features.hasSystemIni && features.hasFirstIet) || features.hasRootPfs) 95 else 90,
+                    "[游戏目录]",
+                )
+            firstXp3 != null || features.hasStartupTjs || features.hasConfigTjs || krkrExes.isNotEmpty() -> {
+                val entry = krkrExes.firstOrNull() ?: firstXp3
+                score(result, EngineType.KIRIKIRI, if (entry != null) 95 else 80, entry ?: "[游戏目录]")
+                result.xp3Candidates.addAll(krkrExes)
+                when {
+                    features.dataXp3 == null && features.xp3Files.size > 1 -> result.xp3Candidates.addAll(features.xp3Files)
+                    krkrExes.isNotEmpty() && firstXp3 != null -> result.xp3Candidates.add(firstXp3)
                 }
             }
-            features.hasOnsScript || features.hasOnsArchive -> score(
-                result,
-                EngineType.ONS,
-                if (features.hasOnsScript) 90 else 70,
-                "[游戏目录]"
-            )
+            features.hasOnsScript || features.hasOnsArchive ->
+                score(
+                    result,
+                    EngineType.ONS,
+                    if (features.hasOnsScript) 90 else 70,
+                    "[游戏目录]",
+                )
         }
         return result
     }
@@ -103,6 +132,7 @@ object EngineDetector {
         var hasAppAsar = false
         var hasPackageJson = false
         var hasElectronPak = false
+        val rootExes = ArrayList<StorageNode>()
     }
 
     private fun collectFeatures(
@@ -112,15 +142,16 @@ object EngineDetector {
         level: Int,
         maxLevel: Int,
         state: FeatureState,
-        knownFiles: List<StorageNode>?
+        knownFiles: List<StorageNode>?,
     ) {
-        val files = try {
-            if (dir?.isDirectory != true) return
-            knownFiles ?: dir.children()
-        } catch (error: Throwable) {
-            Log.w(TAG, "feature scan failed uri=${safeUri(dir)}", error)
-            return
-        }
+        val files =
+            try {
+                if (dir?.isDirectory != true) return
+                knownFiles ?: dir.children()
+            } catch (error: Throwable) {
+                Log.w(TAG, "feature scan failed uri=${safeUri(dir)}", error)
+                return
+            }
         for (file in files) {
             val original = safeName(file)
             val lower = original.lowercase(Locale.ROOT)
@@ -154,6 +185,7 @@ object EngineDetector {
             if (lower == "app.asar" || relative.endsWith("/app.asar")) state.hasAppAsar = true
             if (lower == "package.json" || relative.endsWith("/package.json")) state.hasPackageJson = true
             if (lower.startsWith("chrome_") && lower.endsWith(".pak")) state.hasElectronPak = true
+            if (level == 1 && lower.endsWith(".exe")) state.rootExes += file
             if (lower.endsWith(".xp3")) {
                 state.xp3Files += originalRelative
                 state.xp3Sizes[originalRelative] = runCatching { file.size }.getOrDefault(0L)
@@ -162,21 +194,45 @@ object EngineDetector {
         }
     }
 
-    private fun selectFirstXp3(features: FeatureState, folderName: String?): String? {
-        val entries = features.xp3Files.map { relative ->
-            Xp3EntrySelector.Entry(
-                name = relative.substringAfterLast('/'),
-                size = features.xp3Sizes[relative] ?: 0L,
-            )
-        }
+    /** Root exes that hold an XP3 archive, the likeliest launch file first (a Chinese build before the original). */
+    private fun boundExes(
+        features: FeatureState,
+        folderName: String?,
+        boundExe: ((StorageNode) -> Boolean)?,
+    ): List<String> {
+        if (boundExe == null) return emptyList()
+        val bound =
+            features.rootExes
+                .filter { !ExeEntrySelector.isAuxiliary(safeName(it)) && runCatching { boundExe(it) }.getOrDefault(false) }
+                .map { ExeEntrySelector.Entry(safeName(it), runCatching { it.size }.getOrDefault(0L)) }
+        return ExeEntrySelector.rank(bound, folderName)
+    }
+
+    private fun selectFirstXp3(
+        features: FeatureState,
+        folderName: String?,
+    ): String? {
+        val entries =
+            features.xp3Files.map { relative ->
+                Xp3EntrySelector.Entry(
+                    name = relative.substringAfterLast('/'),
+                    size = features.xp3Sizes[relative] ?: 0L,
+                )
+            }
         val picked = Xp3EntrySelector.select(entries, folderName, null) ?: return null
         return features.xp3Files.firstOrNull { it.substringAfterLast('/').equals(picked, ignoreCase = true) }
     }
 
     private fun safeName(file: StorageNode?): String = runCatching { file?.name.orEmpty() }.getOrDefault("")
+
     private fun safeUri(file: StorageNode?): String = runCatching { file?.uri?.toString().orEmpty() }.getOrDefault("unknown")
 
-    private fun score(result: Result, engine: EngineType, confidence: Int, launchTarget: String) {
+    private fun score(
+        result: Result,
+        engine: EngineType,
+        confidence: Int,
+        launchTarget: String,
+    ) {
         if (confidence <= result.confidence) return
         result.engine = engine
         result.confidence = confidence

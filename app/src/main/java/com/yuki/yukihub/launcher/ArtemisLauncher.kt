@@ -8,7 +8,8 @@ import android.util.Log
 import com.akira.tyranoemu.remote.ArtemisActivityV1
 import com.akira.tyranoemu.remote.ArtemisActivityV2
 import com.akira.tyranoemu.remote.ArtemisActivityV3
-import com.apps.LauncherActivity
+import com.kireibox.app.LauncherActivity
+import com.yuki.yukihub.launcherbridge.LauncherEngineOptions
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -51,11 +52,12 @@ internal object ArtemisLauncher {
 
         val requestedPackage = packageName?.trim().orEmpty()
         val autoFallback = requestedPackage.equals("internal.artemis", ignoreCase = true)
-        val effectivePackage = if (autoFallback) {
-            preferredPackage(context, requestedPackage, rootPath)
-        } else {
-            requestedPackage
-        }
+        val effectivePackage =
+            if (autoFallback) {
+                preferredPackage(context, requestedPackage, rootPath)
+            } else {
+                requestedPackage
+            }
         val activityClass = chooseActivity(effectivePackage)
         logInfo(
             "ARTEMIS_SCOPED_V2 pkg=$requestedPackage effectivePkg=$effectivePackage " +
@@ -70,7 +72,7 @@ internal object ArtemisLauncher {
             putExtra("rootUri", gamePath)
             putExtra("launchTarget", launchTarget)
             putExtra("launchMode", "internal.artemis")
-            putExtra("orientation", 6)
+            putExtra("orientation", LauncherEngineOptions.orientation(context))
             putExtra("scopedSaveDir", scoped)
             putExtra("scopedSaveName", saveName)
             putExtra("artemisAutoFallback", autoFallback)
@@ -81,11 +83,17 @@ internal object ArtemisLauncher {
     }
 
     @JvmStatic
-    fun resolveGamePath(rootUri: String?, launchTarget: String?): String? =
-        ScriptEngineLaunchers.uriToFilePath(rootUri)?.takeUnless(String::isEmpty) ?: rootUri
+    fun resolveGamePath(
+        rootUri: String?,
+        launchTarget: String?
+    ): String? = ScriptEngineLaunchers.uriToFilePath(rootUri)?.takeUnless(String::isEmpty) ?: rootUri
 
     @JvmStatic
-    fun resolveSaveLocation(context: Context?, rootPath: String?, scoped: Boolean): SaveLocation {
+    fun resolveSaveLocation(
+        context: Context?,
+        rootPath: String?,
+        scoped: Boolean
+    ): SaveLocation {
         if (!scoped) {
             return SaveLocation(
                 null,
@@ -96,8 +104,9 @@ internal object ArtemisLauncher {
         if (rootPath.isNullOrBlank() || rootPath.startsWith("content://")) {
             return SaveLocation(null, "无法解析游戏本地目录", false)
         }
-        val external = context?.getExternalFilesDir(null)
-            ?: return SaveLocation(null, "应用独立存储目录不可用", false)
+        val external =
+            context?.getExternalFilesDir(null)
+                ?: return SaveLocation(null, "应用独立存储目录不可用", false)
         return SaveLocation(
             File(File(external, "save"), safeSaveName(rootPath)),
             "Artemis 独立存档目录",
@@ -105,7 +114,11 @@ internal object ArtemisLauncher {
         )
     }
 
-    private fun prepareScopedMirror(context: Context, rootPath: String?, saveName: String?): String? {
+    private fun prepareScopedMirror(
+        context: Context,
+        rootPath: String?,
+        saveName: String?
+    ): String? {
         if (rootPath.isNullOrBlank()) return null
         return try {
             val sourceRoot = File(rootPath)
@@ -148,7 +161,10 @@ internal object ArtemisLauncher {
         }
     }
 
-    private fun startSaveObserver(mirrorRoot: File, saveRoot: File) {
+    private fun startSaveObserver(
+        mirrorRoot: File,
+        saveRoot: File
+    ) {
         try {
             val mirrorPath = mirrorRoot.absolutePath
             val savePath = saveRoot.absolutePath
@@ -159,18 +175,22 @@ internal object ArtemisLauncher {
                 saveObservers.clear()
             }
             previous?.stopWatching()
-            val observer = object : FileObserver(
-                mirrorPath,
-                CLOSE_WRITE or MOVED_TO or CREATE,
-            ) {
-                override fun onEvent(event: Int, path: String?) {
-                    try {
-                        copyRegularFiles(File(mirrorPath), File(savePath), onlyNewer = true)
-                    } catch (error: Throwable) {
-                        logWarn("Artemis realtime save export failed", error)
+            val observer =
+                object : FileObserver(
+                    mirrorPath,
+                    CLOSE_WRITE or MOVED_TO or CREATE,
+                ) {
+                    override fun onEvent(
+                        event: Int,
+                        path: String?
+                    ) {
+                        try {
+                            copyRegularFiles(File(mirrorPath), File(savePath), onlyNewer = true)
+                        } catch (error: Throwable) {
+                            logWarn("Artemis realtime save export failed", error)
+                        }
                     }
                 }
-            }
             observer.startWatching()
             synchronized(observerLock) { saveObservers[mirrorPath] = observer }
             logInfo("Artemis save observer started mirror=$mirrorPath save=$savePath")
@@ -179,7 +199,11 @@ internal object ArtemisLauncher {
         }
     }
 
-    private fun copyRegularFiles(fromDirectory: File?, toDirectory: File?, onlyNewer: Boolean): Int {
+    private fun copyRegularFiles(
+        fromDirectory: File?,
+        toDirectory: File?,
+        onlyNewer: Boolean
+    ): Int {
         if (fromDirectory?.isDirectory != true || toDirectory == null) return 0
         if (!ensureDirectory(toDirectory)) return 0
         return fromDirectory.listFiles()?.count { source ->
@@ -188,22 +212,28 @@ internal object ArtemisLauncher {
             if (onlyNewer && destination.exists() &&
                 destination.lastModified() >= source.lastModified() &&
                 destination.length() == source.length()
-            ) return@count false
+            ) {
+                return@count false
+            }
             copyFile(source, destination)
         } ?: 0
     }
 
-    private fun copyFile(source: File, destination: File): Boolean = try {
-        destination.parentFile?.let { if (!ensureDirectory(it)) return false }
-        FileInputStream(source).use { input ->
-            FileOutputStream(destination, false).use { output -> input.copyTo(output, 64 * 1024) }
+    private fun copyFile(
+        source: File,
+        destination: File
+    ): Boolean =
+        try {
+            destination.parentFile?.let { if (!ensureDirectory(it)) return false }
+            FileInputStream(source).use { input ->
+                FileOutputStream(destination, false).use { output -> input.copyTo(output, 64 * 1024) }
+            }
+            destination.setLastModified(source.lastModified())
+            true
+        } catch (error: Throwable) {
+            logWarn("copy file failed $source -> $destination", error)
+            false
         }
-        destination.setLastModified(source.lastModified())
-        true
-    } catch (error: Throwable) {
-        logWarn("copy file failed $source -> $destination", error)
-        false
-    }
 
     @JvmStatic
     fun isResourceName(name: String?): Boolean {
@@ -225,10 +255,15 @@ internal object ArtemisLauncher {
         }
     }
 
-    private fun preferredPackage(context: Context, requestedPackage: String, rootPath: String?): String {
+    private fun preferredPackage(
+        context: Context,
+        requestedPackage: String,
+        rootPath: String?
+    ): String {
         if (rootPath.isNullOrBlank()) return requestedPackage
-        val saved = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .getString(ENGINE_PREF_PREFIX + Integer.toHexString(rootPath.hashCode()), null)
+        val saved =
+            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .getString(ENGINE_PREF_PREFIX + Integer.toHexString(rootPath.hashCode()), null)
         return saved?.takeIf(String::isNotBlank) ?: requestedPackage
     }
 
@@ -254,10 +289,12 @@ internal object ArtemisLauncher {
         }
     }
 
-    private fun ensureDirectory(directory: File): Boolean =
-        directory.isDirectory || (!directory.exists() && directory.mkdirs())
+    private fun ensureDirectory(directory: File): Boolean = directory.isDirectory || (!directory.exists() && directory.mkdirs())
 
-    private fun ensureSymlink(link: File, target: File): Boolean {
+    private fun ensureSymlink(
+        link: File,
+        target: File
+    ): Boolean {
         return try {
             if (link.exists()) {
                 if (isSymlinkTo(link, target)) return true
@@ -271,18 +308,23 @@ internal object ArtemisLauncher {
         }
     }
 
-    private fun isSymlinkTo(link: File, target: File): Boolean = try {
-        Os.readlink(link.absolutePath) == target.absolutePath
-    } catch (_: Throwable) {
-        false
-    }
+    private fun isSymlinkTo(
+        link: File,
+        target: File
+    ): Boolean =
+        try {
+            Os.readlink(link.absolutePath) == target.absolutePath
+        } catch (_: Throwable) {
+            false
+        }
 
-    private fun isSymlink(file: File): Boolean = try {
-        Os.readlink(file.absolutePath)
-        true
-    } catch (_: Throwable) {
-        false
-    }
+    private fun isSymlink(file: File): Boolean =
+        try {
+            Os.readlink(file.absolutePath)
+            true
+        } catch (_: Throwable) {
+            false
+        }
 
     private fun deleteRecursively(file: File) {
         if (!file.exists()) return
@@ -290,7 +332,10 @@ internal object ArtemisLauncher {
         if (!file.delete()) logWarn("delete failed ${file.absolutePath}")
     }
 
-    private fun appendThemeColors(intent: Intent, context: Context) {
+    private fun appendThemeColors(
+        intent: Intent,
+        context: Context
+    ) {
         try {
             val primary = KireiEngineTheme.primary(context)
             intent.putExtra("primaryColor", primary)
@@ -305,15 +350,19 @@ internal object ArtemisLauncher {
         }
     }
 
-    private fun engineIntentFlags(): Int = Intent.FLAG_ACTIVITY_NEW_TASK or
-        Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION or
-        Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION or Intent.FLAG_GRANT_PREFIX_URI_PERMISSION
+    private fun engineIntentFlags(): Int =
+        Intent.FLAG_ACTIVITY_NEW_TASK or
+            Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION or
+            Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION or Intent.FLAG_GRANT_PREFIX_URI_PERMISSION
 
     private fun logInfo(message: String) {
         runCatching { Log.i(TAG, message) }
     }
 
-    private fun logWarn(message: String, error: Throwable? = null) {
+    private fun logWarn(
+        message: String,
+        error: Throwable? = null
+    ) {
         runCatching { if (error == null) Log.w(TAG, message) else Log.w(TAG, message, error) }
     }
 }

@@ -23,7 +23,10 @@ internal class CoverLoadCoordinator<K : Any, V : Any>(
     private val mutex = Mutex()
     private val inFlight = mutableMapOf<K, Flight<V>>()
 
-    suspend fun load(key: K, decode: suspend () -> V?): V? {
+    suspend fun load(
+        key: K,
+        decode: suspend () -> V?
+    ): V? {
         readCache(key)?.let { return it }
         val flight = acquire(key, decode)
         return try {
@@ -34,42 +37,52 @@ internal class CoverLoadCoordinator<K : Any, V : Any>(
     }
 
     suspend fun cancelAll() {
-        val flights = mutex.withLock {
-            inFlight.values.map { it.deferred }.also { inFlight.clear() }
-        }
+        val flights =
+            mutex.withLock {
+                inFlight.values.map { it.deferred }.also { inFlight.clear() }
+            }
         flights.forEach { it.cancelAndJoin() }
     }
 
-    private suspend fun acquire(key: K, decode: suspend () -> V?): Flight<V> = mutex.withLock {
-        inFlight[key]?.also {
-            it.consumers += 1
-            return@withLock it
-        }
-        val deferred = scope.async(start = CoroutineStart.LAZY) {
-            currentCoroutineContext().ensureActive()
-            decode()?.also { value ->
-                currentCoroutineContext().ensureActive()
-                writeCache(key, value)
+    private suspend fun acquire(
+        key: K,
+        decode: suspend () -> V?
+    ): Flight<V> =
+        mutex.withLock {
+            inFlight[key]?.also {
+                it.consumers += 1
+                return@withLock it
             }
-        }
-        Flight(deferred, consumers = 1).also {
-            inFlight[key] = it
-            deferred.start()
-        }
-    }
-
-    private suspend fun release(key: K, flight: Flight<V>) {
-        withContext(NonCancellable) {
-            val cancelFlight = mutex.withLock {
-                if (inFlight[key] !== flight) return@withLock false
-                flight.consumers -= 1
-                if (flight.consumers == 0) {
-                    inFlight.remove(key)
-                    !flight.deferred.isCompleted
-                } else {
-                    false
+            val deferred =
+                scope.async(start = CoroutineStart.LAZY) {
+                    currentCoroutineContext().ensureActive()
+                    decode()?.also { value ->
+                        currentCoroutineContext().ensureActive()
+                        writeCache(key, value)
+                    }
                 }
+            Flight(deferred, consumers = 1).also {
+                inFlight[key] = it
+                deferred.start()
             }
+        }
+
+    private suspend fun release(
+        key: K,
+        flight: Flight<V>
+    ) {
+        withContext(NonCancellable) {
+            val cancelFlight =
+                mutex.withLock {
+                    if (inFlight[key] !== flight) return@withLock false
+                    flight.consumers -= 1
+                    if (flight.consumers == 0) {
+                        inFlight.remove(key)
+                        !flight.deferred.isCompleted
+                    } else {
+                        false
+                    }
+                }
             if (cancelFlight) flight.deferred.cancelAndJoin()
         }
     }

@@ -27,17 +27,18 @@ object ShortcutServiceStatusPolicy {
         uid: Int,
         binding: Boolean,
         connectionLost: Boolean,
-    ): ShortcutServiceStatus = when {
-        !installed -> ShortcutServiceStatus.NOT_INSTALLED
-        !running -> ShortcutServiceStatus.NOT_RUNNING
-        !supportedVersion -> ShortcutServiceStatus.UNSUPPORTED_VERSION
-        binding -> ShortcutServiceStatus.BINDING
-        connectionLost -> ShortcutServiceStatus.CONNECTION_LOST
-        !permissionGranted && rationale -> ShortcutServiceStatus.PERMISSION_DENIED
-        !permissionGranted -> ShortcutServiceStatus.PERMISSION_REQUIRED
-        uid != 2000 -> ShortcutServiceStatus.UNSUPPORTED_IDENTITY
-        else -> ShortcutServiceStatus.READY
-    }
+    ): ShortcutServiceStatus =
+        when {
+            !installed -> ShortcutServiceStatus.NOT_INSTALLED
+            !running -> ShortcutServiceStatus.NOT_RUNNING
+            !supportedVersion -> ShortcutServiceStatus.UNSUPPORTED_VERSION
+            binding -> ShortcutServiceStatus.BINDING
+            connectionLost -> ShortcutServiceStatus.CONNECTION_LOST
+            !permissionGranted && rationale -> ShortcutServiceStatus.PERMISSION_DENIED
+            !permissionGranted -> ShortcutServiceStatus.PERMISSION_REQUIRED
+            uid != 2000 -> ShortcutServiceStatus.UNSUPPORTED_IDENTITY
+            else -> ShortcutServiceStatus.READY
+        }
 }
 
 data class ExternalShortcutDescriptor(
@@ -65,16 +66,18 @@ data class ExternalShortcutDirectLaunch(
 ) {
     fun encode(): String = "$PREFIX${gameId.toUtf8Hex()}"
 
-    fun intentSpec(): IntentSpec = IntentSpec(
-        packageName = GAME_HUB_PACKAGE,
-        activityName = GAME_HUB_ACTIVITY,
-        action = ACTION_VIEW,
-        flags = FLAG_ACTIVITY_NEW_TASK or FLAG_ACTIVITY_CLEAR_TOP,
-        extras = mapOf(
-            EXTRA_NAV_TARGET to NAV_TARGET_LOCAL_GAME,
-            EXTRA_GAME_ID to gameId,
-        ),
-    )
+    fun intentSpec(): IntentSpec =
+        IntentSpec(
+            packageName = GAME_HUB_PACKAGE,
+            activityName = GAME_HUB_ACTIVITY,
+            action = ACTION_VIEW,
+            flags = FLAG_ACTIVITY_NEW_TASK or FLAG_ACTIVITY_CLEAR_TOP,
+            extras =
+                mapOf(
+                    EXTRA_NAV_TARGET to NAV_TARGET_LOCAL_GAME,
+                    EXTRA_GAME_ID to gameId,
+                ),
+        )
 
     data class IntentSpec(
         val packageName: String,
@@ -108,15 +111,19 @@ data class ExternalShortcutDirectLaunch(
             return create(value.substring(PREFIX.length).hexToUtf8())
         }
 
-        fun fromGame(game: Game?): ExternalShortcutDirectLaunch? = game
-            ?.takeIf { it.engine == EngineType.ANDROID_APP }
-            ?.launchTarget
-            ?.let(::parse)
+        fun fromGame(game: Game?): ExternalShortcutDirectLaunch? =
+            game
+                ?.takeIf { it.engine == EngineType.ANDROID_APP }
+                ?.launchTarget
+                ?.let(::parse)
     }
 }
 
 object ExternalShortcutPolicy {
-    fun descriptors(values: Iterable<ExternalShortcutDescriptor>, ownPackage: String): List<ExternalShortcutDescriptor> =
+    fun descriptors(
+        values: Iterable<ExternalShortcutDescriptor>,
+        ownPackage: String
+    ): List<ExternalShortcutDescriptor> =
         values.asSequence()
             .filter { it.packageName.isNotBlank() && it.shortcutId.isNotBlank() }
             .filter { it.packageName != ownPackage }
@@ -142,11 +149,16 @@ object ExternalShortcutIdentity {
         val legacy: Boolean = false,
     )
 
-    fun rootUri(userId: Int, packageName: String, shortcutId: String): String =
-        "$PREFIX" + "u${userId.coerceAtLeast(0)}/${packageName.trim()}/${shortcutId.toUtf8Hex()}"
+    fun rootUri(
+        userId: Int,
+        packageName: String,
+        shortcutId: String
+    ): String = "$PREFIX" + "u${userId.coerceAtLeast(0)}/${packageName.trim()}/${shortcutId.toUtf8Hex()}"
 
-    fun legacyVivoRootUri(packageName: String, shortcutId: String): String =
-        "$LEGACY_VIVO_PREFIX${packageName.trim()}/${shortcutId.toUtf8Hex()}"
+    fun legacyVivoRootUri(
+        packageName: String,
+        shortcutId: String
+    ): String = "$LEGACY_VIVO_PREFIX${packageName.trim()}/${shortcutId.toUtf8Hex()}"
 
     fun parse(raw: String?): Parsed? {
         val value = raw?.trim().orEmpty()
@@ -168,17 +180,20 @@ object ExternalShortcutIdentity {
         return null
     }
 
-    fun fromGame(game: Game?): Parsed? = game
-        ?.takeIf { it.engine == EngineType.ANDROID_APP }
-        ?.rootUri
-        ?.let(::parse)
+    fun fromGame(game: Game?): Parsed? =
+        game
+            ?.takeIf { it.engine == EngineType.ANDROID_APP }
+            ?.rootUri
+            ?.let(::parse)
 
     fun isExternalShortcut(game: Game?): Boolean = fromGame(game) != null
-
 }
 
 object ExternalShortcutMergePolicy {
-    fun isUserRenamed(currentTitle: String?, originalTitle: String?): Boolean {
+    fun isUserRenamed(
+        currentTitle: String?,
+        originalTitle: String?
+    ): Boolean {
         val current = currentTitle?.trim().orEmpty()
         val original = originalTitle?.trim().orEmpty()
         return current.isNotEmpty() && original.isNotEmpty() && current != original
@@ -188,17 +203,18 @@ object ExternalShortcutMergePolicy {
 }
 
 object ExternalShortcutLaunchPolicy {
-    fun requiresShizuku(game: Game?): Boolean =
-        ExternalShortcutIdentity.fromGame(game) != null && ExternalShortcutDirectLaunch.fromGame(game) == null
+    fun requiresShizuku(game: Game?): Boolean = ExternalShortcutIdentity.fromGame(game) != null && ExternalShortcutDirectLaunch.fromGame(game) == null
 }
 
-private fun String.toUtf8Hex(): String = toByteArray(StandardCharsets.UTF_8)
-    .joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
+private fun String.toUtf8Hex(): String =
+    toByteArray(StandardCharsets.UTF_8)
+        .joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
 
 private fun String.hexToUtf8(): String? {
     if (length % 2 != 0 || any { it.digitToIntOrNull(16) == null }) return null
-    val bytes = ByteArray(length / 2) { index ->
-        substring(index * 2, index * 2 + 2).toInt(16).toByte()
-    }
+    val bytes =
+        ByteArray(length / 2) { index ->
+            substring(index * 2, index * 2 + 2).toInt(16).toByte()
+        }
     return runCatching { String(bytes, StandardCharsets.UTF_8) }.getOrNull()
 }

@@ -1,19 +1,12 @@
 package com.kireibox.ui
 
-import java.io.File
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MainNavigationCrossfadeTest {
     private fun source(): String {
-        val candidates = listOf(
-            File("src/main/java/com/kireibox/ui/KireiBoxApp.kt"),
-            File("../app/src/main/java/com/kireibox/ui/KireiBoxApp.kt"),
-        )
-        val file = candidates.firstOrNull { it.isFile }
-            ?: error("KireiBoxApp.kt not found from ${File("").absolutePath}")
-        return file.readText()
+        return UiSourceFiles.all()
     }
 
     @Test

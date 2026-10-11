@@ -6,7 +6,9 @@ enum class EngineType(val displayName: String) {
     TYRANO("Tyrano"),
     ARTEMIS("Artemis"),
     ANDROID_APP("Android 应用"),
-    UNKNOWN("Unknown");
+    WINDOWS("PC"),
+    UNKNOWN("Unknown"),
+    ;
 
     companion object {
         @JvmStatic

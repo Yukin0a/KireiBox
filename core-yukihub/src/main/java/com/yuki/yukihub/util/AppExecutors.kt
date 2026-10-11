@@ -15,17 +15,20 @@ import java.util.concurrent.TimeUnit
 object AppExecutors {
     private val IO_POOL_SIZE: Int = maxOf(2, minOf(Runtime.getRuntime().availableProcessors(), 6))
 
-    private val ioExecutor: ExecutorService = Executors.newFixedThreadPool(IO_POOL_SIZE) { r ->
-        Thread(r, "YukiHub-IO").apply { priority = Thread.NORM_PRIORITY - 1 }
-    }
+    private val ioExecutor: ExecutorService =
+        Executors.newFixedThreadPool(IO_POOL_SIZE) { r ->
+            Thread(r, "YukiHub-IO").apply { priority = Thread.NORM_PRIORITY - 1 }
+        }
 
-    private val singleExecutor: ExecutorService = Executors.newSingleThreadExecutor { r ->
-        Thread(r, "YukiHub-Single").apply { priority = Thread.NORM_PRIORITY - 1 }
-    }
+    private val singleExecutor: ExecutorService =
+        Executors.newSingleThreadExecutor { r ->
+            Thread(r, "YukiHub-Single").apply { priority = Thread.NORM_PRIORITY - 1 }
+        }
 
-    private val scheduledExecutor: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor { r ->
-        Thread(r, "YukiHub-Scheduled").apply { priority = Thread.NORM_PRIORITY - 1 }
-    }
+    private val scheduledExecutor: ScheduledExecutorService =
+        Executors.newSingleThreadScheduledExecutor { r ->
+            Thread(r, "YukiHub-Scheduled").apply { priority = Thread.NORM_PRIORITY - 1 }
+        }
 
     @JvmStatic
     fun io(): ExecutorService = ioExecutor
@@ -47,6 +50,8 @@ object AppExecutors {
     }
 
     @JvmStatic
-    fun schedule(command: Runnable, delayMs: Long): ScheduledFuture<*> =
-        scheduledExecutor.schedule(command, delayMs, TimeUnit.MILLISECONDS)
+    fun schedule(
+        command: Runnable,
+        delayMs: Long,
+    ): ScheduledFuture<*> = scheduledExecutor.schedule(command, delayMs, TimeUnit.MILLISECONDS)
 }

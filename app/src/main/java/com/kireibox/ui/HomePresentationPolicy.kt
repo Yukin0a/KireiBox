@@ -102,60 +102,75 @@ object HomePresentationPolicy {
             "safe frame must have positive size"
         }
         val isLandscape = safeFrame.w > safeFrame.h
-        val horizontalInset = when (sizeClass) {
-            HomeSizeClass.COMPACT -> 16f
-            HomeSizeClass.WIDE -> 24f
-        }
-        val verticalInset = when {
-            isLandscape && sizeClass == HomeSizeClass.COMPACT -> 8f
-            isLandscape -> 12f
-            else -> 16f
-        }
-        val titleSize = when (sizeClass) {
-            HomeSizeClass.COMPACT -> if (isLandscape) 22f else 24f
-            HomeSizeClass.WIDE -> if (isLandscape) 24f else 26f
-        }
-        val requestedMenuDiameter = when (sizeClass) {
-            HomeSizeClass.COMPACT -> 48f
-            HomeSizeClass.WIDE -> 52f
-        }
+        val horizontalInset =
+            when (sizeClass) {
+                HomeSizeClass.COMPACT -> 16f
+                HomeSizeClass.WIDE -> 24f
+            }
+        val verticalInset =
+            when {
+                isLandscape && sizeClass == HomeSizeClass.COMPACT -> 8f
+                isLandscape -> 12f
+                else -> 16f
+            }
+        val titleSize =
+            when (sizeClass) {
+                HomeSizeClass.COMPACT -> if (isLandscape) 22f else 24f
+                HomeSizeClass.WIDE -> if (isLandscape) 24f else 26f
+            }
+        val requestedMenuDiameter =
+            when (sizeClass) {
+                HomeSizeClass.COMPACT -> 48f
+                HomeSizeClass.WIDE -> 52f
+            }
         val physicallyAvailableDiameter = minOf(safeFrame.w, safeFrame.h)
         val menuDiameter = requestedMenuDiameter.coerceAtMost(physicallyAvailableDiameter)
-        val requestedMenuIconSize = when (sizeClass) {
-            HomeSizeClass.COMPACT -> 22f
-            HomeSizeClass.WIDE -> 24f
-        }
+        val requestedMenuIconSize =
+            when (sizeClass) {
+                HomeSizeClass.COMPACT -> 22f
+                HomeSizeClass.WIDE -> 24f
+            }
         val menuIconSize = requestedMenuIconSize.coerceAtMost(menuDiameter)
-        val menuX = (safeFrame.x + safeFrame.w - horizontalInset - menuDiameter)
-            .coerceIn(safeFrame.x, safeFrame.x + safeFrame.w - menuDiameter)
-        val menuY = (safeFrame.y + verticalInset)
-            .coerceIn(safeFrame.y, safeFrame.y + safeFrame.h - menuDiameter)
-        val titleX = (safeFrame.x + horizontalInset)
-            .coerceIn(safeFrame.x, safeFrame.x + safeFrame.w)
-        val titleHeight = max(HOME_MIN_TOUCH_TARGET_DP, titleSize * 1.35f)
-            .coerceAtMost(safeFrame.h)
-        val titleY = (safeFrame.y + verticalInset)
-            .coerceIn(safeFrame.y, safeFrame.y + safeFrame.h - titleHeight)
-        val titleRight = (menuX - horizontalInset)
-            .coerceIn(titleX, safeFrame.x + safeFrame.w)
+        val menuX =
+            (safeFrame.x + safeFrame.w - horizontalInset - menuDiameter)
+                .coerceIn(safeFrame.x, safeFrame.x + safeFrame.w - menuDiameter)
+        val menuY =
+            (safeFrame.y + verticalInset)
+                .coerceIn(safeFrame.y, safeFrame.y + safeFrame.h - menuDiameter)
+        val titleX =
+            (safeFrame.x + horizontalInset)
+                .coerceIn(safeFrame.x, safeFrame.x + safeFrame.w)
+        val titleHeight =
+            max(HOME_MIN_TOUCH_TARGET_DP, titleSize * 1.35f)
+                .coerceAtMost(safeFrame.h)
+        val titleY =
+            (safeFrame.y + verticalInset)
+                .coerceIn(safeFrame.y, safeFrame.y + safeFrame.h - titleHeight)
+        val titleRight =
+            (menuX - horizontalInset)
+                .coerceIn(titleX, safeFrame.x + safeFrame.w)
         val titleWidth = (titleRight - titleX).coerceAtLeast(0f)
         val menuRect = HomeRect(menuX, menuY, menuDiameter, menuDiameter)
-        val menuHitDiameter = if (physicallyAvailableDiameter < HOME_MIN_TOUCH_TARGET_DP) {
-            physicallyAvailableDiameter
-        } else {
-            max(HOME_MIN_TOUCH_TARGET_DP, menuDiameter)
-                .coerceAtMost(physicallyAvailableDiameter)
-        }
-        val menuHitX = (menuRect.x + menuRect.w / 2f - menuHitDiameter / 2f)
-            .coerceIn(safeFrame.x, safeFrame.x + safeFrame.w - menuHitDiameter)
-        val menuHitY = (menuRect.y + menuRect.h / 2f - menuHitDiameter / 2f)
-            .coerceIn(safeFrame.y, safeFrame.y + safeFrame.h - menuHitDiameter)
-        val menuHitRect = HomeRect(
-            x = menuHitX,
-            y = menuHitY,
-            w = menuHitDiameter,
-            h = menuHitDiameter,
-        )
+        val menuHitDiameter =
+            if (physicallyAvailableDiameter < HOME_MIN_TOUCH_TARGET_DP) {
+                physicallyAvailableDiameter
+            } else {
+                max(HOME_MIN_TOUCH_TARGET_DP, menuDiameter)
+                    .coerceAtMost(physicallyAvailableDiameter)
+            }
+        val menuHitX =
+            (menuRect.x + menuRect.w / 2f - menuHitDiameter / 2f)
+                .coerceIn(safeFrame.x, safeFrame.x + safeFrame.w - menuHitDiameter)
+        val menuHitY =
+            (menuRect.y + menuRect.h / 2f - menuHitDiameter / 2f)
+                .coerceIn(safeFrame.y, safeFrame.y + safeFrame.h - menuHitDiameter)
+        val menuHitRect =
+            HomeRect(
+                x = menuHitX,
+                y = menuHitY,
+                w = menuHitDiameter,
+                h = menuHitDiameter,
+            )
         return HomeTopChromeSpec(
             titleRect = HomeRect(titleX, titleY, titleWidth, titleHeight),
             menuRect = menuRect,
@@ -174,14 +189,16 @@ object HomePresentationPolicy {
     fun contentDensityFor(
         sizeClass: HomeSizeClass,
         safeHeightDp: Float,
-    ): HomeContentDensity = when (sizeClass) {
-        HomeSizeClass.COMPACT -> HomeContentDensity.COMPACT
-        HomeSizeClass.WIDE -> if (safeHeightDp < 600f) {
-            HomeContentDensity.COMPACT_HEIGHT
-        } else {
-            HomeContentDensity.STANDARD
+    ): HomeContentDensity =
+        when (sizeClass) {
+            HomeSizeClass.COMPACT -> HomeContentDensity.COMPACT
+            HomeSizeClass.WIDE ->
+                if (safeHeightDp < 600f) {
+                    HomeContentDensity.COMPACT_HEIGHT
+                } else {
+                    HomeContentDensity.STANDARD
+                }
         }
-    }
 
     /**
      * Resolves mode-dependent rendering and size-dependent density independently. A rotation or
@@ -195,12 +212,13 @@ object HomePresentationPolicy {
         val selectedMode = mode ?: HomePresentationMode.IMMERSIVE
         return HomePresentationSpec(
             mode = selectedMode,
-            renderKind = renderKind(
-                mode = selectedMode,
-                viewportWidth = safeFrame.w,
-                viewportHeight = safeFrame.h,
-                sizeClass = sizeClass,
-            ),
+            renderKind =
+                renderKind(
+                    mode = selectedMode,
+                    viewportWidth = safeFrame.w,
+                    viewportHeight = safeFrame.h,
+                    sizeClass = sizeClass,
+                ),
             sizeClass = sizeClass,
             contentDensity = contentDensityFor(sizeClass, safeFrame.h),
             topChrome = topChromeSpec(safeFrame, sizeClass),
@@ -225,12 +243,13 @@ object HomePresentationPolicy {
         viewportWidth: Float,
         viewportHeight: Float,
         sizeClass: HomeSizeClass,
-    ): HomeRenderKind = renderKind(
-        HomePresentationMode.fromStored(storedMode),
-        viewportWidth,
-        viewportHeight,
-        sizeClass,
-    )
+    ): HomeRenderKind =
+        renderKind(
+            HomePresentationMode.fromStored(storedMode),
+            viewportWidth,
+            viewportHeight,
+            sizeClass,
+        )
 
     fun renderKind(
         mode: HomePresentationMode?,
@@ -238,43 +257,58 @@ object HomePresentationPolicy {
         viewportHeight: Float,
         @Suppress("UNUSED_PARAMETER") sizeClass: HomeSizeClass,
     ): HomeRenderKind {
-        val orientation = if (viewportWidth > viewportHeight) {
-            HomeOrientation.LANDSCAPE
-        } else {
-            HomeOrientation.PORTRAIT
-        }
+        val orientation =
+            if (viewportWidth > viewportHeight) {
+                HomeOrientation.LANDSCAPE
+            } else {
+                HomeOrientation.PORTRAIT
+            }
         return when (mode ?: HomePresentationMode.IMMERSIVE) {
-            HomePresentationMode.IMMERSIVE -> when (orientation) {
-                HomeOrientation.PORTRAIT -> HomeRenderKind.IMMERSIVE_PORTRAIT
-                HomeOrientation.LANDSCAPE -> HomeRenderKind.IMMERSIVE_LANDSCAPE
-            }
-            HomePresentationMode.COMPONENTS -> when (orientation) {
-                HomeOrientation.PORTRAIT -> HomeRenderKind.COMPONENTS_PORTRAIT
-                HomeOrientation.LANDSCAPE -> HomeRenderKind.COMPONENTS_LANDSCAPE
-            }
+            HomePresentationMode.IMMERSIVE ->
+                when (orientation) {
+                    HomeOrientation.PORTRAIT -> HomeRenderKind.IMMERSIVE_PORTRAIT
+                    HomeOrientation.LANDSCAPE -> HomeRenderKind.IMMERSIVE_LANDSCAPE
+                }
+            HomePresentationMode.COMPONENTS ->
+                when (orientation) {
+                    HomeOrientation.PORTRAIT -> HomeRenderKind.COMPONENTS_PORTRAIT
+                    HomeOrientation.LANDSCAPE -> HomeRenderKind.COMPONENTS_LANDSCAPE
+                }
         }
     }
 
-    private fun portraitAssignments(gameCount: Int, selected: Int): List<HomeCardAssignment> {
-        val assignments = mutableListOf(
-            HomeCardAssignment(selected, HomeCardSlot.CENTER, HomeCardDepth.FRONT),
-        )
+    private fun portraitAssignments(
+        gameCount: Int,
+        selected: Int
+    ): List<HomeCardAssignment> {
+        val assignments =
+            mutableListOf(
+                HomeCardAssignment(selected, HomeCardSlot.CENTER, HomeCardDepth.FRONT),
+            )
         (0 until gameCount)
             .filter { it != selected }
             .sortedWith(compareBy<Int> { abs(it - selected) }.thenBy { it })
             .forEach { index ->
-                assignments += HomeCardAssignment(
-                    gameIndex = index,
-                    slot = if (index < selected) HomeCardSlot.NEAR_LEFT else HomeCardSlot.NEAR_RIGHT,
-                    depth = HomeCardDepth.REAR,
-                )
+                assignments +=
+                    HomeCardAssignment(
+                        gameIndex = index,
+                        slot = if (index < selected) HomeCardSlot.NEAR_LEFT else HomeCardSlot.NEAR_RIGHT,
+                        depth = HomeCardDepth.REAR,
+                    )
             }
         return assignments
     }
 
-    private fun landscapeAssignments(gameCount: Int, selected: Int): List<HomeCardAssignment> {
+    private fun landscapeAssignments(
+        gameCount: Int,
+        selected: Int
+    ): List<HomeCardAssignment> {
         val bySlot = linkedMapOf<HomeCardSlot, Int>()
-        fun addIfValid(slot: HomeCardSlot, index: Int) {
+
+        fun addIfValid(
+            slot: HomeCardSlot,
+            index: Int
+        ) {
             if (index in 0 until gameCount && index != selected && index !in bySlot.values) {
                 bySlot[slot] = index
             }
@@ -307,8 +341,10 @@ object HomePresentationPolicy {
      * glass layer can never sample itself. Both home modes use the same metrics.dockRect.
      */
     @Suppress("UNUSED_PARAMETER")
-    fun shouldShowGlobalDock(selectedTab: KireiTab, mode: HomePresentationMode?): Boolean =
-        true
+    fun shouldShowGlobalDock(
+        selectedTab: KireiTab,
+        mode: HomePresentationMode?
+    ): Boolean = true
 
     /** Orientation comes from the safe window area so cutout/inset insets cannot flip the render kind. */
     fun renderKindForSafeArea(
@@ -320,11 +356,11 @@ object HomePresentationPolicy {
         safeRightPx: Float,
         safeBottomPx: Float,
         sizeClass: HomeSizeClass,
-    ): HomeRenderKind = renderKind(
-        mode = mode,
-        viewportWidth = (fullWidthPx - safeLeftPx - safeRightPx).coerceAtLeast(0f),
-        viewportHeight = (fullHeightPx - safeTopPx - safeBottomPx).coerceAtLeast(0f),
-        sizeClass = sizeClass,
-    )
-
+    ): HomeRenderKind =
+        renderKind(
+            mode = mode,
+            viewportWidth = (fullWidthPx - safeLeftPx - safeRightPx).coerceAtLeast(0f),
+            viewportHeight = (fullHeightPx - safeTopPx - safeBottomPx).coerceAtLeast(0f),
+            sizeClass = sizeClass,
+        )
 }

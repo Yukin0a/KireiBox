@@ -10,12 +10,12 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.Density
-import com.yuki.yukihub.model.Game
 import com.yuki.yukihub.BuildConfig
+import com.yuki.yukihub.model.Game
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.yield
@@ -37,9 +37,11 @@ internal class FocusGalleryMachine {
         private set
     var isSettling: Boolean = false
         private set
+
     /** Monotonic commit counter: every successful settle bumps it exactly once. */
     var commitSequence: Long = 0L
         internal set
+
     /**
      * Monotonic counter of explicit user interactions: side taps, dot navigation and the
      * first frame of every drag that takes over from idle. The auto-advance timer captures
@@ -55,10 +57,11 @@ internal class FocusGalleryMachine {
         requestedDirection: FocusDirection,
     ) {
         if (gameCount <= 0) return
-        val target = when (requestedDirection) {
-            FocusDirection.ADVANCE -> FocusGalleryIndexPolicy.next(currentGameIndex, gameCount)
-            FocusDirection.BACK -> FocusGalleryIndexPolicy.previous(currentGameIndex, gameCount)
-        }
+        val target =
+            when (requestedDirection) {
+                FocusDirection.ADVANCE -> FocusGalleryIndexPolicy.next(currentGameIndex, gameCount)
+                FocusDirection.BACK -> FocusGalleryIndexPolicy.previous(currentGameIndex, gameCount)
+            }
         direction = requestedDirection
         targetGameIndex = target
         progress = 0f
@@ -94,10 +97,11 @@ internal class FocusGalleryMachine {
         if (gameCount <= 0) return
         if (progress <= 0f) {
             direction = requestedDirection
-            targetGameIndex = when (requestedDirection) {
-                FocusDirection.ADVANCE -> FocusGalleryIndexPolicy.next(currentGameIndex, gameCount)
-                FocusDirection.BACK -> FocusGalleryIndexPolicy.previous(currentGameIndex, gameCount)
-            }
+            targetGameIndex =
+                when (requestedDirection) {
+                    FocusDirection.ADVANCE -> FocusGalleryIndexPolicy.next(currentGameIndex, gameCount)
+                    FocusDirection.BACK -> FocusGalleryIndexPolicy.previous(currentGameIndex, gameCount)
+                }
             isSettling = true
         }
     }
@@ -127,11 +131,12 @@ internal class FocusGalleryMachine {
 
     fun snapshot(gameCount: Int): FocusGallerySnapshot {
         val index = if (gameCount <= 0) 0 else currentGameIndex.mod(gameCount)
-        val cards = FocusGalleryMappingPolicy.cards(
-            gameCount = gameCount,
-            currentGameIndex = index,
-            direction = direction,
-        )
+        val cards =
+            FocusGalleryMappingPolicy.cards(
+                gameCount = gameCount,
+                currentGameIndex = index,
+                direction = direction,
+            )
         return FocusGallerySnapshot(
             currentGameIndex = index,
             targetGameIndex = targetGameIndex,
@@ -160,16 +165,19 @@ internal class FocusGalleryController(
     companion object {
         /** Standard focus transition: continuous position/size/scale motion, >= 520ms. */
         const val TRANSITION_MILLIS = 520
+
         /** Reduced-motion transition: short opacity-only crossfade, no movement or scale. */
         const val REDUCED_TRANSITION_MILLIS = 160
+
         /** Drag-release settle spring: critically damped so it never overshoots the page. */
         const val SETTLE_DAMPING_RATIO = Spring.DampingRatioNoBouncy
         const val SETTLE_STIFFNESS = Spring.StiffnessMediumLow
     }
 
-    val machine = FocusGalleryMachine().apply {
-        currentGameIndex = initialGameIndex.coerceAtLeast(0)
-    }
+    val machine =
+        FocusGalleryMachine().apply {
+            currentGameIndex = initialGameIndex.coerceAtLeast(0)
+        }
 
     private val progressAnimator = Animatable(0f)
     private var animationJob: Job? = null
@@ -233,11 +241,12 @@ internal class FocusGalleryController(
     fun beginAdvance(gameCount: Int) {
         if (gameCount <= 1) return
         val target = FocusGalleryIndexPolicy.next(machine.currentGameIndex, gameCount)
-        val plan = FocusGalleryInteractionPolicy.navigationPlan(
-            currentIndex = machine.currentGameIndex,
-            targetIndex = target,
-            gameCount = gameCount,
-        ) ?: return
+        val plan =
+            FocusGalleryInteractionPolicy.navigationPlan(
+                currentIndex = machine.currentGameIndex,
+                targetIndex = target,
+                gameCount = gameCount,
+            ) ?: return
         startSequence(gameCount, plan)
     }
 
@@ -265,21 +274,26 @@ internal class FocusGalleryController(
     fun beginBack(gameCount: Int) {
         if (gameCount <= 1) return
         val target = FocusGalleryIndexPolicy.previous(machine.currentGameIndex, gameCount)
-        val plan = FocusGalleryInteractionPolicy.navigationPlan(
-            currentIndex = machine.currentGameIndex,
-            targetIndex = target,
-            gameCount = gameCount,
-        ) ?: return
+        val plan =
+            FocusGalleryInteractionPolicy.navigationPlan(
+                currentIndex = machine.currentGameIndex,
+                targetIndex = target,
+                gameCount = gameCount,
+            ) ?: return
         startSequence(gameCount, plan)
     }
 
     /** Dot navigation to an explicit game index using the shortest direction. */
-    fun goToGame(gameIndex: Int, gameCount: Int) {
-        val plan = FocusGalleryInteractionPolicy.navigationPlan(
-            currentIndex = machine.currentGameIndex,
-            targetIndex = gameIndex,
-            gameCount = gameCount,
-        ) ?: return
+    fun goToGame(
+        gameIndex: Int,
+        gameCount: Int
+    ) {
+        val plan =
+            FocusGalleryInteractionPolicy.navigationPlan(
+                currentIndex = machine.currentGameIndex,
+                targetIndex = gameIndex,
+                gameCount = gameCount,
+            ) ?: return
         machine.noteManualInteraction()
         startSequence(gameCount, plan)
     }
@@ -290,16 +304,20 @@ internal class FocusGalleryController(
      * so the outcome cannot depend on whether a stale auto job committed a frame earlier;
      * the generation token also makes the commit atomic (exactly one per settle).
      */
-    fun switchToGame(gameId: Long, gameCount: Int): FocusSwitchResult {
+    fun switchToGame(
+        gameId: Long,
+        gameCount: Int
+    ): FocusSwitchResult {
         val target = machine.games.indexOfFirst { it.id == gameId }
         if (target < 0) return FocusSwitchResult.IGNORED
         machine.noteManualInteraction()
-        val decision = FocusSwitchPolicy.decide(
-            currentGameIndex = machine.currentGameIndex,
-            targetGameIndex = target,
-            isSettling = machine.isSettling,
-            settlingTargetIndex = machine.targetGameIndex,
-        )
+        val decision =
+            FocusSwitchPolicy.decide(
+                currentGameIndex = machine.currentGameIndex,
+                targetGameIndex = target,
+                isSettling = machine.isSettling,
+                settlingTargetIndex = machine.targetGameIndex,
+            )
         when (decision) {
             FocusSwitchResult.IGNORED -> return FocusSwitchResult.IGNORED
             FocusSwitchResult.CONTINUING -> {
@@ -318,11 +336,12 @@ internal class FocusGalleryController(
             }
             FocusSwitchResult.NAVIGATED -> Unit
         }
-        val plan = FocusGalleryInteractionPolicy.navigationPlan(
-            currentIndex = machine.currentGameIndex,
-            targetIndex = target,
-            gameCount = gameCount,
-        )
+        val plan =
+            FocusGalleryInteractionPolicy.navigationPlan(
+                currentIndex = machine.currentGameIndex,
+                targetIndex = target,
+                gameCount = gameCount,
+            )
         if (plan == null) return FocusSwitchResult.STAYED
         startSequence(gameCount, plan)
         return FocusSwitchResult.NAVIGATED
@@ -334,7 +353,12 @@ internal class FocusGalleryController(
      * total inside [0, 1], so dragging past a page stops at the boundary without a
      * rubber-band (the gallery is cyclic) and a gesture can never cross more than one page.
      */
-    fun updateDrag(deltaXDp: Float, requestedDirection: FocusDirection, slotDistanceDp: Float, gameCount: Int) {
+    fun updateDrag(
+        deltaXDp: Float,
+        requestedDirection: FocusDirection,
+        slotDistanceDp: Float,
+        gameCount: Int
+    ) {
         animationJob?.cancel()
         animationJob = null
         transitionGeneration++
@@ -382,16 +406,18 @@ internal class FocusGalleryController(
         gameCount: Int,
     ) {
         val effectiveDirection = if (machine.progress > 0f) machine.direction else requestedDirection
-        val velocityPagesPerSecond = if (slotDistanceDp > 0f) {
-            velocityDpPerSecond / slotDistanceDp
-        } else {
-            0f
-        }
-        val decision = FocusGalleryInteractionPolicy.settle(
-            progress = machine.progress,
-            velocityPagesPerSecond = velocityPagesPerSecond,
-            requestedDirection = effectiveDirection,
-        )
+        val velocityPagesPerSecond =
+            if (slotDistanceDp > 0f) {
+                velocityDpPerSecond / slotDistanceDp
+            } else {
+                0f
+            }
+        val decision =
+            FocusGalleryInteractionPolicy.settle(
+                progress = machine.progress,
+                velocityPagesPerSecond = velocityPagesPerSecond,
+                requestedDirection = effectiveDirection,
+            )
         machine.interruptWithDirection(gameCount, decision.direction)
         settleTo(
             target = decision.targetProgress,
@@ -418,49 +444,59 @@ internal class FocusGalleryController(
      * destination. Committing the final index on the first step would leave later steps
      * animating an already-committed card.
      */
-    internal fun startSequence(gameCount: Int, plan: FocusNavigationPlan) {
+    internal fun startSequence(
+        gameCount: Int,
+        plan: FocusNavigationPlan
+    ) {
         animationJob?.cancel()
         val generation = ++transitionGeneration
-        animationJob = scope.launch {
-            repeat(plan.stepCount) { step ->
-                if (!isActive || generation != transitionGeneration) return@launch
-                val stepTarget = if (step == plan.stepCount - 1) {
-                    plan.targetIndex
-                } else {
-                    when (plan.direction) {
-                        FocusDirection.ADVANCE ->
-                            FocusGalleryIndexPolicy.next(machine.currentGameIndex, gameCount)
-                        FocusDirection.BACK ->
-                            FocusGalleryIndexPolicy.previous(machine.currentGameIndex, gameCount)
-                    }
+        animationJob =
+            scope.launch {
+                repeat(plan.stepCount) { step ->
+                    if (!isActive || generation != transitionGeneration) return@launch
+                    val stepTarget =
+                        if (step == plan.stepCount - 1) {
+                            plan.targetIndex
+                        } else {
+                            when (plan.direction) {
+                                FocusDirection.ADVANCE ->
+                                    FocusGalleryIndexPolicy.next(machine.currentGameIndex, gameCount)
+                                FocusDirection.BACK ->
+                                    FocusGalleryIndexPolicy.previous(machine.currentGameIndex, gameCount)
+                            }
+                        }
+                    machine.beginTransitionTo(stepTarget, gameCount, plan.direction)
+                    progressAnimator.snapTo(0f)
+                    if (!isActive || generation != transitionGeneration) return@launch
+                    emitSnapshot()
+                    animateCurrentProgress(target = 1f, generation = generation)
+                    if (!isActive || generation != transitionGeneration) return@launch
+                    // Commit on the post-settle frame, never in the animation's final callback.
+                    yield()
+                    if (!isActive || generation != transitionGeneration) return@launch
+                    machine.setProgress(1f)
+                    machine.commitCurrent(gameCount)
+                    progressAnimator.snapTo(0f)
+                    emitSnapshot()
                 }
-                machine.beginTransitionTo(stepTarget, gameCount, plan.direction)
-                progressAnimator.snapTo(0f)
-                if (!isActive || generation != transitionGeneration) return@launch
-                emitSnapshot()
-                animateCurrentProgress(target = 1f, generation = generation)
-                if (!isActive || generation != transitionGeneration) return@launch
-                // Commit on the post-settle frame, never in the animation's final callback.
-                yield()
-                if (!isActive || generation != transitionGeneration) return@launch
-                machine.setProgress(1f)
-                machine.commitCurrent(gameCount)
-                progressAnimator.snapTo(0f)
-                emitSnapshot()
             }
-        }
     }
 
     /** Tween transition for taps, dots and auto advance (fixed-duration, non-velocity). */
-    private fun animateTo(target: Float, gameCount: Int, commit: Boolean = true) {
+    private fun animateTo(
+        target: Float,
+        gameCount: Int,
+        commit: Boolean = true
+    ) {
         animationJob?.cancel()
         val generation = ++transitionGeneration
-        animationJob = scope.launch {
-            progressAnimator.snapTo(machine.progress)
-            if (!isActive || generation != transitionGeneration) return@launch
-            animateCurrentProgress(target, generation)
-            finishSettle(target, gameCount, commit, generation)
-        }
+        animationJob =
+            scope.launch {
+                progressAnimator.snapTo(machine.progress)
+                if (!isActive || generation != transitionGeneration) return@launch
+                animateCurrentProgress(target, generation)
+                finishSettle(target, gameCount, commit, generation)
+            }
     }
 
     /**
@@ -478,44 +514,52 @@ internal class FocusGalleryController(
     ) {
         animationJob?.cancel()
         val generation = ++transitionGeneration
-        animationJob = scope.launch {
-            progressAnimator.snapTo(machine.progress)
-            if (!isActive || generation != transitionGeneration) return@launch
-            if (reducedMotion) {
-                animateCurrentProgress(target, generation)
-            } else {
-                // Sign the initial velocity toward the settle target: a commit fling keeps
-                // its momentum and a returned gesture decelerates before coming back.
-                val initialVelocity = if (target >= machine.progress) {
-                    abs(velocityPagesPerSecond)
+        animationJob =
+            scope.launch {
+                progressAnimator.snapTo(machine.progress)
+                if (!isActive || generation != transitionGeneration) return@launch
+                if (reducedMotion) {
+                    animateCurrentProgress(target, generation)
                 } else {
-                    -abs(velocityPagesPerSecond)
-                }
-                progressAnimator.animateTo(
-                    targetValue = target,
-                    animationSpec = spring(
-                        dampingRatio = SETTLE_DAMPING_RATIO,
-                        stiffness = SETTLE_STIFFNESS,
-                    ),
-                    initialVelocity = initialVelocity,
-                ) {
-                    // The frame callback is not a suspend lambda; job cancellation already
-                    // stops the animation, so the generation token guards stale writes.
-                    if (generation == transitionGeneration) {
-                        machine.setProgress(value)
-                        emitSnapshot()
+                    // Sign the initial velocity toward the settle target: a commit fling keeps
+                    // its momentum and a returned gesture decelerates before coming back.
+                    val initialVelocity =
+                        if (target >= machine.progress) {
+                            abs(velocityPagesPerSecond)
+                        } else {
+                            -abs(velocityPagesPerSecond)
+                        }
+                    progressAnimator.animateTo(
+                        targetValue = target,
+                        animationSpec =
+                            spring(
+                                dampingRatio = SETTLE_DAMPING_RATIO,
+                                stiffness = SETTLE_STIFFNESS,
+                            ),
+                        initialVelocity = initialVelocity,
+                    ) {
+                        // The frame callback is not a suspend lambda; job cancellation already
+                        // stops the animation, so the generation token guards stale writes.
+                        if (generation == transitionGeneration) {
+                            machine.setProgress(value)
+                            emitSnapshot()
+                        }
                     }
                 }
+                finishSettle(target, gameCount, commit, generation)
             }
-            finishSettle(target, gameCount, commit, generation)
-        }
     }
 
     /**
      * Shared settle completion: commit exactly once when the target reached the page end,
      * otherwise cancel back to the anchor, then park the animator at rest.
      */
-    private suspend fun finishSettle(target: Float, gameCount: Int, commit: Boolean, generation: Long) {
+    private suspend fun finishSettle(
+        target: Float,
+        gameCount: Int,
+        commit: Boolean,
+        generation: Long
+    ) {
         if (!currentCoroutineContext().isActive || generation != transitionGeneration) return
         if (commit && target >= 1f) {
             yield()
@@ -529,7 +573,10 @@ internal class FocusGalleryController(
         emitSnapshot()
     }
 
-    private suspend fun animateCurrentProgress(target: Float, generation: Long) {
+    private suspend fun animateCurrentProgress(
+        target: Float,
+        generation: Long
+    ) {
         var freeze = if (BuildConfig.DEBUG) freezeOverride?.coerceIn(0f, 1f) else null
         if (freeze != null) {
             while (currentCoroutineContext().isActive && generation == transitionGeneration && freeze != null) {
@@ -579,11 +626,14 @@ internal data class FocusAutoAdvanceToken(
  * captured [FocusAutoAdvanceToken] when the delay fires.
  */
 internal object FocusAutoAdvanceTimerPolicy {
-    const val AUTO_ADVANCE_MILLIS = SpotlightCarouselPolicy.AUTO_ADVANCE_MILLIS
+    /** Single source of truth for the interval is [SpotlightCarouselPolicy.AUTO_ADVANCE_MILLIS]. */
+    val AUTO_ADVANCE_MILLIS: Long get() = SpotlightCarouselPolicy.AUTO_ADVANCE_MILLIS
 
     /** Captures the machine sequences at the moment the timer starts. */
-    fun tokenFor(commitSequence: Long, manualInteractionSequence: Long): FocusAutoAdvanceToken =
-        FocusAutoAdvanceToken(commitSequence, manualInteractionSequence)
+    fun tokenFor(
+        commitSequence: Long,
+        manualInteractionSequence: Long
+    ): FocusAutoAdvanceToken = FocusAutoAdvanceToken(commitSequence, manualInteractionSequence)
 
     /**
      * LaunchedEffect key contract: every value that must restart a full six-second
@@ -600,17 +650,18 @@ internal object FocusAutoAdvanceTimerPolicy {
         isVisible: Boolean,
         isResumed: Boolean,
         reducedMotion: Boolean,
-    ): List<Any> = listOf(
-        galleryIdle,
-        galleryCardPressed,
-        currentGameIndex,
-        commitSequence,
-        manualInteractionSequence,
-        gameCount,
-        isVisible,
-        isResumed,
-        reducedMotion,
-    )
+    ): List<Any> =
+        listOf(
+            galleryIdle,
+            galleryCardPressed,
+            currentGameIndex,
+            commitSequence,
+            manualInteractionSequence,
+            gameCount,
+            isVisible,
+            isResumed,
+            reducedMotion,
+        )
 }
 
 /** Horizontal drag ownership for the focus stage; the vertical pager owns vertical motion. */
@@ -620,49 +671,51 @@ internal fun Modifier.focusGalleryDrag(
     density: Density,
     geometry: FocusGalleryGeometry,
     gameCount: Int,
-): Modifier = if (!enabled) {
-    this
-} else {
-    pointerInput(controller, geometry, gameCount) {
-        var lastDirection = FocusDirection.ADVANCE
-        var lastDeltaDp = 0f
-        var lastEventMillis = 0L
-        var velocityDpPerSecond = 0f
-        detectHorizontalDragGestures(
-            onDragStart = { },
-            onHorizontalDrag = { change, dragAmount ->
-                change.consume()
-                val deltaDp = with(density) { dragAmount.toDp().value }
-                val now = change.uptimeMillis
-                if (lastEventMillis > 0L && now > lastEventMillis) {
-                    val dtSeconds = (now - lastEventMillis) / 1000f
-                    velocityDpPerSecond = if (dtSeconds > 0f) {
-                        (deltaDp + lastDeltaDp) / 2f / dtSeconds
-                    } else {
-                        velocityDpPerSecond
+): Modifier =
+    if (!enabled) {
+        this
+    } else {
+        pointerInput(controller, geometry, gameCount) {
+            var lastDirection = FocusDirection.ADVANCE
+            var lastDeltaDp = 0f
+            var lastEventMillis = 0L
+            var velocityDpPerSecond = 0f
+            detectHorizontalDragGestures(
+                onDragStart = { },
+                onHorizontalDrag = { change, dragAmount ->
+                    change.consume()
+                    val deltaDp = with(density) { dragAmount.toDp().value }
+                    val now = change.uptimeMillis
+                    if (lastEventMillis > 0L && now > lastEventMillis) {
+                        val dtSeconds = (now - lastEventMillis) / 1000f
+                        velocityDpPerSecond =
+                            if (dtSeconds > 0f) {
+                                (deltaDp + lastDeltaDp) / 2f / dtSeconds
+                            } else {
+                                velocityDpPerSecond
+                            }
                     }
-                }
-                lastDeltaDp = deltaDp
-                lastEventMillis = now
-                lastDirection = if (deltaDp < 0f) FocusDirection.ADVANCE else FocusDirection.BACK
-                controller.updateDrag(deltaDp, lastDirection, geometry.slotDistanceDp, gameCount)
-            },
-            onDragEnd = {
-                controller.settleDrag(
-                    velocityDpPerSecond = velocityDpPerSecond,
-                    requestedDirection = lastDirection,
-                    slotDistanceDp = geometry.slotDistanceDp,
-                    gameCount = gameCount,
-                )
-            },
-            onDragCancel = {
-                controller.settleDrag(
-                    velocityDpPerSecond = 0f,
-                    requestedDirection = lastDirection,
-                    slotDistanceDp = geometry.slotDistanceDp,
-                    gameCount = gameCount,
-                )
-            },
-        )
+                    lastDeltaDp = deltaDp
+                    lastEventMillis = now
+                    lastDirection = if (deltaDp < 0f) FocusDirection.ADVANCE else FocusDirection.BACK
+                    controller.updateDrag(deltaDp, lastDirection, geometry.slotDistanceDp, gameCount)
+                },
+                onDragEnd = {
+                    controller.settleDrag(
+                        velocityDpPerSecond = velocityDpPerSecond,
+                        requestedDirection = lastDirection,
+                        slotDistanceDp = geometry.slotDistanceDp,
+                        gameCount = gameCount,
+                    )
+                },
+                onDragCancel = {
+                    controller.settleDrag(
+                        velocityDpPerSecond = 0f,
+                        requestedDirection = lastDirection,
+                        slotDistanceDp = geometry.slotDistanceDp,
+                        gameCount = gameCount,
+                    )
+                },
+            )
+        }
     }
-}
