@@ -1,25 +1,34 @@
 pluginManagement {
-  repositories {
-   maven { url 'https://maven.aliyun.com/repository/public/' }
-   maven { url 'https://maven.aliyun.com/repository/google/' }
-   maven { url 'https://maven.aliyun.com/repository/gradle-plugin/' }
-   maven { url 'https://jitpack.io' }
-    gradlePluginPortal()
-    google()
-    mavenCentral()
-  }
+    repositories {
+        // GitHub runners use upstream repositories; mirror failures must not block CI.
+        if (System.getenv("GITHUB_ACTIONS") != "true") {
+            maven { url 'https://maven.aliyun.com/repository/public/' }
+            maven { url 'https://maven.aliyun.com/repository/google/' }
+            maven { url 'https://maven.aliyun.com/repository/gradle-plugin/' }
+        }
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+        if (System.getenv("GITHUB_ACTIONS") != "true") {
+            maven { url 'https://jitpack.io' }
+        }
+    }
 }
 
 dependencyResolutionManagement {
-  repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-  repositories {
-    maven { url 'https://maven.aliyun.com/repository/public/' }
-    maven { url 'https://maven.aliyun.com/repository/google/' }
-    maven { url 'https://maven.aliyun.com/repository/gradle-plugin/' }
-    maven { url 'https://jitpack.io' }
-    google()
-    mavenCentral()
-  }
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        if (System.getenv("GITHUB_ACTIONS") != "true") {
+            maven { url 'https://maven.aliyun.com/repository/public/' }
+            maven { url 'https://maven.aliyun.com/repository/google/' }
+            maven { url 'https://maven.aliyun.com/repository/gradle-plugin/' }
+        }
+        google()
+        mavenCentral()
+        if (System.getenv("GITHUB_ACTIONS") != "true") {
+            maven { url 'https://jitpack.io' }
+        }
+    }
 }
 
 rootProject.name = "KireiBox"
