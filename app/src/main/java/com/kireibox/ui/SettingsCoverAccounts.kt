@@ -171,7 +171,6 @@ private fun CoverAccountCard(
                 )
             }
         }
-
     }
     if (editToken) BangumiTokenDialog(colors, viewModel) { editToken = false }
     if (confirmSignOut) CoverSignOutDialog(source, colors, onConfirm = { viewModel.disconnectCoverAccount(source) }) { confirmSignOut = false }

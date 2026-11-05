@@ -35,6 +35,7 @@ data class PlaytimeWriteResult(
 /** The NextMoe calls playtime sync makes; [NextmoeUserApi] in the app, a fake in tests. */
 interface NextmoePlaytimeRemote {
     val requestCount: Int get() = 0
+
     /** Remote minutes per work for up to 100 works; works never reported are absent. */
     fun playtimes(workIds: List<String>): Map<String, Int>
 
@@ -42,10 +43,15 @@ interface NextmoePlaytimeRemote {
     fun allPlaytimes(): Map<String, Int>
 
     fun privacy(): Boolean? = null
+
     fun setPrivacy(privateRecords: Boolean) {}
 
     fun catalog(workIds: List<String>): List<VnMetadata> = emptyList()
-    fun put(workId: String, minutes: Int): PlaytimeWriteResult = write(listOf(workId to minutes)).first()
+
+    fun put(
+        workId: String,
+        minutes: Int
+    ): PlaytimeWriteResult = write(listOf(workId to minutes)).first()
 
     /** Writes absolute minutes for up to 100 works. */
     fun write(items: List<Pair<String, Int>>): List<PlaytimeWriteResult>
@@ -82,7 +88,10 @@ class NextmoeUserApi(
         repeat(MAX_PAGES) {
             val query = mapOf("limit" to "100", "nsfw" to "true") + listOfNotNull(cursor?.let { "cursor" to it })
             val json = send("me/playtimes", query)
-            objects(json.optJSONArray("items")).filter { it.optString("work_id").isNotBlank() }.forEach { val id = it.optString("work_id"); all[id] = maxOf(all[id] ?: 0, it.optInt("minutes")) }
+            objects(json.optJSONArray("items")).filter { it.optString("work_id").isNotBlank() }.forEach {
+                val id = it.optString("work_id")
+                all[id] = maxOf(all[id] ?: 0, it.optInt("minutes"))
+            }
             // next_cursor is absent on the last page.
             cursor = json.optString("next_cursor").ifBlank { null } ?: return all
         }
@@ -103,26 +112,30 @@ class NextmoeUserApi(
     override fun privacy(): Boolean = send("me/privacy", emptyMap()).optString("play_records") == "private"
 
     override fun setPrivacy(privateRecords: Boolean) {
-        send("me/privacy", emptyMap(), JSONObject().put("play_records", if(privateRecords) "private" else "public").toString().toRequestBody(JSON), method = "PATCH")
+        send("me/privacy", emptyMap(), JSONObject().put("play_records", if (privateRecords) "private" else "public").toString().toRequestBody(JSON), method = "PATCH")
     }
 
     override fun catalog(workIds: List<String>): List<VnMetadata> {
         if (workIds.isEmpty()) return emptyList()
         val query = mapOf("include" to "titles,refs,covers", "nsfw" to "true")
         val works = objects(send("catalog/works", query + ("ids" to workIds.joinToString(","))).optJSONArray("items")).map(AccountCatalogClient::parseNextmoe).toMutableList()
-        for(id in workIds.filter { requested -> works.none { it.id == requested } }) {
+        for (id in workIds.filter { requested -> works.none { it.id == requested } }) {
             val detail = send("catalog/works/$id", query, allowNotFound = true)
             val problem = detail.optJSONObject("problem") ?: detail
             val current = problem.optString("current_id")
-            if(problem.optString("code") == "ENTITY_MERGED" && current.isNotBlank()) {
+            if (problem.optString("code") == "ENTITY_MERGED" && current.isNotBlank()) {
                 works += AccountCatalogClient.parseNextmoe(send("catalog/works/$current", query)).copy(id = id)
-            } else if(detail.optString("object") == "work") works += AccountCatalogClient.parseNextmoe(detail)
+            } else if (detail.optString("object") == "work") {
+                works += AccountCatalogClient.parseNextmoe(detail)
+            }
         }
         return works
     }
 
-    override fun put(workId: String, minutes: Int): PlaytimeWriteResult =
-        parseWrite(workId, send("me/playtimes/$workId", emptyMap(), JSONObject().put("minutes", minutes).toString().toRequestBody(JSON), method = "PUT", returnProblem = true))
+    override fun put(
+        workId: String,
+        minutes: Int
+    ): PlaytimeWriteResult = parseWrite(workId, send("me/playtimes/$workId", emptyMap(), JSONObject().put("minutes", minutes).toString().toRequestBody(JSON), method = "PUT", returnProblem = true))
 
     override fun delete(workId: String) {
         send("me/playtimes/$workId", emptyMap(), method = "DELETE", allowNotFound = true)
@@ -206,7 +219,10 @@ class NextmoeUserApi(
             }
         }
 
-        fun maxPlaytimes(array: JSONArray?): Map<String, Int> = objects(array).filter { it.optString("work_id").isNotBlank() }.groupBy { it.optString("work_id") }.mapValues { (_, rows) -> rows.maxOf { it.optInt("minutes") } }
+        fun maxPlaytimes(array: JSONArray?): Map<String, Int> =
+            objects(array).filter {
+                it.optString("work_id").isNotBlank()
+            }.groupBy { it.optString("work_id") }.mapValues { (_, rows) -> rows.maxOf { it.optInt("minutes") } }
 
         private fun objects(array: JSONArray?): List<JSONObject> = if (array == null) emptyList() else (0 until array.length()).mapNotNull(array::optJSONObject)
     }

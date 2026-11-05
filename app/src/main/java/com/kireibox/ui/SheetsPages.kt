@@ -299,25 +299,42 @@ internal fun LibraryOverviewSheet(
                 itemsIndexed(orderedGames, key = { _, entry -> entry.key }) { index, entry ->
                     val game = entry.game
                     KireiListRow(
-                        spec = KireiListRowSpec(
-                            title = entry.title,
-                            subtitle = if(game == null) "仅云端 · 本机未绑定" else entry.cloud?.let { "云端 ${it.minutes} 分钟 · 已绑定" }
-                                ?: entry.sync?.let { if(it.workId == null) "未匹配云端" else if(it.lastResult == "WAITING_UPLOAD") "待上传" else "已绑定" } ?: "未匹配云端",
-                            trailing = KireiRowTrailing.Value(LibraryOverviewPolicy.compactPlayTime(entry.milliseconds), chevron = false),
-                            tileSize = OverviewRankWidth + SheetCoverWidth,
-                            horizontalPadding = KireiSpacing.xl,
-                            subtitleMaxLines = 1,
-                            verticalPadding = KireiSpacing.xs,
-                            leading = {
-                                if(game != null) OverviewLeading(index + 1, game, colors)
-                                else Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text((index + 1).toString(), color = colors.secondary, style = AppleTypography.numericSmall, modifier = Modifier.width(OverviewRankWidth))
-                                    entry.cloud?.let { CloudWorkArtwork(it, Modifier.size(SheetCoverWidth, SheetCoverHeight), blurCloudCovers, colors) }
-                                }
-                            },
-                        ),
+                        spec =
+                            KireiListRowSpec(
+                                title = entry.title,
+                                subtitle =
+                                    if (game == null) {
+                                        "仅云端 · 本机未绑定"
+                                    } else {
+                                        entry.cloud?.let { "云端 ${it.minutes} 分钟 · 已绑定" }
+                                            ?: entry.sync?.let {
+                                                if (it.workId == null) {
+                                                    "未匹配云端"
+                                                } else if (it.lastResult == "WAITING_UPLOAD") {
+                                                    "待上传"
+                                                } else {
+                                                    "已绑定"
+                                                }
+                                            } ?: "未匹配云端"
+                                    },
+                                trailing = KireiRowTrailing.Value(LibraryOverviewPolicy.compactPlayTime(entry.milliseconds), chevron = false),
+                                tileSize = OverviewRankWidth + SheetCoverWidth,
+                                horizontalPadding = KireiSpacing.xl,
+                                subtitleMaxLines = 1,
+                                verticalPadding = KireiSpacing.xs,
+                                leading = {
+                                    if (game != null) {
+                                        OverviewLeading(index + 1, game, colors)
+                                    } else {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text((index + 1).toString(), color = colors.secondary, style = AppleTypography.numericSmall, modifier = Modifier.width(OverviewRankWidth))
+                                            entry.cloud?.let { CloudWorkArtwork(it, Modifier.size(SheetCoverWidth, SheetCoverHeight), blurCloudCovers, colors) }
+                                        }
+                                    }
+                                },
+                            ),
                         colors = colors,
-                        onClick = { if(game != null) onGame(game) else onCloud() },
+                        onClick = { if (game != null) onGame(game) else onCloud() },
                     )
                 }
             }
@@ -360,7 +377,7 @@ internal fun GameActionSheet(
 ) {
     val context = LocalContext.current
     var editPlaytime by remember(game.id) { mutableStateOf(false) }
-    if(editPlaytime) GamePlaytimeDialog(game, state, colors, viewModel) { editPlaytime = false }
+    if (editPlaytime) GamePlaytimeDialog(game, state, colors, viewModel) { editPlaytime = false }
     var artemisVersionMenuExpanded by remember(game.id) { mutableStateOf(false) }
     val selectedArtemisVersion = com.yuki.yukihub.launcher.ArtemisVersion.fromStored(game.emulatorPackage)
     KireiActionSheet(game.title ?: "游戏操作", colors, onDismiss, expanded = true, grouped = true) {
@@ -478,9 +495,12 @@ internal fun GameActionSheet(
             }
         }
         SheetRowGroup(colors, title = "游玩记录") {
-            item { SheetActionRow(Icons.Rounded.Edit, "游玩时长", "本机 ${game.totalPlayTime / 60_000L} 分钟 · 查看云端、补录或调整", colors) {
-                viewModel.loadPlaytimeAttention(); editPlaytime = true
-            } }
+            item {
+                SheetActionRow(Icons.Rounded.Edit, "游玩时长", "本机 ${game.totalPlayTime / 60_000L} 分钟 · 查看云端、补录或调整", colors) {
+                    viewModel.loadPlaytimeAttention()
+                    editPlaytime = true
+                }
+            }
         }
         SheetRowGroup(colors, title = "封面与信息") {
             item { SheetActionRow(Icons.Rounded.Edit, "游戏名称", "只修改 KireiBox 中的显示名称", colors, onClick = onRename) }

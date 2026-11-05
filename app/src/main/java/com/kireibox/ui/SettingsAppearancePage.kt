@@ -60,9 +60,6 @@ import com.kireibox.designsystem.KireiSpacing
 import com.kireibox.designsystem.KireiTokens
 import com.kireibox.designsystem.LocalResolvedMotionMode
 import com.kireibox.designsystem.components.KireiListGroup
-import com.kireibox.designsystem.components.KireiListRow
-import com.kireibox.designsystem.components.KireiListRowSpec
-import com.kireibox.designsystem.components.KireiRowTrailing
 import com.yuki.yukihub.settings.AccentChoice
 import com.yuki.yukihub.settings.MotionMode
 import com.yuki.yukihub.settings.OrientationMode
@@ -135,7 +132,6 @@ internal fun AppearanceSettings(
             )
         }
         item { OrientationModeRow(value = settings?.orientationMode ?: OrientationMode.AUTO, colors = colors, onChange = viewModel::setOrientationMode) }
-
     }
     InterfaceSettings(state, colors, viewModel)
 }

@@ -421,8 +421,13 @@ class AccountCatalogClient(private val accounts: CoverAccounts) {
                         .joinToString("  ")
 
                 // The elected cover is the site's actual default; gallery order/size is unrelated.
-                val images = listOfNotNull(row.optJSONObject("cover")) +
-                    objects(row.optJSONArray("covers")).sortedWith(compareByDescending<JSONObject> { it.optInt("height") > it.optInt("width") && it.optInt("width") > 0 }.thenByDescending { it.optInt("width").toLong() * it.optInt("height") }) + listOfNotNull(row.optJSONObject("banner"))
+                val images =
+                    listOfNotNull(row.optJSONObject("cover")) +
+                        objects(row.optJSONArray("covers")).sortedWith(
+                            compareByDescending<JSONObject> {
+                                it.optInt("height") > it.optInt("width") && it.optInt("width") > 0
+                            }.thenByDescending { it.optInt("width").toLong() * it.optInt("height") }
+                        ) + listOfNotNull(row.optJSONObject("banner"))
                 covers += images.mapNotNull(MetadataCover::fromJson).distinctBy { it.url }
                 covers.firstOrNull()?.let { cover ->
                     coverUrl = cover.url

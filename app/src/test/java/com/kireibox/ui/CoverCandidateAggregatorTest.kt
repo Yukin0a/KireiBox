@@ -38,26 +38,34 @@ class CoverCandidateAggregatorTest {
         bestRank = rank,
     )
 
-
     @Test fun unknownNextmoeRatingUsesVndbOnlyForSameIdAndSameImage() {
-        val url="https://t.vndb.org/cv/1/123.jpg"
-        val nextmoe=candidate(CoverSourceMode.NEXTMOE,"12",refs="vndb:v17",chinese="Same Title",coverUrl=url,covers=listOf(MetadataCover(url,sexual="unknown")))
-        val vndb=candidate(CoverSourceMode.VNDB,"v17",chinese="Same Title",coverUrl=url,covers=listOf(MetadataCover(url,sexual="explicit")))
-        val order=CoverSourcePriority.searchOrder { false }
-        val merged=CoverCandidateAggregator.aggregate(listOf(nextmoe,vndb),order).single()
-        assertEquals(2.0,merged.metadata.coverSexual,0.0)
-        assertEquals("explicit",merged.metadata.covers.first { it.url==url }.sexual)
+        val url = "https://t.vndb.org/cv/1/123.jpg"
+        val nextmoe = candidate(CoverSourceMode.NEXTMOE, "12", refs = "vndb:v17", chinese = "Same Title", coverUrl = url, covers = listOf(MetadataCover(url, sexual = "unknown")))
+        val vndb = candidate(CoverSourceMode.VNDB, "v17", chinese = "Same Title", coverUrl = url, covers = listOf(MetadataCover(url, sexual = "explicit")))
+        val order = CoverSourcePriority.searchOrder { false }
+        val merged = CoverCandidateAggregator.aggregate(listOf(nextmoe, vndb), order).single()
+        assertEquals(2.0, merged.metadata.coverSexual, 0.0)
+        assertEquals("explicit", merged.metadata.covers.first { it.url == url }.sexual)
         assertTrue(com.yuki.yukihub.metadata.policy.NsfwCoverPolicy.shouldAutoMark(CoverSourceMode.NEXTMOE, merged.metadata))
-        val redraw=candidate(CoverSourceMode.NEXTMOE,"12",refs="vndb:v17",chinese="Same Title",coverUrl=url,covers=listOf(MetadataCover(url,source="ai_redraw",sexual="suggestive")))
-        val safeVndb=candidate(CoverSourceMode.VNDB,"v17",chinese="Same Title",coverUrl=url,covers=listOf(MetadataCover(url,source="vndb",sexual="safe")))
-        val verified=CoverCandidateAggregator.aggregate(listOf(redraw,safeVndb),order).single()
-        assertEquals("vndb", verified.metadata.covers.first { it.url==url }.source)
+        val redraw =
+            candidate(CoverSourceMode.NEXTMOE, "12", refs = "vndb:v17", chinese = "Same Title", coverUrl = url, covers = listOf(MetadataCover(url, source = "ai_redraw", sexual = "suggestive")))
+        val safeVndb = candidate(CoverSourceMode.VNDB, "v17", chinese = "Same Title", coverUrl = url, covers = listOf(MetadataCover(url, source = "vndb", sexual = "safe")))
+        val verified = CoverCandidateAggregator.aggregate(listOf(redraw, safeVndb), order).single()
+        assertEquals("vndb", verified.metadata.covers.first { it.url == url }.source)
         assertFalse(com.yuki.yukihub.metadata.policy.NsfwCoverPolicy.shouldAutoMark(CoverSourceMode.NEXTMOE, verified.metadata))
-        val differentImage=candidate(CoverSourceMode.VNDB,"v17",chinese="Same Title",coverUrl="https://t.vndb.org/other.jpg",covers=listOf(MetadataCover("https://t.vndb.org/other.jpg",sexual="explicit")))
-        assertEquals(0.0,CoverCandidateAggregator.aggregate(listOf(nextmoe,differentImage),order).single().metadata.coverSexual,0.0)
-        val differentWork=candidate(CoverSourceMode.VNDB,"v99",chinese="Same Title",coverUrl=url,covers=listOf(MetadataCover(url,sexual="explicit")))
-        assertEquals(0.0,CoverCandidateAggregator.aggregate(listOf(nextmoe,differentWork),order).single().metadata.coverSexual,0.0)
+        val differentImage =
+            candidate(
+                CoverSourceMode.VNDB,
+                "v17",
+                chinese = "Same Title",
+                coverUrl = "https://t.vndb.org/other.jpg",
+                covers = listOf(MetadataCover("https://t.vndb.org/other.jpg", sexual = "explicit"))
+            )
+        assertEquals(0.0, CoverCandidateAggregator.aggregate(listOf(nextmoe, differentImage), order).single().metadata.coverSexual, 0.0)
+        val differentWork = candidate(CoverSourceMode.VNDB, "v99", chinese = "Same Title", coverUrl = url, covers = listOf(MetadataCover(url, sexual = "explicit")))
+        assertEquals(0.0, CoverCandidateAggregator.aggregate(listOf(nextmoe, differentWork), order).single().metadata.coverSexual, 0.0)
     }
+
     @Test
     fun mergesCatalogsSharingAnExternalRef() {
         val vndb =

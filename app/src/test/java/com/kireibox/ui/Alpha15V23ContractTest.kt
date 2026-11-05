@@ -25,7 +25,6 @@ class Alpha15V23ContractTest {
     @Test
     fun sortChoiceLivesOnLibraryHubAndNumberedEditorIsWiredInBothLayouts() {
         val source = UiSourceFiles.all()
-        val hub = source.substringAfter("fun LibraryHubSettings(").substringBefore("fun InterfaceSettings(")
         val scan = source.substringAfter("fun LibrarySettings(").substringBefore("fun PermissionSettings(")
 
         assertFalse(source.contains("fun LibraryHubSettings("))

@@ -92,7 +92,10 @@ class CoverAccounts private constructor(context: Context) {
      * Whether adult works are searched. Defaults to **on**: most galgames are adult-only and every
      * source hides them while this is off, so the default-off behaviour made the cover picker look
      * broken (e.g. Riddle Joker returned nothing). NSFW covers are still blurred by default.
+     *
+     * Keep the search API compatible after removing the filter from settings.
      */
+    @Suppress("FunctionOnlyReturningConstant")
     fun includesAdult() = true
 
     fun setIncludesAdult(value: Boolean) {

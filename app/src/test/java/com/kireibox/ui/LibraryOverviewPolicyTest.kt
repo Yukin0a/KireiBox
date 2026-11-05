@@ -9,11 +9,10 @@ import org.junit.Test
 import java.io.File
 
 class LibraryOverviewPolicyTest {
-
     @Test fun cloudOnlyWorksAreListedWithoutCreatingGamesAndBoundWorksAreNotDuplicated() {
-        val game = Game(id=1, title="本地作品", totalPlayTime=60_000L)
-        val rows = listOf(com.yuki.yukihub.sync.PlaytimeGame(1, "本地作品", 1, com.yuki.yukihub.sync.PlaytimeLedgerRow(workId="100")))
-        val works = listOf(com.yuki.yukihub.sync.CloudPlaytimeWork("100", 120), com.yuki.yukihub.sync.CloudPlaytimeWork("200", 30, com.yuki.yukihub.metadata.model.VnMetadata(chineseTitle="云端作品")))
+        val game = Game(id = 1, title = "本地作品", totalPlayTime = 60_000L)
+        val rows = listOf(com.yuki.yukihub.sync.PlaytimeGame(1, "本地作品", 1, com.yuki.yukihub.sync.PlaytimeLedgerRow(workId = "100")))
+        val works = listOf(com.yuki.yukihub.sync.CloudPlaytimeWork("100", 120), com.yuki.yukihub.sync.CloudPlaytimeWork("200", 30, com.yuki.yukihub.metadata.model.VnMetadata(chineseTitle = "云端作品")))
         val records = LibraryOverviewPolicy.records(listOf(game), rows, works, LibraryOverviewSort.PLAY_TIME)
         assertEquals(2, records.size)
         assertEquals(7_200_000L, records.first().milliseconds)
@@ -24,12 +23,14 @@ class LibraryOverviewPolicyTest {
     }
 
     @Test fun suggestedOrIgnoredCloudWorksRemainVisibleAndFetchTimeDoesNotInventAPlayDate() {
-        val game = Game(id=1, title="本地", lastPlayedAt=2)
-        val works = listOf(com.yuki.yukihub.sync.CloudPlaytimeWork("100", 30, gameId=1, match="SUGGESTED", fetchedAt=99999), com.yuki.yukihub.sync.CloudPlaytimeWork("200", 45, match="IGNORED"))
+        val game = Game(id = 1, title = "本地", lastPlayedAt = 2)
+        val works =
+            listOf(com.yuki.yukihub.sync.CloudPlaytimeWork("100", 30, gameId = 1, match = "SUGGESTED", fetchedAt = 99999), com.yuki.yukihub.sync.CloudPlaytimeWork("200", 45, match = "IGNORED"))
         val records = LibraryOverviewPolicy.records(listOf(game), emptyList(), works, LibraryOverviewSort.RECENT)
         assertEquals(3, records.size)
         assertEquals(game, records.first().game)
     }
+
     @Test fun recentSortPutsPlayedGamesFirstThenUsesTitle() {
         val never = Game(id = 1, title = "Never", lastPlayedAt = 0)
         val beta = Game(id = 2, title = "Beta", lastPlayedAt = 20)

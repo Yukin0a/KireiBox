@@ -10,7 +10,9 @@ import com.yuki.yukihub.metadata.model.CoverSourceMode
 import com.yuki.yukihub.metadata.model.VnMetadata
 import com.yuki.yukihub.model.Game
 import com.yuki.yukihub.settings.YukiSettingsStore
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -23,14 +25,33 @@ class NsfwRatingPixelTest {
         val metadata = YukiMetadataController(context)
         val prefs = context.getSharedPreferences(YukiSettingsStore.PREFS_NAME, Context.MODE_PRIVATE)
         val fixtures = mutableListOf<Game>()
-        fun fixture(score: Double, automatic: Boolean?, blurred: Boolean = true, imageSource: String = "vndb"): Game {
-            val game = Game(title = "NSFW regression fixture", rootUri = "test://nsfw-${System.nanoTime()}",
-                nsfw = blurred, coverSourceType = 1, vndbBindingMode = "AUTO")
+
+        fun fixture(
+            score: Double,
+            automatic: Boolean?,
+            blurred: Boolean = true,
+            imageSource: String = "vndb"
+        ): Game {
+            val game =
+                Game(
+                    title = "NSFW regression fixture",
+                    rootUri = "test://nsfw-${System.nanoTime()}",
+                    nsfw = blurred,
+                    coverSourceType = 1,
+                    vndbBindingMode = "AUTO"
+                )
             repo.insert(game)
             fixtures += game
-            metadata.saveMetadata(game.id, CoverSourceMode.NEXTMOE,
-                VnMetadata(coverUrl = "https://example.invalid/cover-${game.id}.jpg", coverSexual = score, externalRefs = "vndb:v17",
-                    covers = mutableListOf(com.yuki.yukihub.metadata.model.MetadataCover("https://example.invalid/cover-${game.id}.jpg", source = imageSource, sexual = score.toString()))))
+            metadata.saveMetadata(
+                game.id,
+                CoverSourceMode.NEXTMOE,
+                VnMetadata(
+                    coverUrl = "https://example.invalid/cover-${game.id}.jpg",
+                    coverSexual = score,
+                    externalRefs = "vndb:v17",
+                    covers = mutableListOf(com.yuki.yukihub.metadata.model.MetadataCover("https://example.invalid/cover-${game.id}.jpg", source = imageSource, sexual = score.toString()))
+                )
+            )
             when (automatic) {
                 true -> settings.markAutomaticCoverRating(game.id)
                 false -> settings.markNsfwDetected(game.id)
@@ -51,8 +72,16 @@ class NsfwRatingPixelTest {
             val manual = fixture(0.0, false)
             val manualClear = fixture(2.0, false, false)
             // A local/default replacement can retain old metadata but must stay clear.
-            val replacement = fixture(2.0, true, false).also { it.vndbBindingMode="MANUAL"; repo.update(it) }
-            val default = fixture(2.0, true, false).also { it.vndbBindingMode="DISABLED"; repo.update(it) }
+            val replacement =
+                fixture(2.0, true, false).also {
+                    it.vndbBindingMode = "MANUAL"
+                    repo.update(it)
+                }
+            val default =
+                fixture(2.0, true, false).also {
+                    it.vndbBindingMode = "DISABLED"
+                    repo.update(it)
+                }
             NsfwCoverBackfill(context).run()
             assertFalse("AI redraw must not inherit VNDB trust", repo.findById(untrusted.id)!!.nsfw)
             assertFalse(repo.findById(bangumi.id)!!.nsfw)

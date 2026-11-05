@@ -14,8 +14,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.io.IOException
 
 /** Why a sync could not run or finish; the settings status line words each one. */
@@ -70,25 +70,32 @@ class NextmoePlaytimeSync(
     fun schedule(delayMillis: Long = DEFAULT_DELAY_MS) {
         if (mutableStatus.value.running) return
         if (pending?.isActive == true) {
-            if(delayMillis >= DEFAULT_DELAY_MS) return
+            if (delayMillis >= DEFAULT_DELAY_MS) return
             pending?.cancel()
         }
         pending =
             scope.launch {
                 delay(delayMillis)
-                trigger = if(delayMillis < DEFAULT_DELAY_MS) "游戏库或封面更新" else "回到前台"
+                trigger = if (delayMillis < DEFAULT_DELAY_MS) "游戏库或封面更新" else "回到前台"
                 runWithRetry()
             }
     }
 
     @Synchronized
     fun syncNow() {
-        if(mutableStatus.value.running) {
-            scope.launch { while(mutableStatus.value.running) delay(100); syncNow() }
+        if (mutableStatus.value.running) {
+            scope.launch {
+                while (mutableStatus.value.running) delay(100)
+                syncNow()
+            }
             return
         }
         pending?.cancel()
-        pending = scope.launch { trigger = "立即同步"; runWithRetry() }
+        pending =
+            scope.launch {
+                trigger = "立即同步"
+                runWithRetry()
+            }
     }
 
     /** One retry after a network failure while the process lives; otherwise the next launcher resume catches up. */
@@ -105,7 +112,10 @@ class NextmoePlaytimeSync(
     }
 
     /** Games whose work the user still has to confirm or pick, and games NextMoe refused. */
-    fun attention(): List<PlaytimeGame> = ledger.libraryGames(account()).filter { it.row != null && (it.row.workId == null || it.row.rejected != null || it.row.lastResult?.startsWith("FAILED:") == true) }
+    fun attention(): List<PlaytimeGame> =
+        ledger.libraryGames(
+            account()
+        ).filter { it.row != null && (it.row.workId == null || it.row.rejected != null || it.row.lastResult?.startsWith("FAILED:") == true) }
 
     /** The user confirmed [workId] for [gameId]: bind it and upload on the next sync. */
     suspend fun confirm(
@@ -114,13 +124,17 @@ class NextmoePlaytimeSync(
     ) = mutex.withLock {
         val account = account()
         val row = ledger.libraryGames(account).firstOrNull { it.gameId == gameId }?.row ?: PlaytimeLedgerRow()
-        if(row.workId != null && row.workId != workId) ledger.undoImport(gameId)
+        if (row.workId != null && row.workId != workId) ledger.undoImport(gameId)
         ledger.save(gameId, account, rebind(row, workId).copy(boundFrom = NextmoeWorkPlan.manualWork(ledger.binding(gameId)) ?: "confirmed:$workId"))
         syncNow()
     }
 
     /** The user is about to pick another work in the cover picker: decide this game again afterwards. */
-    suspend fun forget(gameId: Long) = mutex.withLock { ledger.undoImport(gameId); ledger.forgetResolution(gameId, account()) }
+    suspend fun forget(gameId: Long) =
+        mutex.withLock {
+            ledger.undoImport(gameId)
+            ledger.forgetResolution(gameId, account())
+        }
 
     /** Runs one sync unless one is already running; returns what stopped it, or null when it finished. */
     suspend fun runOnce(): PlaytimeSyncProblem? {
@@ -145,7 +159,15 @@ class NextmoePlaytimeSync(
                     summary = runCatching { NextmoePlaytimeLedger.summarize(ledger.libraryGames(account())) }.getOrDefault(mutableStatus.value.summary),
                 )
             if (problem != PlaytimeSyncProblem.NOT_CONNECTED) {
-                val errors = runCatching { ledger.libraryGames(account()).mapNotNull { it.row?.lastResult?.takeIf { value -> value.startsWith("FAILED:") } }.distinct().joinToString() }.getOrDefault("")
+                val errors =
+                    runCatching {
+                        ledger.libraryGames(account()).mapNotNull {
+                            it.row?.lastResult?.takeIf {
+                                    value ->
+                                value.startsWith("FAILED:")
+                            }
+                        }.distinct().joinToString()
+                    }.getOrDefault("")
                 val entry = "${clock()} · $trigger · 云端 ${remoteSnapshot.size} · 上传 $uploaded · 拉取 $pulled · 失败 $failed · 请求 ${api.requestCount - startRequests} · ${problem ?: "完成"} $errors"
                 prefs.edit().putString("history_${account()}", (listOf(entry) + history()).take(20).joinToString("\n")).apply()
             }
@@ -184,41 +206,49 @@ class NextmoePlaytimeSync(
         }
 
     fun privacy(): Boolean? = api.privacy()
+
     fun setPrivacy(value: Boolean) = api.setPrivacy(value)
 
     fun cloud(): List<CloudPlaytimeWork> = ledger.cloud(account())
+
     fun library(): List<PlaytimeGame> = ledger.libraryGames(account())
+
     fun history(): List<String> = prefs.getString("history_${account()}", "").orEmpty().lines().filter { it.isNotBlank() }
 
     private fun ignoreCloudUnlocked(workId: String) {
         val account = account()
-        ledger.snapshot(account, ledger.cloud(account).map { if(it.workId == workId) it.copy(match = "IGNORED", gameId = null) else it })
+        ledger.snapshot(account, ledger.cloud(account).map { if (it.workId == workId) it.copy(match = "IGNORED", gameId = null) else it })
     }
 
-    suspend fun ignoreCloud(workId: String) = mutex.withLock {
-        val account = account()
-        ledger.libraryGames(account).filter { it.row?.workId == workId }.forEach { game ->
-            ledger.undoImport(game.gameId)
-            ledger.save(game.gameId, account, game.row!!.copy(workId = null, candidateId = null, lastResult = "IMPORT_UNDONE"))
+    suspend fun ignoreCloud(workId: String) =
+        mutex.withLock {
+            val account = account()
+            ledger.libraryGames(account).filter { it.row?.workId == workId }.forEach { game ->
+                ledger.undoImport(game.gameId)
+                ledger.save(game.gameId, account, game.row!!.copy(workId = null, candidateId = null, lastResult = "IMPORT_UNDONE"))
+            }
+            ignoreCloudUnlocked(workId)
+            refreshSummary()
         }
-        ignoreCloudUnlocked(workId)
-        refreshSummary()
-    }
 
-    suspend fun undo(gameId: Long) = mutex.withLock {
-        val account = account()
-        ledger.undoImport(gameId)
-        val row = ledger.libraryGames(account).firstOrNull { it.gameId == gameId }?.row ?: PlaytimeLedgerRow()
-        row.workId?.let(::ignoreCloudUnlocked)
-        ledger.save(gameId, account, row.copy(workId = null, candidateId = null, lastResult = "IMPORT_UNDONE"))
-        refreshSummary()
-    }
+    suspend fun undo(gameId: Long) =
+        mutex.withLock {
+            val account = account()
+            ledger.undoImport(gameId)
+            val row = ledger.libraryGames(account).firstOrNull { it.gameId == gameId }?.row ?: PlaytimeLedgerRow()
+            row.workId?.let(::ignoreCloudUnlocked)
+            ledger.save(gameId, account, row.copy(workId = null, candidateId = null, lastResult = "IMPORT_UNDONE"))
+            refreshSummary()
+        }
 
-    suspend fun editLocal(gameId: Long, change: () -> Boolean) = mutex.withLock {
+    suspend fun editLocal(
+        gameId: Long,
+        change: () -> Boolean
+    ) = mutex.withLock {
         val lower = change()
         val account = account()
         val row = ledger.libraryGames(account).firstOrNull { it.gameId == gameId }?.row ?: PlaytimeLedgerRow()
-        ledger.save(gameId, account, row.copy(forceWrite = lower || row.forceWrite, ignoreRemoteAbove = if(lower) Int.MAX_VALUE else row.ignoreRemoteAbove, rejected = null, retryAfter = 0))
+        ledger.save(gameId, account, row.copy(forceWrite = lower || row.forceWrite, ignoreRemoteAbove = if (lower) Int.MAX_VALUE else row.ignoreRemoteAbove, rejected = null, retryAfter = 0))
         syncNow()
     }
 
@@ -227,10 +257,17 @@ class NextmoePlaytimeSync(
         val previous = ledger.cloud(account).associateBy { it.workId }
         val expired = remoteSnapshot.keys.filter { previous[it]?.metadata == null || clock() - previous.getValue(it).fetchedAt > 7 * 86_400_000L }
         val catalog = expired.chunked(BATCH).flatMap(api::catalog).associateBy { it.id }
-        val works = remoteSnapshot.map { (id, minutes) ->
-            val old = previous[id]
-            CloudPlaytimeWork(id, minutes, catalog[id] ?: old?.metadata, match = if(old?.match == "IGNORED") "IGNORED" else "NONE", fetchedAt = if(id in catalog) clock() else old?.fetchedAt ?: 0)
-        }
+        val works =
+            remoteSnapshot.map { (id, minutes) ->
+                val old = previous[id]
+                CloudPlaytimeWork(
+                    id,
+                    minutes,
+                    catalog[id] ?: old?.metadata,
+                    match = if (old?.match == "IGNORED") "IGNORED" else "NONE",
+                    fetchedAt = if (id in catalog) clock() else old?.fetchedAt ?: 0
+                )
+            }
         // Keep the previous snapshot on network/JSON failures; replace only after all pages succeed.
         ledger.snapshot(account, works)
         resolve(account, ledger.libraryGames(account))
@@ -240,23 +277,34 @@ class NextmoePlaytimeSync(
         upload(account)
         val bound = ledger.libraryGames(account).filter { it.row?.workId != null }.groupBy { it.row!!.workId }
         val cloud = ledger.cloud(account)
-        val added = bound.filterKeys { id -> cloud.none { it.workId == id } }.mapNotNull { (id, group) ->
-            val game = group.first()
-            val minutes = game.row!!.remoteMinutes
-            if(minutes <= 0) null else CloudPlaytimeWork(id!!, minutes, gameId = game.gameId, match = "BOUND")
-        }
-        ledger.snapshot(account, cloud.map { work ->
-            val game = bound[work.workId]?.firstOrNull()
-            if(game != null) work.copy(gameId = game.gameId, match = "BOUND", minutes = game.row!!.remoteMinutes) else work
-        } + added)
+        val added =
+            bound.filterKeys { id -> cloud.none { it.workId == id } }.mapNotNull { (id, group) ->
+                val game = group.first()
+                val minutes = game.row!!.remoteMinutes
+                if (minutes <= 0) null else CloudPlaytimeWork(id!!, minutes, gameId = game.gameId, match = "BOUND")
+            }
+        ledger.snapshot(
+            account,
+            cloud.map { work ->
+                val game = bound[work.workId]?.firstOrNull()
+                if (game != null) work.copy(gameId = game.gameId, match = "BOUND", minutes = game.row!!.remoteMinutes) else work
+            } + added
+        )
     }
 
-    private fun matchCloud(account: String, works: List<CloudPlaytimeWork>) {
+    private fun matchCloud(
+        account: String,
+        works: List<CloudPlaytimeWork>
+    ) {
         val initial = ledger.libraryGames(account)
         initial.filter { it.row?.workId != null && it.row.boundFrom == null }.forEach { game ->
             val binding = ledger.binding(game.gameId)
-            val matches = works.filter { work -> work.match != "IGNORED" && (binding.nextmoeId == work.workId || NextmoeWorkPlan.refs(binding).any { it in work.metadata?.externalRefs.orEmpty().split(',').map(String::trim) }) }
-            if(matches.size > 1) {
+            val matches =
+                works.filter {
+                        work ->
+                    work.match != "IGNORED" && (binding.nextmoeId == work.workId || NextmoeWorkPlan.refs(binding).any { it in work.metadata?.externalRefs.orEmpty().split(',').map(String::trim) })
+                }
+            if (matches.size > 1) {
                 ledger.undoImport(game.gameId)
                 ledger.save(game.gameId, account, game.row!!.copy(workId = null, candidateId = matches.first().workId, lastResult = "AMBIGUOUS"))
             }
@@ -275,15 +323,29 @@ class NextmoePlaytimeSync(
             val game = library.first { it.gameId == id }
             ledger.save(id, account, rebind(game.row ?: PlaytimeLedgerRow(), matches.single().workId))
         }
-        val snapshots = works.map { work ->
-            if(work.match == "IGNORED") return@map work
-            val titles = work.metadata?.let { listOf(it.chineseTitle, it.originalTitle, it.romanTitle) + it.titleAliases }.orEmpty().map(::normalizedTitle).filter { it.isNotBlank() }
-            val candidates = library.filter { it.row?.workId == null && it.row?.lastResult != "IMPORT_UNDONE" && normalizedTitle(it.title) in titles }
-            candidates.forEach { game ->
-                if(proposals[game.gameId].isNullOrEmpty()) ledger.save(game.gameId, account, (game.row ?: PlaytimeLedgerRow()).copy(candidateId = work.workId, candidateTitle = work.metadata?.chineseTitle?.ifBlank { work.metadata.originalTitle }, lastResult = "TITLE_SUGGESTED"))
+        val snapshots =
+            works.map { work ->
+                if (work.match == "IGNORED") return@map work
+                val titles = work.metadata?.let { listOf(it.chineseTitle, it.originalTitle, it.romanTitle) + it.titleAliases }.orEmpty().map(::normalizedTitle).filter { it.isNotBlank() }
+                val candidates = library.filter { it.row?.workId == null && it.row?.lastResult != "IMPORT_UNDONE" && normalizedTitle(it.title) in titles }
+                candidates.forEach { game ->
+                    if (proposals[game.gameId].isNullOrEmpty()) {
+                        ledger.save(
+                            game.gameId,
+                            account,
+                            (game.row ?: PlaytimeLedgerRow()).copy(
+                                candidateId = work.workId,
+                                candidateTitle =
+                                    work.metadata?.chineseTitle?.ifBlank {
+                                        work.metadata.originalTitle
+                                    },
+                                lastResult = "TITLE_SUGGESTED"
+                            )
+                        )
+                    }
+                }
+                if (candidates.isNotEmpty()) work.copy(match = "SUGGESTED", gameId = candidates.singleOrNull()?.gameId) else work
             }
-            if(candidates.isNotEmpty()) work.copy(match = "SUGGESTED", gameId = candidates.singleOrNull()?.gameId) else work
-        }
         ledger.snapshot(account, snapshots)
     }
 
@@ -293,16 +355,25 @@ class NextmoePlaytimeSync(
             val row = game.row?.takeIf { it.rejected == null } ?: return@forEach
             val work = row.workId ?: return@forEach
             val minutes = remoteSnapshot[work] ?: 0
-            if(row.forceWrite) return@forEach
+            if (row.forceWrite) return@forEach
             val ignored = row.ignoreRemoteAbove?.let { minutes <= it } == true
-            val result = when {
-                ignored -> "SKIPPED_REMOTE_HIGHER"
-                minutes > game.localMinutes -> { ledger.raiseLocal(game.gameId, minutes); raised++; "PULLED" }
-                minutes == game.localMinutes -> "IN_SYNC"
-                row.retryAfter > clock() && row.lastResult?.startsWith("FAILED:") == true -> row.lastResult
-                else -> "WAITING_UPLOAD"
-            }
-            ledger.save(game.gameId, account, row.copy(remoteMinutes = minutes, uploadedMinutes = if(ignored) row.uploadedMinutes else maxOf(row.uploadedMinutes, minutes), lastResult = result, lastResultAt = clock()))
+            val result =
+                when {
+                    ignored -> "SKIPPED_REMOTE_HIGHER"
+                    minutes > game.localMinutes -> {
+                        ledger.raiseLocal(game.gameId, minutes)
+                        raised++
+                        "PULLED"
+                    }
+                    minutes == game.localMinutes -> "IN_SYNC"
+                    row.retryAfter > clock() && row.lastResult?.startsWith("FAILED:") == true -> row.lastResult
+                    else -> "WAITING_UPLOAD"
+                }
+            ledger.save(
+                game.gameId,
+                account,
+                row.copy(remoteMinutes = minutes, uploadedMinutes = if (ignored) row.uploadedMinutes else maxOf(row.uploadedMinutes, minutes), lastResult = result, lastResultAt = clock())
+            )
         }
         return raised
     }
@@ -313,7 +384,7 @@ class NextmoePlaytimeSync(
         library.forEach { game ->
             val row = game.row ?: return@forEach
             val stale = row.staleWorkId ?: return@forEach
-            if(library.none { it.row?.workId == stale }) api.delete(stale)
+            if (library.none { it.row?.workId == stale }) api.delete(stale)
             ledger.save(game.gameId, account, row.copy(staleWorkId = null, uploadedWorkId = row.uploadedWorkId?.takeIf { it != stale }))
         }
     }
@@ -332,8 +403,12 @@ class NextmoePlaytimeSync(
             when {
                 // A NextMoe cover the user newly picked wins over any earlier answer (a merged id still counts as the same pick).
                 manual != null && manual != (row?.boundFrom ?: row?.workId) -> {
-                    if(row?.workId != null && row.workId != manual) ledger.undoImport(game.gameId)
-                    ledger.save(game.gameId, account, rebind(row ?: PlaytimeLedgerRow(), manual).copy(boundFrom = manual, forceWrite = row?.forceWrite ?: false, ignoreRemoteAbove = row?.ignoreRemoteAbove))
+                    if (row?.workId != null && row.workId != manual) ledger.undoImport(game.gameId)
+                    ledger.save(
+                        game.gameId,
+                        account,
+                        rebind(row ?: PlaytimeLedgerRow(), manual).copy(boundFrom = manual, forceWrite = row?.forceWrite ?: false, ignoreRemoteAbove = row?.ignoreRemoteAbove)
+                    )
                 }
                 row == null || (row.workId == null && row.lastResult != "IMPORT_UNDONE") -> unresolved += binding
             }
@@ -349,12 +424,18 @@ class NextmoePlaytimeSync(
         unresolved.forEach { binding ->
             val localKey = normalizedTitle(games.firstOrNull { it.gameId == binding.gameId }?.title.orEmpty())
             val exactTitles = details.filter { localKey.length >= 4 && localKey in NextmoeTitleIdentity.aliases(it) }
-            val titleConfirmed = exactTitles.size == 1 && NextmoeWorkPlan.refs(binding).none { it in ambiguousRefs } &&
-                (binding.nextmoeId == exactTitles.single().id || NextmoeWorkPlan.refs(binding).any { byRef[it] == exactTitles.single().id })
+            val titleConfirmed =
+                exactTitles.size == 1 && NextmoeWorkPlan.refs(binding).none { it in ambiguousRefs } &&
+                    (binding.nextmoeId == exactTitles.single().id || NextmoeWorkPlan.refs(binding).any { byRef[it] == exactTitles.single().id })
             val proposed = NextmoeWorkPlan.decide(binding, byRef, titleConfirmed)
-            val decision = if(proposed is WorkDecision.Bound && NextmoeWorkPlan.manualWork(binding) == null &&
-                NextmoeWorkPlan.manualRef(binding) == null && NextmoeWorkPlan.refs(binding).any { it in ambiguousRefs })
-                WorkDecision.Candidate(proposed.workId) else proposed
+            val decision =
+                if (proposed is WorkDecision.Bound && NextmoeWorkPlan.manualWork(binding) == null &&
+                    NextmoeWorkPlan.manualRef(binding) == null && NextmoeWorkPlan.refs(binding).any { it in ambiguousRefs }
+                ) {
+                    WorkDecision.Candidate(proposed.workId)
+                } else {
+                    proposed
+                }
             if (!keepUnbound && decision !is WorkDecision.Bound) return@forEach
             val row =
                 when (decision) {
@@ -374,34 +455,65 @@ class NextmoePlaytimeSync(
             force.forEach { (work, group) ->
                 val target = group.first { it.row!!.forceWrite }.localMinutes
                 val result = api.put(work, target)
-                val observed = if(result.ok) api.playtimes(listOf(work))[work] ?: target else remoteSnapshot[work] ?: 0
-                if(result.ok) uploaded++
+                val observed = if (result.ok) api.playtimes(listOf(work))[work] ?: target else remoteSnapshot[work] ?: 0
+                if (result.ok) uploaded++
                 group.forEach { record(account, it, target, observed, result, true) }
             }
-            val writes = batch.filter { it !in force }.map { (work, group) -> work to group.maxOf { it.localMinutes } }
-                .filter { (work, minutes) -> minutes > (remoteSnapshot[work] ?: 0) }
-            val results = if(writes.isEmpty()) emptyMap() else api.write(writes).associateBy { it.workId }
+            val writes =
+                batch.filter { it !in force }.map { (work, group) -> work to group.maxOf { it.localMinutes } }
+                    .filter { (work, minutes) -> minutes > (remoteSnapshot[work] ?: 0) }
+            val results = if (writes.isEmpty()) emptyMap() else api.write(writes).associateBy { it.workId }
             uploaded += results.values.count { it.ok }
-            writes.forEach { (work, minutes) -> batch.first { it.key == work }.value.forEach { record(account, it, minutes, if(results[work]?.ok == true) minutes else remoteSnapshot[work] ?: 0, results[work], false) } }
+            writes.forEach {
+                    (work, minutes) ->
+                batch.first { it.key == work }.value.forEach { record(account, it, minutes, if (results[work]?.ok == true) minutes else remoteSnapshot[work] ?: 0, results[work], false) }
+            }
         }
     }
 
-    private fun record(account: String, game: PlaytimeGame, written: Int, remote: Int, result: PlaytimeWriteResult?, force: Boolean) {
+    private fun record(
+        account: String,
+        game: PlaytimeGame,
+        written: Int,
+        remote: Int,
+        result: PlaytimeWriteResult?,
+        force: Boolean
+    ) {
         val row = game.row ?: return
-        val next = when {
-            result?.ok == true -> {
-                row.copy(uploadedMinutes = written, uploadedWorkId = row.workId, remoteMinutes = remote, forceWrite = false, retryCount = 0, retryAfter = 0,
-                    ignoreRemoteAbove = if(force && remote > written) remote else if(force) null else row.ignoreRemoteAbove,
-                    lastResult = if(force && remote > written) "SKIPPED_REMOTE_HIGHER" else "UPLOADED")
+        val next =
+            when {
+                result?.ok == true -> {
+                    row.copy(
+                        uploadedMinutes = written,
+                        uploadedWorkId = row.workId,
+                        remoteMinutes = remote,
+                        forceWrite = false,
+                        retryCount = 0,
+                        retryAfter = 0,
+                        ignoreRemoteAbove =
+                            if (force && remote > written) {
+                                remote
+                            } else if (force) {
+                                null
+                            } else {
+                                row.ignoreRemoteAbove
+                            },
+                        lastResult = if (force && remote > written) "SKIPPED_REMOTE_HIGHER" else "UPLOADED"
+                    )
+                }
+                result?.code == "ENTITY_MERGED" && result.currentId.isNotBlank() -> row.copy(workId = result.currentId, lastResult = "MERGED")
+                else -> {
+                    failed++
+                    val code = result?.code ?: "MISSING"
+                    val permanent = code in setOf("NOT_FOUND", "VALIDATION_FAILED", "HTTP_404", "HTTP_422", "HTTP_403", "FORBIDDEN")
+                    row.copy(
+                        rejected = code.takeIf { permanent },
+                        retryCount = row.retryCount + 1,
+                        retryAfter = clock() + (30_000L * (1L shl row.retryCount.coerceAtMost(10))),
+                        lastResult = "FAILED:$code"
+                    )
+                }
             }
-            result?.code == "ENTITY_MERGED" && result.currentId.isNotBlank() -> row.copy(workId = result.currentId, lastResult = "MERGED")
-            else -> {
-                failed++
-                val code = result?.code ?: "MISSING"
-                val permanent = code in setOf("NOT_FOUND", "VALIDATION_FAILED", "HTTP_404", "HTTP_422", "HTTP_403", "FORBIDDEN")
-                row.copy(rejected = code.takeIf { permanent }, retryCount = row.retryCount + 1, retryAfter = clock() + (30_000L * (1L shl row.retryCount.coerceAtMost(10))), lastResult = "FAILED:$code")
-            }
-        }
         ledger.save(game.gameId, account, next.copy(lastResultAt = clock()))
     }
 
@@ -414,6 +526,7 @@ class NextmoePlaytimeSync(
         private const val KEY_BLOCKED_UNTIL = "blocked_until"
         private const val KEY_BLOCKED_DAILY = "blocked_daily"
         private const val BATCH = 100
+
         fun normalizedTitle(title: String): String = NextmoeTitleIdentity.key(title)
 
         const val DEFAULT_DELAY_MS = 2 * 60 * 1000L

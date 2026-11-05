@@ -32,11 +32,12 @@ object KireiBackPolicy {
             else -> KireiLibraryBackAction.PAGE
         }
 
-    fun canonicalSettingsPage(page: KireiSettingsPage): KireiSettingsPage = when (page) {
-        KireiSettingsPage.INTERFACE -> KireiSettingsPage.APPEARANCE
-        KireiSettingsPage.LIBRARY_HUB -> KireiSettingsPage.PERMISSIONS
-        else -> page
-    }
+    fun canonicalSettingsPage(page: KireiSettingsPage): KireiSettingsPage =
+        when (page) {
+            KireiSettingsPage.INTERFACE -> KireiSettingsPage.APPEARANCE
+            KireiSettingsPage.LIBRARY_HUB -> KireiSettingsPage.PERMISSIONS
+            else -> page
+        }
 
     fun settingsParent(page: KireiSettingsPage): KireiSettingsPage? =
         when (page) {

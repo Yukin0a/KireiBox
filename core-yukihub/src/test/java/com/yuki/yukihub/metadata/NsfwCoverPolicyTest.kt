@@ -6,10 +6,15 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class NsfwCoverPolicyTest {
-    private fun metadata(origin: String = "vndb", rating: String = "suggestive") =
-        com.yuki.yukihub.metadata.model.VnMetadata(coverUrl = "selected", coverSexual = 2.0,
-            externalRefs = "bangumi:17,vndb:v45247",
-            covers = mutableListOf(com.yuki.yukihub.metadata.model.MetadataCover("selected", source = origin, sexual = rating)))
+    private fun metadata(
+        origin: String = "vndb",
+        rating: String = "suggestive"
+    ) = com.yuki.yukihub.metadata.model.VnMetadata(
+        coverUrl = "selected",
+        coverSexual = 2.0,
+        externalRefs = "bangumi:17,vndb:v45247",
+        covers = mutableListOf(com.yuki.yukihub.metadata.model.MetadataCover("selected", source = origin, sexual = rating))
+    )
 
     @Test fun `NextMoe requires selected VNDB image and work anchor`() {
         assertTrue(NsfwCoverPolicy.shouldAutoMark(CoverSourceMode.NEXTMOE, metadata()))
@@ -27,7 +32,15 @@ class NsfwCoverPolicyTest {
         assertFalse(NsfwCoverPolicy.shouldAutoMark(CoverSourceMode.VNDB, metadata(rating = "safe")))
         assertFalse(NsfwCoverPolicy.shouldAutoMark(CoverSourceMode.VNDB, metadata(rating = "unknown")))
         assertFalse(NsfwCoverPolicy.shouldAutoMark(CoverSourceMode.VNDB, metadata().apply { coverUrl = "another-image" }))
-        assertTrue(NsfwCoverPolicy.shouldAutoMark(CoverSourceMode.VNDB, metadata().apply { covers.clear(); coverSexual = 1.13 }))
+        assertTrue(
+            NsfwCoverPolicy.shouldAutoMark(
+                CoverSourceMode.VNDB,
+                metadata().apply {
+                    covers.clear()
+                    coverSexual = 1.13
+                }
+            )
+        )
     }
 
     @Test

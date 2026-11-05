@@ -145,8 +145,10 @@ internal fun coverCacheKey(
     context: Context? = null,
 ): String? =
     uri?.takeIf { it.isNotBlank() }?.let {
-        (context?.let { ctx -> deviceCoverRequest(ctx, it, role, componentWidthPx, componentHeightPx, blurred) }
-            ?: CoverDecodePolicy.request(it, role, componentWidthPx, componentHeightPx, blurred)).cacheKey
+        (
+            context?.let { ctx -> deviceCoverRequest(ctx, it, role, componentWidthPx, componentHeightPx, blurred) }
+                ?: CoverDecodePolicy.request(it, role, componentWidthPx, componentHeightPx, blurred)
+        ).cacheKey
     }
 
 @Composable
@@ -276,13 +278,14 @@ internal suspend fun decodeNetworkCover(
         decodeNetworkCoverFile(context, cached, coverRequest)?.let { return it }
         cached.delete()
     }
-    val temporary = downloadCoverPreview(
-        client = CoverPreviewClient,
-        url = coverRequest.uri,
-        directory = File(context.cacheDir, "cover-previews"),
-        maxBytes = CoverDecodePolicy.MAX_NETWORK_BYTES,
-        sourceKey = coverRequest.sourceKey,
-    ) ?: return null
+    val temporary =
+        downloadCoverPreview(
+            client = CoverPreviewClient,
+            url = coverRequest.uri,
+            directory = File(context.cacheDir, "cover-previews"),
+            maxBytes = CoverDecodePolicy.MAX_NETWORK_BYTES,
+            sourceKey = coverRequest.sourceKey,
+        ) ?: return null
     return try {
         decodeNetworkCoverFile(context, temporary, coverRequest)?.also {
             // Cache failures must not hide an otherwise valid image.
@@ -293,15 +296,23 @@ internal suspend fun decodeNetworkCover(
     }
 }
 
-private suspend fun decodeNetworkCoverFile(context: Context, file: File, request: CoverImageRequest): Bitmap? {
+private suspend fun decodeNetworkCoverFile(
+    context: Context,
+    file: File,
+    request: CoverImageRequest
+): Bitmap? {
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     BitmapFactory.decodeFile(file.path, bounds)
     currentCoroutineContext().ensureActive()
     val sample = CoverDecodePolicy.sampleSize(bounds.outWidth, bounds.outHeight, request) ?: return null
-    val bitmap = BitmapFactory.decodeFile(file.path, BitmapFactory.Options().apply {
-        inSampleSize = sample
-        inPreferredConfig = Bitmap.Config.ARGB_8888
-    })
+    val bitmap =
+        BitmapFactory.decodeFile(
+            file.path,
+            BitmapFactory.Options().apply {
+                inSampleSize = sample
+                inPreferredConfig = Bitmap.Config.ARGB_8888
+            }
+        )
     currentCoroutineContext().ensureActive()
     return finishDecodedCover(context, bitmap, request)
 }

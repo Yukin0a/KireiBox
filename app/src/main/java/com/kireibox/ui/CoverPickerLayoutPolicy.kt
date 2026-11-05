@@ -84,7 +84,11 @@ internal object CoverPickerLayoutPolicy {
     /** True when every source that was asked failed to answer (timeout / unreachable). */
     fun allUnreachable(search: CoverSearchUi): Boolean = search.sourceHits.isNotEmpty() && search.sourceFailed.isNotEmpty() && search.sourceFailed.size == search.sourceHits.size
 
-    /** The empty results state; the action re-runs the search on every source. */
+    /**
+     * The empty results state; the action re-runs the search on every source.
+     * Retains the former adult-content filter parameter for compatibility.
+     */
+    @Suppress("UNUSED_PARAMETER")
     fun emptyState(
         allUnreachable: Boolean,
         includeAdult: Boolean,
@@ -106,7 +110,10 @@ internal object CoverVariantCaption {
         ).joinToString(" · ")
 
     /** Image rating is separate from game age rating; suggestive may include censored nudity. */
-    fun rating(sexual: String, source: String = "vndb"): String? {
+    fun rating(
+        sexual: String,
+        source: String = "vndb"
+    ): String? {
         val level =
             when (sexual.trim().lowercase()) {
                 "safe" -> 0.0

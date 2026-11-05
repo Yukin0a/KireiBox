@@ -58,7 +58,12 @@ data class PlaytimeLedgerSummary(
 /** Where sync state lives; [NextmoePlaytimeLedger] in the app, an in-memory fake in tests. */
 interface NextmoePlaytimeStore {
     fun cloud(account: String): List<CloudPlaytimeWork> = emptyList()
-    fun snapshot(account: String, works: List<CloudPlaytimeWork>) {}
+
+    fun snapshot(
+        account: String,
+        works: List<CloudPlaytimeWork>
+    ) {}
+
     fun undoImport(gameId: Long) {}
 
     /** Every game with ≥ 1 played minute, with its row for [account]. */
@@ -124,7 +129,8 @@ class NextmoePlaytimeLedger(context: Context) : NextmoePlaytimeStore {
     ): List<PlaytimeGame> =
         helper.readableDatabase.rawQuery(
             "SELECT g.id, g.title, g.total_play_time, s.work_id, s.candidate_id, s.candidate_title, s.uploaded_minutes, " +
-                "s.uploaded_work_id, s.stale_work_id, s.rejected, s.game_id, s.bound_from, s.remote_minutes, s.last_result, s.last_result_at, s.force_write, s.retry_count, s.retry_after, s.ignore_remote_above, g.cloud_import_ms " +
+                "s.uploaded_work_id, s.stale_work_id, s.rejected, s.game_id, s.bound_from, s.remote_minutes, s.last_result, s.last_result_at, " +
+                "s.force_write, s.retry_count, s.retry_after, s.ignore_remote_above, g.cloud_import_ms " +
                 "FROM games g LEFT JOIN nextmoe_playtime_sync s ON s.game_id = g.id AND s.account_id = ? " +
                 // Inlined, not bound: a bound arg is TEXT and never compares as a number against an expression.
                 "WHERE IFNULL(g.total_play_time, 0) >= $minPlayTimeMs ORDER BY g.id",
@@ -202,22 +208,53 @@ class NextmoePlaytimeLedger(context: Context) : NextmoePlaytimeStore {
         helper.writableDatabase.insertWithOnConflict(TABLE, null, values, SQLiteDatabase.CONFLICT_REPLACE)
     }
 
-    override fun cloud(account: String): List<CloudPlaytimeWork> = helper.readableDatabase.rawQuery(
-        "SELECT work_id, minutes, metadata, game_id, match, fetched_at FROM nextmoe_cloud_works WHERE account_id=? ORDER BY minutes DESC", arrayOf(account)
-    ).use { c -> buildList { while(c.moveToNext()) add(CloudPlaytimeWork(c.getString(0), c.getInt(1), com.yuki.yukihub.metadata.model.VnMetadata.fromJson(c.getStringOrNull(2)), if(c.isNull(3)) null else c.getLong(3), c.getString(4), c.getLong(5))) } }
+    override fun cloud(account: String): List<CloudPlaytimeWork> =
+        helper.readableDatabase.rawQuery(
+            "SELECT work_id, minutes, metadata, game_id, match, fetched_at FROM nextmoe_cloud_works WHERE account_id=? ORDER BY minutes DESC",
+            arrayOf(account)
+        ).use {
+                c ->
+            buildList {
+                while (c.moveToNext()) add(
+                    CloudPlaytimeWork(
+                        c.getString(0),
+                        c.getInt(1),
+                        com.yuki.yukihub.metadata.model.VnMetadata.fromJson(c.getStringOrNull(2)),
+                        if (c.isNull(3)) null else c.getLong(3),
+                        c.getString(4),
+                        c.getLong(5)
+                    )
+                )
+            }
+        }
 
-    override fun snapshot(account: String, works: List<CloudPlaytimeWork>) {
+    override fun snapshot(
+        account: String,
+        works: List<CloudPlaytimeWork>
+    ) {
         val db = helper.writableDatabase
         db.beginTransaction()
         try {
             db.delete("nextmoe_cloud_works", "account_id=?", arrayOf(account))
-            works.forEach { work -> db.insertOrThrow("nextmoe_cloud_works", null, ContentValues().apply {
-                put("account_id", account); put("work_id", work.workId); put("minutes", work.minutes)
-                put("metadata", work.metadata?.toJson()?.toString()); put("game_id", work.gameId)
-                put("match", work.match); put("fetched_at", work.fetchedAt)
-            }) }
+            works.forEach { work ->
+                db.insertOrThrow(
+                    "nextmoe_cloud_works",
+                    null,
+                    ContentValues().apply {
+                        put("account_id", account)
+                        put("work_id", work.workId)
+                        put("minutes", work.minutes)
+                        put("metadata", work.metadata?.toJson()?.toString())
+                        put("game_id", work.gameId)
+                        put("match", work.match)
+                        put("fetched_at", work.fetchedAt)
+                    }
+                )
+            }
             db.setTransactionSuccessful()
-        } finally { db.endTransaction() }
+        } finally {
+            db.endTransaction()
+        }
     }
 
     override fun undoImport(gameId: Long) {

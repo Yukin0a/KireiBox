@@ -188,17 +188,31 @@ class YukiDatabaseHelper(context: Context) :
         )
     }
 
-    private fun upgradePlaytime23AfterLedger(db: SQLiteDatabase, oldVersion: Int) {
+    private fun upgradePlaytime23AfterLedger(
+        db: SQLiteDatabase,
+        oldVersion: Int
+    ) {
         if (oldVersion < 22) createNextmoePlaytimeSyncTable(db)
         upgradePlaytime23(db)
     }
 
     private fun upgradePlaytime23(db: SQLiteDatabase) {
         safeAlter(db, "ALTER TABLE games ADD COLUMN cloud_import_ms INTEGER NOT NULL DEFAULT 0")
-        for ((name, type) in listOf("remote_minutes" to "INTEGER NOT NULL DEFAULT 0", "last_result" to "TEXT", "last_result_at" to "INTEGER NOT NULL DEFAULT 0", "force_write" to "INTEGER NOT NULL DEFAULT 0", "retry_count" to "INTEGER NOT NULL DEFAULT 0", "retry_after" to "INTEGER NOT NULL DEFAULT 0", "ignore_remote_above" to "INTEGER")) {
+        for ((name, type) in listOf(
+            "remote_minutes" to "INTEGER NOT NULL DEFAULT 0",
+            "last_result" to "TEXT",
+            "last_result_at" to "INTEGER NOT NULL DEFAULT 0",
+            "force_write" to "INTEGER NOT NULL DEFAULT 0",
+            "retry_count" to "INTEGER NOT NULL DEFAULT 0",
+            "retry_after" to "INTEGER NOT NULL DEFAULT 0",
+            "ignore_remote_above" to "INTEGER"
+        )) {
             safeAlter(db, "ALTER TABLE nextmoe_playtime_sync ADD COLUMN $name $type")
         }
-        db.execSQL("CREATE TABLE IF NOT EXISTS nextmoe_cloud_works (account_id TEXT NOT NULL, work_id TEXT NOT NULL, minutes INTEGER NOT NULL, metadata TEXT, game_id INTEGER, match TEXT NOT NULL DEFAULT 'NONE', fetched_at INTEGER NOT NULL, PRIMARY KEY(account_id, work_id))")
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS nextmoe_cloud_works (account_id TEXT NOT NULL, work_id TEXT NOT NULL, minutes INTEGER NOT NULL, " +
+                "metadata TEXT, game_id INTEGER, match TEXT NOT NULL DEFAULT 'NONE', fetched_at INTEGER NOT NULL, PRIMARY KEY(account_id, work_id))"
+        )
     }
 
     private fun createMetadataCacheTable(db: SQLiteDatabase) {

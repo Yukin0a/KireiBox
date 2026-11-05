@@ -13,12 +13,11 @@ class NextmoeWorkPlanTest {
         bangumi: String? = null,
     ) = GameBinding(1, visible, mode, nextmoe, vndb, bangumi)
 
-
     @Test fun exactLocalizedNameCorroboratesOneIdButNeverConflictingIds() {
-        val auto = binding("vndb", "AUTO", vndb="v17")
-        assertEquals(WorkDecision.Bound("200"), NextmoeWorkPlan.decide(auto, mapOf("vndb:v17" to "200"), titlesAgree=true))
-        assertEquals(WorkDecision.Candidate("200"), NextmoeWorkPlan.decide(binding("vndb", "AUTO", nextmoe="201", vndb="v17"), mapOf("vndb:v17" to "200"), titlesAgree=true))
-        assertEquals(WorkDecision.Unmatched, NextmoeWorkPlan.decide(binding(null,"NONE"), emptyMap(), titlesAgree=true))
+        val auto = binding("vndb", "AUTO", vndb = "v17")
+        assertEquals(WorkDecision.Bound("200"), NextmoeWorkPlan.decide(auto, mapOf("vndb:v17" to "200"), titlesAgree = true))
+        assertEquals(WorkDecision.Candidate("200"), NextmoeWorkPlan.decide(binding("vndb", "AUTO", nextmoe = "201", vndb = "v17"), mapOf("vndb:v17" to "200"), titlesAgree = true))
+        assertEquals(WorkDecision.Unmatched, NextmoeWorkPlan.decide(binding(null, "NONE"), emptyMap(), titlesAgree = true))
     }
 
     @Test fun packagingLabelsAreRemovedButSequelAndStorySubtitlesArePreserved() {
@@ -27,6 +26,7 @@ class NextmoeWorkPlanTest {
         org.junit.Assert.assertNotEquals(NextmoeTitleIdentity.key("作品 1"), NextmoeTitleIdentity.key("作品 2"))
         org.junit.Assert.assertNotEquals(NextmoeTitleIdentity.key("作品 (After Story)"), NextmoeTitleIdentity.key("作品"))
     }
+
     @Test
     fun aNextmoeCoverTheUserPickedBindsWithoutAnyRequest() {
         val manual = binding("nextmoe", "MANUAL", nextmoe = "100", vndb = "v1")

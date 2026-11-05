@@ -14,12 +14,16 @@ object CoverSourcePriority {
 
     fun savedOrder(context: android.content.Context): List<CoverSourceMode> {
         val defaults = searchOrder()
-        val keys = context.getSharedPreferences("yukihub_prefs", android.content.Context.MODE_PRIVATE)
-            .getString("cover_source_order", "").orEmpty().split(",")
+        val keys =
+            context.getSharedPreferences("yukihub_prefs", android.content.Context.MODE_PRIVATE)
+                .getString("cover_source_order", "").orEmpty().split(",")
         return (keys.mapNotNull { key -> defaults.firstOrNull { it.key == key } } + defaults).distinct()
     }
 
-    fun saveOrder(context: android.content.Context, order: List<CoverSourceMode>) {
+    fun saveOrder(
+        context: android.content.Context,
+        order: List<CoverSourceMode>
+    ) {
         context.getSharedPreferences("yukihub_prefs", android.content.Context.MODE_PRIVATE).edit()
             .putString("cover_source_order", order.joinToString(",") { it.key }).apply()
     }

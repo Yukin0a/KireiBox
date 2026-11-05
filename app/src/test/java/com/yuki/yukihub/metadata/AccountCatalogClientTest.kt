@@ -13,9 +13,14 @@ class AccountCatalogClientTest {
             val row = rows.getJSONObject(i)
             val parsed = AccountCatalogClient.parseNextmoe(row.getJSONObject("work"))
             val restored = VnMetadata.fromJson(parsed.toJson().toString())!!
-            assertEquals(parsed.chineseTitle, row.getBoolean("shouldBlur"),
+            assertEquals(
+                parsed.chineseTitle,
+                row.getBoolean("shouldBlur"),
                 com.yuki.yukihub.metadata.policy.NsfwCoverPolicy.shouldAutoMark(
-                    com.yuki.yukihub.metadata.model.CoverSourceMode.NEXTMOE, restored))
+                    com.yuki.yukihub.metadata.model.CoverSourceMode.NEXTMOE,
+                    restored
+                )
+            )
         }
     }
 
@@ -198,11 +203,16 @@ class AccountCatalogClientTest {
     }
 
     @Test fun nextmoeCoverRatingFollowsElectedImageAndNeverTheWorkAgeRating() {
-        val parsed = AccountCatalogClient.parseNextmoe(JSONObject("""{
+        val parsed =
+            AccountCatalogClient.parseNextmoe(
+                JSONObject(
+                    """{
           "id":"9","content_rating":"r18","content_limit":"nsfw",
           "cover":{"url":"https://example.com/safe.jpg","sexual":"safe"},
           "covers":[{"url":"https://example.com/adult.jpg","width":2000,"height":3000,"sexual":"explicit"}]
-        }"""))
+        }"""
+                )
+            )
         assertEquals("https://example.com/safe.jpg", parsed.coverUrl)
         assertEquals(0.0, parsed.coverSexual, 0.0)
         assertEquals("explicit", parsed.covers.last().sexual)

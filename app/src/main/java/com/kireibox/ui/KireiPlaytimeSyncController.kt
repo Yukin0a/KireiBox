@@ -3,9 +3,9 @@ package com.kireibox.ui
 import androidx.lifecycle.viewModelScope
 import com.yuki.yukihub.metadata.model.CoverSourceMode
 import com.yuki.yukihub.sync.NextmoePlaytimeSync
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -33,7 +33,7 @@ internal class KireiPlaytimeSyncController(host: KireiViewModel) : KireiViewMode
         }
         viewModelScope.launch {
             host.state.map { state -> state.games.map { Triple(it.id, it.coverUri, it.title) } to state.coverQueue.toString() }.distinctUntilChanged().collect {
-                if(connected()) sync.schedule(3_000L)
+                if (connected()) sync.schedule(3_000L)
             }
         }
         sync.refreshSummary()
@@ -62,7 +62,7 @@ internal class KireiPlaytimeSyncController(host: KireiViewModel) : KireiViewMode
             val accountId = accounts.status.value[CoverSourceMode.NEXTMOE]?.id
             val games = withContext(Dispatchers.IO) { runCatching { sync.attention() }.getOrDefault(emptyList()) }
             val details = withContext(Dispatchers.IO) { Triple(sync.cloud(), sync.library(), sync.history()) }
-            if(accountId != accounts.status.value[CoverSourceMode.NEXTMOE]?.id) return@launch
+            if (accountId != accounts.status.value[CoverSourceMode.NEXTMOE]?.id) return@launch
             mutableState.value = mutableState.value.copy(playtimeAttention = games, cloudPlaytimes = details.first, playtimeLibrary = details.second, playtimeHistory = details.third)
         }
     }
@@ -90,7 +90,14 @@ internal class KireiPlaytimeSyncController(host: KireiViewModel) : KireiViewMode
     /** After a NextMoe login the first sync runs at once; after a sign-out the status line is re-read. */
     fun onAccountChanged(source: CoverSourceMode) {
         if (source != CoverSourceMode.NEXTMOE) return
-        mutableState.value = mutableState.value.copy(cloudPlaytimes = emptyList(), playtimeLibrary = emptyList(), playtimeAttention = emptyList(), playtimeHistory = emptyList(), playRecordsPrivate = null)
+        mutableState.value =
+            mutableState.value.copy(
+                cloudPlaytimes = emptyList(),
+                playtimeLibrary = emptyList(),
+                playtimeAttention = emptyList(),
+                playtimeHistory = emptyList(),
+                playRecordsPrivate = null
+            )
         if (connected()) sync.syncNow() else sync.refreshSummary()
     }
 

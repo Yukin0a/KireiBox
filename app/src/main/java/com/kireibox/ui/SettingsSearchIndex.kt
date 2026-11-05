@@ -147,14 +147,35 @@ internal object SettingsSearchIndex {
         page: KireiSettingsPage,
         group: String,
         keywords: List<String>,
-    ): SettingsSearchEntry = SettingsSearchEntry(when (page) { KireiSettingsPage.COVER_ACCOUNTS -> "封面来源账号"; KireiSettingsPage.PLAYTIME_SYNC -> PLAYTIME_SYNC_TITLE; else -> settingsPageTitle(page) }, at(page, root, group), keywords, anchor = null)
+    ): SettingsSearchEntry =
+        SettingsSearchEntry(
+            when (page) {
+                KireiSettingsPage.COVER_ACCOUNTS -> "封面来源账号"
+                KireiSettingsPage.PLAYTIME_SYNC -> PLAYTIME_SYNC_TITLE
+                else -> settingsPageTitle(page)
+            },
+            at(page, root, group),
+            keywords,
+            anchor = null
+        )
 
     private fun page(
         page: KireiSettingsPage,
         group: String,
         subtitle: String,
         keywords: List<String>,
-    ): SettingsSearchEntry = SettingsSearchEntry(when (page) { KireiSettingsPage.COVER_ACCOUNTS -> "封面来源账号"; KireiSettingsPage.PLAYTIME_SYNC -> PLAYTIME_SYNC_TITLE; else -> settingsPageTitle(page) }, at(page, root, group), keywords, anchor = null, subtitle = subtitle)
+    ): SettingsSearchEntry =
+        SettingsSearchEntry(
+            when (page) {
+                KireiSettingsPage.COVER_ACCOUNTS -> "封面来源账号"
+                KireiSettingsPage.PLAYTIME_SYNC -> PLAYTIME_SYNC_TITLE
+                else -> settingsPageTitle(page)
+            },
+            at(page, root, group),
+            keywords,
+            anchor = null,
+            subtitle = subtitle
+        )
 
     private fun appearanceEntries(): List<SettingsSearchEntry> {
         val display = at(KireiSettingsPage.APPEARANCE, appearance, "显示")

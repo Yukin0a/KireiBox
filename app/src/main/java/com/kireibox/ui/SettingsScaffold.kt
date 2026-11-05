@@ -27,11 +27,11 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.kireibox.designsystem.KireiColors
 import com.kireibox.designsystem.KireiSpacing
-import com.kireibox.designsystem.components.LocalCompactSettingsRows
 import com.kireibox.designsystem.components.KireiLargeTitle
 import com.kireibox.designsystem.components.KireiLargeTopBar
 import com.kireibox.designsystem.components.KireiTopBarDefaults
 import com.kireibox.designsystem.components.KireiTopBarSlots
+import com.kireibox.designsystem.components.LocalCompactSettingsRows
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
 

@@ -30,13 +30,13 @@ class YukiSettingsStoreTest {
         assertEquals("bangumi", store.snapshot().metadataSource)
     }
 
-
     @Test fun `default source is anonymous NextMoe and an explicit Bangumi choice survives`() {
         val prefs = fakePrefs()
         assertEquals("nextmoe", YukiSettingsStore(prefs).snapshot().metadataSource)
         prefs.edit().putString(YukiSettingsStore.KEY_METADATA_SOURCE, "bangumi").apply()
         assertEquals("bangumi", YukiSettingsStore(prefs).snapshot().metadataSource)
     }
+
     @Test fun `manual nsfw choice overrides automatic image tracking`() {
         val store = YukiSettingsStore(fakePrefs())
         store.markAutomaticCoverRating(1)

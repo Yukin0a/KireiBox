@@ -35,6 +35,9 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
 
       - name: Install required Android components
         shell: bash
@@ -46,11 +49,17 @@ jobs:
             "ndk;27.0.12077973" \
             "cmake;3.22.1"
 
-      - name: Run Debug build gates
+      - name: Run unit tests
+        run: ./gradlew test --no-daemon --stacktrace
+
+      - name: Check file size and static analysis
         run: >-
-          ./gradlew test
-          :core-yukihub:verifyFileSize :app:verifyFileSize
+          ./gradlew :core-yukihub:verifyFileSize :app:verifyFileSize
           :core-yukihub:detekt :app:detekt
-          :core-yukihub:ktlintCheck :app:ktlintCheck
-          :app:lintDebug :app:assembleDebug
           --no-daemon --stacktrace
+
+      - name: Check Kotlin formatting
+        run: ./gradlew :core-yukihub:ktlintCheck :app:ktlintCheck --no-daemon --stacktrace
+
+      - name: Run Android Lint and build Debug APK
+        run: ./gradlew :app:lintDebug :app:assembleDebug --no-daemon --stacktrace

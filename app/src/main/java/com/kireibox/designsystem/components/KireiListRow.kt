@@ -21,8 +21,8 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -158,11 +158,16 @@ internal fun KireiListRow(
     onClick: (() -> Unit)? = null,
 ) {
     val rowSpec = spec
-    val spec = if (LocalCompactSettingsRows.current) rowSpec.copy(
-        verticalPadding = 6.dp,
-        minHeight = if (rowSpec.subtitle.isNullOrBlank()) 48.dp else 60.dp,
-        tileSize = minOf(rowSpec.tileSize, 30.dp),
-    ) else rowSpec
+    val spec =
+        if (LocalCompactSettingsRows.current) {
+            rowSpec.copy(
+                verticalPadding = 6.dp,
+                minHeight = if (rowSpec.subtitle.isNullOrBlank()) 48.dp else 60.dp,
+                tileSize = minOf(rowSpec.tileSize, 30.dp),
+            )
+        } else {
+            rowSpec
+        }
     val interaction = remember { MutableInteractionSource() }
     val press = rememberPressProgress(interaction)
     val focused by interaction.collectIsFocusedAsState()

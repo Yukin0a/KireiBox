@@ -25,8 +25,9 @@ internal class NsfwCoverBackfill(context: Context) {
             val legacyAutomatic = !hasDecision && game.nsfw && game.vndbBindingMode == "AUTO"
             val firstDecision = !game.nsfw && !settings.wasNsfwDetected(game.id) && game.vndbBindingMode == "AUTO"
             // Recheck AUTO covers cleared by the overly permissive r3 policy as well.
-            val repairAutomatic = settings.followsAutomaticCoverRating(game.id) &&
-                (game.nsfw || game.vndbBindingMode == "AUTO")
+            val repairAutomatic =
+                settings.followsAutomaticCoverRating(game.id) &&
+                    (game.nsfw || game.vndbBindingMode == "AUTO")
             // A clear automatic flag may describe a local/default replacement with stale metadata.
             if (!legacyAutomatic && !firstDecision && !repairAutomatic) return@forEach
             val source =

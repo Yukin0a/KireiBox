@@ -11,10 +11,11 @@ object NextmoeTitleIdentity {
 
     fun key(title: String): String {
         val normalized = Normalizer.normalize(title, Normalizer.Form.NFKC).lowercase(Locale.ROOT)
-        val cleaned = brackets.replace(normalized) { match ->
-            val label = match.value.drop(1).dropLast(1).trim()
-            if(label.split(Regex("[+ /_・]+" )).all { it.isNotBlank() && packaging.matches(it) }) " " else match.value
-        }.replace(Regex("""\.(?:exe|xp3|zip|7z)$"""), "")
+        val cleaned =
+            brackets.replace(normalized) { match ->
+                val label = match.value.drop(1).dropLast(1).trim()
+                if (label.split(Regex("[+ /_・]+")).all { it.isNotBlank() && packaging.matches(it) }) " " else match.value
+            }.replace(Regex("""\.(?:exe|xp3|zip|7z)$"""), "")
         val unpacked = cleaned.replace(Regex("""(?i)(?:[ _-]*(?:krkr|kirikiri|onscripter|tyrano|artemis|安卓版))$"""), "")
         return unpacked.filter { it.isLetterOrDigit() }
     }

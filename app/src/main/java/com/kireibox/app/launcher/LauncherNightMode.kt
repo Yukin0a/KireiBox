@@ -54,8 +54,8 @@ internal object LauncherNightModeSync {
 
     private fun hasOtherRunningTask(activity: LauncherActivity): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return true
-        val manager = activity.getSystemService(ActivityManager::class.java) ?: return false
+        val manager = activity.getSystemService(ActivityManager::class.java)
         // Unknown means "assume a game may be running": skipping only defers the sync.
-        return runCatching { manager.appTasks.any { it.taskInfo.taskId != activity.taskId && it.taskInfo.isRunning } }.getOrDefault(true)
+        return runCatching { manager?.appTasks?.any { it.taskInfo.taskId != activity.taskId && it.taskInfo.isRunning } ?: false }.getOrDefault(true)
     }
 }

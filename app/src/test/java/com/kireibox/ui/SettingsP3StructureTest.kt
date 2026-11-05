@@ -114,7 +114,14 @@ class SettingsP3StructureTest {
         val covers = UiSourceFiles.file("SettingsCoverPages.kt")
         listOf("title = \"封面\"", "title = \"待确认封面\"", "title = \"已设置封面\"").forEach { assertTrue(covers.contains(it)) }
         val page = functionBody(covers, "CoverSettings")
-        listOf("setMetadataSource", "setBangumiApiBase", "setCoverHybridAutoMatch", "setCoverAutoMatchWifiOnly", "setCoverStrictL2", "clearCoverNoMatchStore").forEach { assertFalse(page.contains(it)) }
+        listOf(
+            "setMetadataSource",
+            "setBangumiApiBase",
+            "setCoverHybridAutoMatch",
+            "setCoverAutoMatchWifiOnly",
+            "setCoverStrictL2",
+            "clearCoverNoMatchStore"
+        ).forEach { assertFalse(page.contains(it)) }
         assertTrue(page.contains("viewModel::setNsfwBlurEnabled"))
         assertFalse(page.contains("viewModel::setIncludeAdult"))
         assertTrue(page.contains("viewModel.openSettingsPage(KireiSettingsPage.COVER_ACCOUNTS)"))

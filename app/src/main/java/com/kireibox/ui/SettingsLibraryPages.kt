@@ -53,7 +53,6 @@ import com.kireibox.designsystem.components.KireiListRow
 import com.kireibox.designsystem.components.KireiListRowSpec
 import com.kireibox.designsystem.components.KireiRowTone
 import com.kireibox.designsystem.components.KireiRowTrailing
-import com.kireibox.designsystem.components.KireiSegment
 import com.kireibox.designsystem.components.KireiStatusChip
 import com.kireibox.designsystem.components.KireiStatusTone
 import com.yuki.yukihub.settings.HomePresentationMode
@@ -269,8 +268,11 @@ internal fun PermissionSettings(
     KireiListGroup(colors, SettingsGroupSpacing, title = "目录管理") {
         item {
             SettingsAnchor("扫描目录") {
-                KireiListRow(KireiListRowSpec(title = "扫描目录", trailing = KireiRowTrailing.Value("${roots.size} 个")), colors,
-                    onClick = { viewModel.openSettingsPage(KireiSettingsPage.LIBRARY) })
+                KireiListRow(
+                    KireiListRowSpec(title = "扫描目录", trailing = KireiRowTrailing.Value("${roots.size} 个")),
+                    colors,
+                    onClick = { viewModel.openSettingsPage(KireiSettingsPage.LIBRARY) }
+                )
             }
         }
     }

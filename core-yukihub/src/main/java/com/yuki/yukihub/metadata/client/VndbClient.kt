@@ -249,8 +249,12 @@ object VndbClient {
             m.coverUrl = MetadataUtils.firstNonEmpty(m.fullCoverUrl, m.thumbnailUrl)
             m.coverSexual = image.optDouble("sexual", 0.0)
             m.coverViolence = image.optDouble("violence", 0.0)
-            if (m.coverUrl.isNotBlank()) m.covers += com.yuki.yukihub.metadata.model.MetadataCover(
-                m.coverUrl, source = "vndb", sexual = if(image.has("sexual") && !image.isNull("sexual")) m.coverSexual.toString() else "unknown")
+            if (m.coverUrl.isNotBlank()) {
+                m.covers +=
+                    com.yuki.yukihub.metadata.model.MetadataCover(
+                        m.coverUrl, source = "vndb", sexual = if (image.has("sexual") && !image.isNull("sexual")) m.coverSexual.toString() else "unknown"
+                    )
+            }
         }
 
         o.optJSONArray("developers")?.let { devs ->

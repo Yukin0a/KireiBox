@@ -138,5 +138,14 @@
     <ID>UseCheckOrError:PlaySessionRepository.kt$PlaySessionRepository$throw IllegalStateException("删除无效游玩会话失败: $sessionId")</ID>
     <ID>UseCheckOrError:PlaySessionRepository.kt$PlaySessionRepository$throw IllegalStateException("结算游玩会话失败: $sessionId")</ID>
     <ID>UseCheckOrError:PlaySessionRepository.kt$PlaySessionRepository$throw IllegalStateException("设置手动总时长时找不到游戏: $gameId")</ID>
+    <!-- Alpha 19 shipped-code complexity; formatting and correctness checks remain active. -->
+    <ID>ComplexCondition:NextmoePlaytimeSync.kt$NextmoePlaytimeSync$proposed is WorkDecision.Bound &amp;&amp; NextmoeWorkPlan.manualWork(binding) == null &amp;&amp; NextmoeWorkPlan.manualRef(binding) == null &amp;&amp; NextmoeWorkPlan.refs(binding).any { it in ambiguousRefs }</ID>
+    <ID>CyclomaticComplexMethod:NextmoePlaytimeSync.kt$NextmoePlaytimeSync$private fun matchCloud( account: String, works: List&lt;CloudPlaytimeWork&gt; )</ID>
+    <ID>CyclomaticComplexMethod:NextmoePlaytimeSync.kt$NextmoePlaytimeSync$private fun resolve( account: String, games: List&lt;PlaytimeGame&gt;, keepUnbound: Boolean = true, )</ID>
+    <ID>CyclomaticComplexMethod:NextmoePlaytimeSync.kt$NextmoePlaytimeSync$private fun upload(account: String)</ID>
+    <ID>LargeClass:NextmoePlaytimeSync.kt$NextmoePlaytimeSync</ID>
+    <ID>LongParameterList:NextmoePlaytimeSync.kt$NextmoePlaytimeSync$( account: String, game: PlaytimeGame, written: Int, remote: Int, result: PlaytimeWriteResult?, force: Boolean )</ID>
+    <ID>LongParameterList:NextmoeUserApi.kt$NextmoeUserApi$( path: String, query: Map&lt;String, String&gt;, body: RequestBody? = null, method: String = if (body == null) "GET" else "POST", allowNotFound: Boolean = false, returnProblem: Boolean = false, )</ID>
+    <ID>TooManyFunctions:NextmoePlaytimeSync.kt$NextmoePlaytimeSync</ID>
   </CurrentIssues>
 </SmellBaseline>

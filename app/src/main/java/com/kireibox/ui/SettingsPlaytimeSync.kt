@@ -144,7 +144,10 @@ internal fun PlaytimeSyncSettings(context: SettingsPageContext) {
     val viewModel = context.viewModel
     val status = state.playtimeSync
     val connected = state.nextmoeConnected()
-    LaunchedEffect(connected) { viewModel.loadPlaytimeAttention(); if(connected) viewModel.loadPlaytimePrivacy() }
+    LaunchedEffect(connected) {
+        viewModel.loadPlaytimeAttention()
+        if (connected) viewModel.loadPlaytimePrivacy()
+    }
     // Coming back from the cover picker (选择作品): sync at once so the pick takes effect.
     var pickerWasOpen by remember { mutableStateOf(false) }
     LaunchedEffect(state.coverSearch == null) {
@@ -161,11 +164,15 @@ internal fun PlaytimeSyncSettings(context: SettingsPageContext) {
                 viewModel.setPlaytimeSyncEnabled(it)
             }
         }
-        if (connected && status.enabled) item {
-            KireiListRow(KireiListRowSpec(title = if (status.running) "正在同步…" else "立即同步", tone = KireiRowTone.ACTION, enabled = !status.running), colors,
-                onClick = { viewModel.syncPlaytimeNow() })
+        if (connected && status.enabled) {
+            item {
+                KireiListRow(
+                    KireiListRowSpec(title = if (status.running) "正在同步…" else "立即同步", tone = KireiRowTone.ACTION, enabled = !status.running),
+                    colors,
+                    onClick = { viewModel.syncPlaytimeNow() }
+                )
+            }
         }
-
     }
     if (connected) CloudPlaytimeSections(state, colors, viewModel)
     val games = state.playtimeAttention.filter { it.row?.rejected == null }
@@ -209,7 +216,15 @@ private fun PlaytimeConfirmRow(
                 ) { viewModel.confirmPlaytimeWork(game.gameId, candidate) }
             }
         }
-    val subtitle = "本机 ${game.localMinutes / 60}h ${game.localMinutes % 60}m · 云端 ${game.row?.remoteMinutes ?: 0}m · " + if (candidate == null) game.row?.lastResult?.takeIf { it.startsWith("FAILED:") }?.let { "临时失败，稍后重试 · $it" } ?: "没有找到对应作品 · 点按选择" else "NextMoe：${game.row?.candidateTitle?.ifBlank { null } ?: "作品 $candidate"}"
+    val subtitle =
+        "本机 ${game.localMinutes / 60}h ${game.localMinutes % 60}m · 云端 ${game.row?.remoteMinutes ?: 0}m · " +
+            if (candidate == null) {
+                game.row?.lastResult?.takeIf {
+                    it.startsWith("FAILED:")
+                }?.let { "临时失败，稍后重试 · $it" } ?: "没有找到对应作品 · 点按选择"
+            } else {
+                "NextMoe：${game.row?.candidateTitle?.ifBlank { null } ?: "作品 $candidate"}"
+            }
     PlaytimeGameRow(PlaytimeRow(game, state, subtitle, trailing), colors) { viewModel.pickPlaytimeWork(game.gameId) }
 }
 

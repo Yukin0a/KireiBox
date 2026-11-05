@@ -8,7 +8,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CoverDecodePolicyTest {
-
     @Test
     fun immersiveTargetsAdaptToDeviceMemoryAndMeasuredPixels() {
         val high = CoverDecodePolicy.request("cover", CoverImageRole.HERO, 1440, 2160, memoryClassMb = 256)

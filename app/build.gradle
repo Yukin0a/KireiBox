@@ -26,6 +26,9 @@ def escapedEnvironmentValue = { String name ->
 }
 
 android {
+    // Compose 1.7's bundled lint detector crashes with K2 UAST in AGP 8.13.
+    // Keep all lint rules enabled and use the compatible UAST frontend.
+    experimentalProperties["android.lint.useK2Uast"] = false
     // Keep the source namespace stable for JNI/reflection and imported engine bridges.
     // The installable identity is the independent com.kireibox.app applicationId above.
     namespace 'com.yuki.yukihub'

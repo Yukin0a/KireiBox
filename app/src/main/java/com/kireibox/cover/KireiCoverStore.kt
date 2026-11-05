@@ -70,8 +70,9 @@ class KireiCoverStore(context: Context) {
                     game.coverSourceType = 1
                     game.vndbBindingMode = bindingMode
                     game.vndbMatchScore = matchScore.coerceIn(0.0, 100.0)
-                    val followsImageRating = settings.followsAutomaticCoverRating(gameId) ||
-                        (!game.nsfw && !settings.wasNsfwDetected(gameId))
+                    val followsImageRating =
+                        settings.followsAutomaticCoverRating(gameId) ||
+                            (!game.nsfw && !settings.wasNsfwDetected(gameId))
                     if (followsImageRating) game.nsfw = NsfwCoverPolicy.shouldAutoMark(source, candidate)
                     game.updatedAt = System.currentTimeMillis()
                     try {

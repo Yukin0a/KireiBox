@@ -123,8 +123,7 @@ internal object CoverCandidateAggregator {
         order: List<CoverSourceMode>
     ): Int = order.indexOf(source).let { if (it < 0) Int.MAX_VALUE else it }
 
-    private fun hasImageRating(value: String): Boolean =
-        value.trim().lowercase() in setOf("safe", "suggestive", "explicit") || value.toDoubleOrNull()?.isFinite() == true
+    private fun hasImageRating(value: String): Boolean = value.trim().lowercase() in setOf("safe", "suggestive", "explicit") || value.toDoubleOrNull()?.isFinite() == true
 
     private fun merge(
         members: List<Int>,
@@ -170,8 +169,9 @@ internal object CoverCandidateAggregator {
             ordered.filter { it.source == CoverSourceMode.VNDB && "vndb:${it.metadata.id}" in refs }.forEach { vndb ->
                 nextmoe.metadata.covers.forEach { unknown ->
                     val evidence = vndb.metadata.covers.firstOrNull { it.url == unknown.url && hasImageRating(it.sexual) }
-                    if (evidence != null)
+                    if (evidence != null) {
                         covers[unknown.url] = unknown.copy(source = "vndb", sexual = evidence.sexual)
+                    }
                 }
             }
         }

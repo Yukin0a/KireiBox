@@ -1,11 +1,9 @@
 package com.kireibox.ui
 
-import android.net.Uri
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
@@ -26,7 +24,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.kireibox.designsystem.KireiColors
 import com.kireibox.designsystem.KireiElevation
@@ -48,7 +45,6 @@ import com.kireibox.designsystem.components.KireiRowTone
 import com.kireibox.designsystem.components.KireiRowTrailing
 import com.kireibox.designsystem.components.KireiTextField
 import com.kireibox.designsystem.components.KireiTextFieldOptions
-import com.yuki.yukihub.metadata.model.CoverSourceMode
 import com.yuki.yukihub.model.Game
 import com.yuki.yukihub.settings.MotionMode
 import kotlin.math.roundToInt
@@ -69,14 +65,27 @@ internal fun CoverSettings(
     KireiListGroup(colors, SettingsGroupSpacing, title = "封面") {
         item {
             SettingsAnchor("封面来源") {
-                KireiListRow(KireiListRowSpec(title = "封面来源", trailing = KireiRowTrailing.Value(com.yuki.yukihub.metadata.match.CoverSourcePriority.savedOrder(LocalContext.current).first().label)), colors, onClick = { sourceOrderOpen = true })
+                KireiListRow(
+                    KireiListRowSpec(
+                        title = "封面来源",
+                        trailing = KireiRowTrailing.Value(com.yuki.yukihub.metadata.match.CoverSourcePriority.savedOrder(LocalContext.current).first().label)
+                    ),
+                    colors,
+                    onClick = {
+                        sourceOrderOpen = true
+                    }
+                )
             }
         }
         item {
-            SettingsToggleRow("模糊成人内容封面", state.settings?.nsfwBlurEnabled != false, colors,
-                subtitle = "按封面图片评级判断，手动选择优先", onCheckedChange = viewModel::setNsfwBlurEnabled)
+            SettingsToggleRow(
+                "模糊成人内容封面",
+                state.settings?.nsfwBlurEnabled != false,
+                colors,
+                subtitle = "按封面图片评级判断，手动选择优先",
+                onCheckedChange = viewModel::setNsfwBlurEnabled
+            )
         }
-
     }
     if (sourceOrderOpen) CoverSourceOrderDialog(colors) { sourceOrderOpen = false }
     KireiListGroup(colors, SettingsGroupSpacing) {
@@ -329,18 +338,39 @@ private fun coverBindingStatus(
     }
 
 @Composable
-private fun CoverSourceOrderDialog(colors: KireiColors, onClose: () -> Unit) {
+private fun CoverSourceOrderDialog(
+    colors: KireiColors,
+    onClose: () -> Unit
+) {
     val androidContext = LocalContext.current
     var order by remember { mutableStateOf(com.yuki.yukihub.metadata.match.CoverSourcePriority.savedOrder(androidContext)) }
-    KireiDialog(KireiDialogSpec(title = "封面来源排序", message = "点按来源上移一位，优先使用排在前面的来源。",
-        confirm = KireiDialogAction("完成", onClose)), colors, onClose) {
+    KireiDialog(
+        KireiDialogSpec(
+            title = "封面来源排序",
+            message = "点按来源上移一位，优先使用排在前面的来源。",
+            confirm = KireiDialogAction("完成", onClose)
+        ),
+        colors,
+        onClose
+    ) {
         order.forEachIndexed { index, source ->
-            KireiListRow(KireiListRowSpec(title = "${index + 1}. ${source.label}", trailing = if (index > 0) KireiRowTrailing.Glyph(Icons.Rounded.ExpandLess) else KireiRowTrailing.Value("优先", chevron = false)), colors, onClick = {
-                if (index > 0) {
-                    order = order.toMutableList().apply { removeAt(index); add(index - 1, source) }
-                    com.yuki.yukihub.metadata.match.CoverSourcePriority.saveOrder(androidContext, order)
+            KireiListRow(
+                KireiListRowSpec(
+                    title = "${index + 1}. ${source.label}",
+                    trailing = if (index > 0) KireiRowTrailing.Glyph(Icons.Rounded.ExpandLess) else KireiRowTrailing.Value("优先", chevron = false)
+                ),
+                colors,
+                onClick = {
+                    if (index > 0) {
+                        order =
+                            order.toMutableList().apply {
+                                removeAt(index)
+                                add(index - 1, source)
+                            }
+                        com.yuki.yukihub.metadata.match.CoverSourcePriority.saveOrder(androidContext, order)
+                    }
                 }
-            })
+            )
         }
     }
 }
