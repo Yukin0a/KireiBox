@@ -254,7 +254,7 @@ private fun CoverSourceStatus(
     val search = scope.search
     // "Connected" here means "can be searched", matching CoverAccounts.canSearch: Bangumi and VNDB
     // are anonymous, so an anonymous Bangumi must not read「未连接」(that implied login was needed).
-    // missingLogins only looks at requiresLogin sources, so it still names NextMoe/Hikarinagi.
+    // Only Hikarinagi requires login; NextMoe catalog search remains anonymous.
     val connected = { source: CoverSourceMode ->
         !source.requiresLogin ||
             scope.state.coverAccounts[source]?.let { it.connected && !it.needsReauth } == true

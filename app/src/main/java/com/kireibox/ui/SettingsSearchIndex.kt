@@ -74,8 +74,8 @@ internal object SettingsSearchIndex {
     }
 
     private val appearance = settingsPageTitle(KireiSettingsPage.APPEARANCE)
-    private val home = settingsPageTitle(KireiSettingsPage.INTERFACE)
-    private val library = settingsPageTitle(KireiSettingsPage.LIBRARY_HUB)
+    private val home = settingsPageTitle(KireiSettingsPage.APPEARANCE)
+    private val library = settingsPageTitle(KireiSettingsPage.PERMISSIONS)
     private val scanRoots = settingsPageTitle(KireiSettingsPage.LIBRARY)
     private val covers = settingsPageTitle(KireiSettingsPage.COVERS)
     private val engines = settingsPageTitle(KireiSettingsPage.ENGINES)
@@ -107,11 +107,9 @@ internal object SettingsSearchIndex {
                 anchor = QUICK_SETUP_ANCHOR,
             ),
             page(KireiSettingsPage.APPEARANCE, "个性化", words("界面", "样式", "皮肤", "外观设置", "appearance", "ui", "look")),
-            page(KireiSettingsPage.INTERFACE, "个性化", words("主页", "桌面", "首页与沉浸式", "沉浸式首页", "home", "homepage")),
-            page(KireiSettingsPage.LIBRARY_HUB, "游戏", words("游戏", "库", "library", "games")),
             SettingsSearchEntry(
                 scanRoots,
-                at(KireiSettingsPage.LIBRARY, library, "目录"),
+                at(KireiSettingsPage.LIBRARY, library, scanRoots),
                 words("目录", "文件夹", "路径", "导入", "folder", "directory", "scan", "path"),
                 anchor = null,
             ),
@@ -149,14 +147,14 @@ internal object SettingsSearchIndex {
         page: KireiSettingsPage,
         group: String,
         keywords: List<String>,
-    ): SettingsSearchEntry = SettingsSearchEntry(settingsPageTitle(page), at(page, root, group), keywords, anchor = null)
+    ): SettingsSearchEntry = SettingsSearchEntry(when (page) { KireiSettingsPage.COVER_ACCOUNTS -> "封面来源账号"; KireiSettingsPage.PLAYTIME_SYNC -> PLAYTIME_SYNC_TITLE; else -> settingsPageTitle(page) }, at(page, root, group), keywords, anchor = null)
 
     private fun page(
         page: KireiSettingsPage,
         group: String,
         subtitle: String,
         keywords: List<String>,
-    ): SettingsSearchEntry = SettingsSearchEntry(settingsPageTitle(page), at(page, root, group), keywords, anchor = null, subtitle = subtitle)
+    ): SettingsSearchEntry = SettingsSearchEntry(when (page) { KireiSettingsPage.COVER_ACCOUNTS -> "封面来源账号"; KireiSettingsPage.PLAYTIME_SYNC -> PLAYTIME_SYNC_TITLE; else -> settingsPageTitle(page) }, at(page, root, group), keywords, anchor = null, subtitle = subtitle)
 
     private fun appearanceEntries(): List<SettingsSearchEntry> {
         val display = at(KireiSettingsPage.APPEARANCE, appearance, "显示")
@@ -174,18 +172,16 @@ internal object SettingsSearchIndex {
             ),
             SettingsSearchEntry("动画效果", display, words("动画", "动效", "过渡", "减少动态", "精简", "省电", "卡顿", "animation", "animations", "motion")),
             SettingsSearchEntry("屏幕方向", display, words("旋转", "自动旋转", "横屏", "竖屏", "方向", "锁定方向", "rotation", "rotate", "orientation", "landscape", "portrait")),
-            SettingsSearchEntry("减少透明度", display, words("模糊", "毛玻璃", "透明", "玻璃", "半透明", "实色背景", "blur", "glass", "frosted", "transparency")),
-            SettingsSearchEntry("增强对比度", display, words("对比度", "高对比", "看不清", "文字太淡", "可读性", "无障碍", "contrast", "accessibility", "a11y")),
         )
     }
 
     private fun homeEntries(): List<SettingsSearchEntry> {
-        val content = at(KireiSettingsPage.INTERFACE, home, "展示内容", scope = SettingsSearchScope.IMMERSIVE)
-        val effects = at(KireiSettingsPage.INTERFACE, home, "视觉效果", scope = SettingsSearchScope.IMMERSIVE)
+        val content = at(KireiSettingsPage.APPEARANCE, home, "首页", "展示内容", scope = SettingsSearchScope.IMMERSIVE)
+        val effects = at(KireiSettingsPage.APPEARANCE, home, "首页", "视觉效果", scope = SettingsSearchScope.IMMERSIVE)
         return listOf(
             SettingsSearchEntry(
                 HOME_STYLE_ANCHOR,
-                at(KireiSettingsPage.INTERFACE, home),
+                at(KireiSettingsPage.APPEARANCE, home, "首页"),
                 words("沉浸式", "组件模式", "组件", "小组件", "仪表盘", "布局", "画廊", "immersive", "widget", "widgets", "dashboard", "layout"),
             ),
             SettingsSearchEntry(
@@ -201,12 +197,12 @@ internal object SettingsSearchIndex {
             ),
             SettingsSearchEntry(
                 "切换方式",
-                at(KireiSettingsPage.INTERFACE, home, "视觉效果"),
+                at(KireiSettingsPage.APPEARANCE, home, "首页", "视觉效果"),
                 ImmersiveCardSwitch.entries.map { it.displayName } + words("切换动画", "卡片切换", "滑动", "过渡", "洗牌", "卡片动画", "transition", "shuffle"),
             ),
             SettingsSearchEntry(
                 "高级选项",
-                at(KireiSettingsPage.INTERFACE, home, "视觉效果", scope = SettingsSearchScope.IMMERSIVE_ADVANCED),
+                at(KireiSettingsPage.APPEARANCE, home, "首页", "视觉效果", scope = SettingsSearchScope.IMMERSIVE_ADVANCED),
                 words("细项", "自定义效果", "高级", "advanced"),
             ),
         )
@@ -215,9 +211,9 @@ internal object SettingsSearchIndex {
     /** 首页 › 高级选项: every detail of the immersive effects. */
     private fun effectEntries(): List<SettingsSearchEntry> {
         val advanced = SettingsSearchScope.IMMERSIVE_ADVANCED
-        val backdrop = at(KireiSettingsPage.INTERFACE, home, "高级选项", "背景", scope = advanced)
-        val card = at(KireiSettingsPage.INTERFACE, home, "高级选项", "卡片", scope = advanced)
-        val ambient = at(KireiSettingsPage.INTERFACE, home, "高级选项", "氛围", scope = advanced)
+        val backdrop = at(KireiSettingsPage.APPEARANCE, home, "首页", "高级选项", "背景", scope = advanced)
+        val card = at(KireiSettingsPage.APPEARANCE, home, "首页", "高级选项", "卡片", scope = advanced)
+        val ambient = at(KireiSettingsPage.APPEARANCE, home, "首页", "高级选项", "氛围", scope = advanced)
         return listOf(
             SettingsSearchEntry(
                 "背景样式",
@@ -240,18 +236,14 @@ internal object SettingsSearchIndex {
                 ImmersiveAmbient.entries.filter { it != ImmersiveAmbient.NONE }.map { it.displayName } + words("粒子", "下雪", "雪花", "飘落", "particles", "snow", "sakura", "dust"),
             ),
             SettingsSearchEntry("陀螺仪视差", ambient, words("陀螺仪", "视差", "重力感应", "体感", "倾斜", "gyro", "gyroscope", "parallax")),
-            SettingsSearchEntry("恢复默认效果", at(KireiSettingsPage.INTERFACE, home, "高级选项", scope = advanced), words("重置", "恢复默认", "默认效果", "reset", "default")),
+            SettingsSearchEntry("恢复默认效果", at(KireiSettingsPage.APPEARANCE, home, "首页", "高级选项", scope = advanced), words("重置", "恢复默认", "默认效果", "reset", "default")),
         )
     }
 
     private fun libraryEntries(): List<SettingsSearchEntry> {
         val updates = at(KireiSettingsPage.LIBRARY, library, scanRoots, "自动更新")
         return listOf(
-            SettingsSearchEntry(
-                "游戏库顺序",
-                at(KireiSettingsPage.LIBRARY_HUB, library, "游戏卡片"),
-                words("排序", "顺序", "最近游玩", "添加时间", "名称", "自定义排序", "手动排序", "sort", "order"),
-            ),
+            SettingsSearchEntry("扫描目录", at(KireiSettingsPage.PERMISSIONS, library, "目录管理"), words("目录管理", "文件夹", "添加目录")),
             SettingsSearchEntry(
                 "添加扫描目录",
                 at(KireiSettingsPage.LIBRARY, library, scanRoots, "已添加的目录"),
@@ -269,19 +261,11 @@ internal object SettingsSearchIndex {
     }
 
     private fun coverEntries(): List<SettingsSearchEntry> {
-        val sources = at(KireiSettingsPage.COVERS, covers, "来源与匹配")
-        val matching = at(KireiSettingsPage.COVERS, covers, "自动匹配")
-        val adult = at(KireiSettingsPage.COVERS, covers, "成人内容")
+        val adult = at(KireiSettingsPage.COVERS, covers, "封面")
         val accounts = at(KireiSettingsPage.COVER_ACCOUNTS, settingsPageTitle(KireiSettingsPage.COVER_ACCOUNTS))
         return listOf(
-            SettingsSearchEntry("默认来源", sources, CoverSourceMode.active.map { it.label } + words("来源", "数据源", "资料来源", "bgm", "source")),
-            SettingsSearchEntry("Bangumi 镜像地址", sources, words("镜像", "代理", "地址", "网络", "api", "bgm", "mirror", "proxy")),
-            SettingsSearchEntry("同时查找多个来源", matching, words("多来源", "混合匹配", "自动匹配", "hybrid")),
-            SettingsSearchEntry("仅 Wi-Fi 自动匹配", matching, words("流量", "移动数据", "省流量", "无线", "网络", "wlan")),
-            SettingsSearchEntry(COVER_STRICT_MATCH_TITLE, matching, words("严格匹配", "标题匹配", "精确匹配", "自动设置封面", "strict", "cover match")),
-            SettingsSearchEntry("清除无结果记录", matching, words("清除", "无结果", "重新匹配", "重试", "缓存", "clear", "retry")),
+            SettingsSearchEntry("封面来源", at(KireiSettingsPage.COVERS, covers, "封面"), words("默认来源", "NextMoe", "国内", "免登录", "下载", "cover", "source")),
             SettingsSearchEntry("模糊成人内容封面", adult, words("成人", "r18", "nsfw", "18禁", "遮挡", "隐私", "blur", "cover")),
-            SettingsSearchEntry("搜索结果包含成人作品", adult, words("成人", "r18", "nsfw", "18禁", "adult")),
             SettingsSearchEntry("待确认封面", at(KireiSettingsPage.COVERS, covers), words("待确认", "待选择", "匹配失败", "选择封面", "挑选封面", "review", "pending", "cover")),
             SettingsSearchEntry("已设置封面", at(KireiSettingsPage.COVERS, covers), words("已设置", "更换封面", "重新选择封面", "修改封面", "change cover")),
         ) +

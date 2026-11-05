@@ -85,7 +85,7 @@ internal fun SettingsSubPage(
     SettingsPageScaffold(SettingsHeaderSpec(settingsPageTitle(page), onBack = viewModel::navigateUpSettings, page = page), context, scroll) {
         when (page) {
             KireiSettingsPage.APPEARANCE -> AppearanceSettings(state, colors, viewModel)
-            KireiSettingsPage.LIBRARY_HUB -> LibraryHubSettings(state, colors, viewModel)
+            KireiSettingsPage.LIBRARY_HUB -> PermissionSettings(state, colors, viewModel, actions)
             KireiSettingsPage.ENGINES -> EngineHubSettings(colors, viewModel)
             KireiSettingsPage.KRKR -> KrkrSettings(state, colors, viewModel, actions)
             KireiSettingsPage.ONS -> OnsSettingsPage(colors)
@@ -94,10 +94,10 @@ internal fun SettingsSubPage(
             KireiSettingsPage.WINLATOR -> WinlatorSettingsPage(colors, viewModel)
             KireiSettingsPage.COVERS -> CoverSettings(context, scroll)
             KireiSettingsPage.COVER_ACCOUNTS -> CoverAccountSettings(state, colors, viewModel)
-            KireiSettingsPage.PLAYTIME_SYNC -> PlaytimeSyncSettings(context)
+            KireiSettingsPage.PLAYTIME_SYNC -> CoverSettings(context, scroll)
             KireiSettingsPage.LIBRARY -> LibrarySettings(state, colors, viewModel, actions)
-            KireiSettingsPage.INTERFACE -> InterfaceSettings(state, colors, viewModel)
-            KireiSettingsPage.PERMISSIONS -> PermissionSettings(state, colors, actions)
+            KireiSettingsPage.INTERFACE -> AppearanceSettings(state, colors, viewModel)
+            KireiSettingsPage.PERMISSIONS -> PermissionSettings(state, colors, viewModel, actions)
             KireiSettingsPage.DIAGNOSTICS -> DiagnosticSettings(state, colors, viewModel, actions)
             KireiSettingsPage.ABOUT -> AboutSettings(state, colors, viewModel)
             KireiSettingsPage.ROOT -> Unit
@@ -110,11 +110,11 @@ internal fun settingsPageTitle(page: KireiSettingsPage): String =
     when (page) {
         KireiSettingsPage.ROOT -> "设置"
         KireiSettingsPage.APPEARANCE -> "外观"
-        KireiSettingsPage.LIBRARY_HUB -> "游戏库"
+        KireiSettingsPage.LIBRARY_HUB -> "存储与权限"
         KireiSettingsPage.LIBRARY -> "扫描目录"
-        KireiSettingsPage.COVERS -> "封面与元数据"
+        KireiSettingsPage.COVERS -> "封面"
         KireiSettingsPage.COVER_ACCOUNTS -> "封面来源账号"
-        KireiSettingsPage.PLAYTIME_SYNC -> PLAYTIME_SYNC_TITLE
+        KireiSettingsPage.PLAYTIME_SYNC -> "封面"
         KireiSettingsPage.ENGINES -> "全局引擎设置"
         KireiSettingsPage.KRKR -> "KRKR 引擎设置"
         KireiSettingsPage.ONS -> "ONS 引擎设置"
@@ -122,7 +122,7 @@ internal fun settingsPageTitle(page: KireiSettingsPage): String =
         KireiSettingsPage.TYRANO -> "Tyrano 引擎设置"
         KireiSettingsPage.WINLATOR -> "Winlator 引擎设置"
         // r4 S1: the 首页 page (style, shown games and immersive effects); the id stays INTERFACE.
-        KireiSettingsPage.INTERFACE -> "首页"
+        KireiSettingsPage.INTERFACE -> "外观"
         KireiSettingsPage.PERMISSIONS -> "存储与权限"
         KireiSettingsPage.DIAGNOSTICS -> "日志与诊断"
         KireiSettingsPage.ABOUT -> "关于"

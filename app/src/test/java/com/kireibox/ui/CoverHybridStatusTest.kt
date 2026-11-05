@@ -39,7 +39,8 @@ class CoverHybridStatusTest {
     @Test
     fun loginHintOnlyWhenALoginSourceIsMissing() {
         val connected = { source: CoverSourceMode -> source != CoverSourceMode.NEXTMOE }
-        assertTrue(CoverHybridStatus.needsLoginHint(CoverSourceMode.active, connected))
+        assertFalse(CoverHybridStatus.needsLoginHint(CoverSourceMode.active, connected))
+        assertTrue(CoverHybridStatus.needsLoginHint(CoverSourceMode.active) { it != CoverSourceMode.HIKARINAGI })
         assertFalse(CoverHybridStatus.needsLoginHint(CoverSourceMode.active) { true })
     }
 }

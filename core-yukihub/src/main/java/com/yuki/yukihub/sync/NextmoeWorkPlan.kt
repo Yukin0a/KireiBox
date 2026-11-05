@@ -25,7 +25,8 @@ sealed interface WorkDecision {
 /**
  * Which NextMoe work a game's playtime may be written to. Time on the wrong work is the one mistake
  * that cannot be undone quietly, so only evidence the user chose — or two independent sources that
- * agree — binds automatically; anything weaker becomes a candidate for the user to confirm.
+ * agree, or an id corroborated by an exact localized title — binds automatically.
+ * Anything weaker becomes a candidate for the user to confirm.
  */
 object NextmoeWorkPlan {
     private const val MANUAL = "MANUAL"
@@ -56,12 +57,14 @@ object NextmoeWorkPlan {
     /**
      * Decides from the refs NextMoe resolved ([resolved]: ref → work id). A manual ref binds alone.
      * Otherwise every piece of evidence (each resolved ref, plus an automatically cached NextMoe id)
-     * must name the same work and there must be at least two pieces; a lone or conflicting answer
+     * must name the same work. Two ids, or one id corroborated by a unique exact title, bind;
+     * a lone uncorroborated or conflicting answer
      * is only a candidate.
      */
     fun decide(
         binding: GameBinding,
         resolved: Map<String, String>,
+        titlesAgree: Boolean = false,
     ): WorkDecision {
         val manual = manualWork(binding)
         val manualRef = manualRef(binding)
@@ -70,7 +73,7 @@ object NextmoeWorkPlan {
             manual != null -> WorkDecision.Bound(manual)
             manualRef != null -> resolved[manualRef]?.let(WorkDecision::Bound) ?: WorkDecision.Unmatched
             evidence.isEmpty() -> WorkDecision.Unmatched
-            evidence.size >= 2 && evidence.distinct().size == 1 -> WorkDecision.Bound(evidence.first())
+            (evidence.size >= 2 || titlesAgree) && evidence.distinct().size == 1 -> WorkDecision.Bound(evidence.first())
             else -> WorkDecision.Candidate(evidence.first())
         }
     }

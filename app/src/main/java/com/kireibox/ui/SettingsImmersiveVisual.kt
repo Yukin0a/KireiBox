@@ -91,7 +91,7 @@ internal fun ImmersiveVisualSettingsPanel(
     // r4 S2: a search result for a detail opens 「高级选项」 so its row exists to scroll to.
     val searchTarget = LocalSettingsAnchorHost.current?.reveal?.searchTarget
     LaunchedEffect(searchTarget) {
-        if (searchTarget?.page == KireiSettingsPage.INTERFACE && searchTarget.expandAdvanced) advancedOpen = true
+        if (searchTarget?.page == KireiSettingsPage.APPEARANCE && searchTarget.expandAdvanced) advancedOpen = true
     }
     ImmersiveGlobalHints(state, visual, colors, viewModel)
     KireiListGroup(colors, groupSpacing, title = "视觉效果", footer = immersivePresetFooter(lowRam)) {

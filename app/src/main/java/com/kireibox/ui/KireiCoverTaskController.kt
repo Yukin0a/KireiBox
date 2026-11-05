@@ -74,7 +74,7 @@ internal class KireiCoverTaskController(host: KireiViewModel) : KireiViewModelCo
         val task = mutableState.value.coverQueue.tasks.firstOrNull { it.gameId == gameId } ?: return
         if (task.status != CoverTaskStatus.NEEDS_REVIEW) return
         val game = mutableState.value.games.firstOrNull { it.id == gameId } ?: return
-        val order = CoverSourcePriority.searchOrder { accounts.canSearch(it) }
+        val order = CoverSourcePriority.savedOrder(hostApplication).filter { accounts.canSearch(it) }
         val candidates =
             CoverCandidateEvidence.decorate(
                 query = game.title.orEmpty(),

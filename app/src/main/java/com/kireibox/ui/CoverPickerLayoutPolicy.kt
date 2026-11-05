@@ -92,7 +92,6 @@ internal object CoverPickerLayoutPolicy {
         when {
             allUnreachable -> KireiEmptyStateSpec("全部来源都连不上", "请检查网络后再试一次", "重新搜索")
             // The option lives in settings, so point there instead of duplicating the control here.
-            !includeAdult -> KireiEmptyStateSpec("没有找到可用封面", "「搜索结果包含成人作品」已关闭，可在「设置 › 封面与元数据」里打开", "重新搜索")
             else -> KireiEmptyStateSpec("没有找到可用封面", "换个名称再试试", "重新搜索")
         }
 }
@@ -103,11 +102,11 @@ internal object CoverVariantCaption {
         listOfNotNull(
             cover.source.takeIf { it.isNotBlank() },
             if (cover.width > 0 && cover.height > 0) "${cover.width}×${cover.height}" else null,
-            rating(cover.sexual),
+            rating(cover.sexual, cover.source),
         ).joinToString(" · ")
 
-    /** VNDB-style rating (safe / suggestive / explicit, or 0–2); unknown ratings are not shown. */
-    fun rating(sexual: String): String? {
+    /** Image rating is separate from game age rating; suggestive may include censored nudity. */
+    fun rating(sexual: String, source: String = "vndb"): String? {
         val level =
             when (sexual.trim().lowercase()) {
                 "safe" -> 0.0
@@ -116,10 +115,11 @@ internal object CoverVariantCaption {
                 else -> sexual.trim().toDoubleOrNull()
             }
         return when {
-            level == null -> null
-            level < .5 -> "全年龄"
-            level < 1.5 -> "轻微暗示"
-            else -> "成人向"
+            level == null || !level.isFinite() || level !in 0.0..2.0 -> "封面未评级"
+            level <= .5 -> "封面无性暗示"
+            source.trim().lowercase() !in setOf("vndb", "hikarinagi") -> "来源评级未核实 · 不自动模糊"
+            level < com.yuki.yukihub.metadata.policy.NsfwCoverPolicy.EXPLICIT_THRESHOLD -> "封面 NSFW · 性暗示"
+            else -> "封面 NSFW · 露骨"
         }
     }
 }

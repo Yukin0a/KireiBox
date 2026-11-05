@@ -55,10 +55,10 @@ class SettingsSearchTest {
         // Same length → index order: page entries precede effects, so 封面来源账号 comes before the
         // 封面缓慢推拉 effect.
         val covers = titles("封面")
-        assertEquals(listOf("封面与元数据", "封面来源账号"), covers.take(2))
+        assertEquals(listOf("封面", "封面来源"), covers.take(2))
         // Among keyword matches, settings that live on the 封面与元数据 page come before effects
         // that merely mention covers (背景样式 · 封面虚化).
-        assertTrue(covers.indexOf(COVER_STRICT_MATCH_TITLE) < covers.indexOf("背景样式"))
+        assertTrue(covers.indexOf("模糊成人内容封面") < covers.indexOf("背景样式"))
     }
 
     @Test
@@ -70,16 +70,14 @@ class SettingsSearchTest {
         assertEquals("配色 → 强调色", "强调色", titles("配色").first())
         assertEquals("强调色", titles("樱粉").first())
         val blur = titles("模糊")
-        assertTrue("模糊 → 减少透明度: $blur", "减少透明度" in blur)
+        assertFalse("removed transparency option is not searchable", "减少透明度" in blur)
         assertEquals("a title match outranks the 减少透明度 keyword", "模糊成人内容封面", blur.first())
-        assertTrue(blur.indexOf("模糊成人内容封面") < blur.indexOf("减少透明度"))
-        assertEquals("减少透明度", titles("毛玻璃").first())
         assertEquals("动画效果", titles("动效").first())
         assertEquals("屏幕方向", titles("旋转").first())
         assertEquals("屏幕方向", titles("横屏").first())
         assertEquals("氛围粒子", titles("雪花").first())
         assertEquals("陀螺仪视差", titles("视差").first())
-        assertEquals("首页", titles("首页与沉浸式").first())
+        assertEquals("首页样式", titles("首页与沉浸式").first())
         assertEquals(QUICK_SETUP_TITLE, titles("引导").first())
         assertEquals("日志与诊断", titles("日志").first())
         assertEquals("日志与诊断", titles("崩溃").first())
@@ -96,16 +94,16 @@ class SettingsSearchTest {
         assertEquals(krkr, titles("krkr"))
         assertEquals("KRKR 引擎设置", titles("吉里吉里").first())
         assertEquals("KRKR 引擎设置", titles("Kirikiri").first())
-        assertEquals("仅 Wi-Fi 自动匹配", titles("wifi").first())
+        assertTrue("removed Wi-Fi control is not searchable", titles("wifi").isEmpty())
         assertEquals("主题", titles("dark").first())
-        assertEquals("减少透明度", titles("blur").first())
+        assertEquals("背景样式", titles("blur").first())
         assertEquals("Bangumi", titles("bangumi").first())
-        assertEquals("Bangumi 镜像地址", titles("bangumi").getOrNull(1))
+        assertFalse(titles("bangumi").contains("Bangumi 镜像地址"))
         assertEquals("检查更新", titles("update").first())
         assertEquals("3D 深度", titles("3d").first())
         // English keywords never match inside unrelated words: 「login」 is no 「log」.
         assertFalse("日志与诊断" in titles("login"))
-        assertEquals(settingsPageTitle(KireiSettingsPage.COVER_ACCOUNTS), titles("login").first())
+        assertEquals("封面来源账号", titles("login").first())
     }
 
     @Test
@@ -116,8 +114,8 @@ class SettingsSearchTest {
         assertTrue("背景样式" in cover)
         // 「blur」: the glass, the cover-blur backdrop and the adult-cover blur.
         val blur = titles("blur")
-        assertTrue(listOf("减少透明度", "背景样式", "模糊成人内容封面").all { it in blur })
-        assertTrue(titles("模糊").containsAll(listOf("减少透明度", "模糊成人内容封面")))
+        assertTrue(listOf("背景样式", "模糊成人内容封面").all { it in blur })
+        assertTrue(titles("模糊").containsAll(listOf("模糊成人内容封面")))
     }
 
     @Test
@@ -141,12 +139,12 @@ class SettingsSearchTest {
         val accent = entries.single { it.title == "强调色" }
         assertEquals(SettingsSearchTarget(KireiSettingsPage.APPEARANCE, "强调色"), settingsSearchTarget(accent, HomePresentationMode.COMPONENTS))
         val grain = entries.single { it.title == "胶片颗粒" }
-        assertEquals(SettingsSearchTarget(KireiSettingsPage.INTERFACE, "胶片颗粒", expandAdvanced = true), settingsSearchTarget(grain, HomePresentationMode.IMMERSIVE))
+        assertEquals(SettingsSearchTarget(KireiSettingsPage.APPEARANCE, "胶片颗粒", expandAdvanced = true), settingsSearchTarget(grain, HomePresentationMode.IMMERSIVE))
         // Without the immersive home the row does not exist: lead to the switch that brings it back.
-        val homeStyle = SettingsSearchTarget(KireiSettingsPage.INTERFACE, SettingsSearchIndex.HOME_STYLE_ANCHOR)
+        val homeStyle = SettingsSearchTarget(KireiSettingsPage.APPEARANCE, SettingsSearchIndex.HOME_STYLE_ANCHOR)
         assertEquals(homeStyle, settingsSearchTarget(grain, HomePresentationMode.COMPONENTS))
         val playTime = entries.single { it.title == "显示游玩时长" }
-        assertEquals(SettingsSearchTarget(KireiSettingsPage.INTERFACE, "显示游玩时长"), settingsSearchTarget(playTime, HomePresentationMode.IMMERSIVE))
+        assertEquals(SettingsSearchTarget(KireiSettingsPage.APPEARANCE, "显示游玩时长"), settingsSearchTarget(playTime, HomePresentationMode.IMMERSIVE))
         assertEquals(homeStyle, settingsSearchTarget(playTime, HomePresentationMode.COMPONENTS))
         // A page result opens the page itself (no row to find).
         val covers = entries.single { it.anchor == null && it.page == KireiSettingsPage.COVERS }
@@ -155,11 +153,11 @@ class SettingsSearchTest {
 
     @Test
     fun resultSubtitlesSayWhereASettingLives() {
-        val reduce = entries.single { it.title == "减少透明度" }
+        val reduce = entries.single { it.title == "屏幕方向" }
         assertEquals("外观 › 显示", settingsSearchSubtitle(reduce, HomePresentationMode.IMMERSIVE))
         val grain = entries.single { it.title == "胶片颗粒" }
-        assertEquals("首页 › 高级选项 › 背景", settingsSearchSubtitle(grain, HomePresentationMode.IMMERSIVE))
-        assertEquals("首页 › 高级选项 › 背景 · 需使用沉浸式首页", settingsSearchSubtitle(grain, HomePresentationMode.COMPONENTS))
+        assertEquals("外观 › 首页 › 高级选项 › 背景", settingsSearchSubtitle(grain, HomePresentationMode.IMMERSIVE))
+        assertEquals("外观 › 首页 › 高级选项 › 背景 · 需使用沉浸式首页", settingsSearchSubtitle(grain, HomePresentationMode.COMPONENTS))
         val appearance = entries.single { it.anchor == null && it.page == KireiSettingsPage.APPEARANCE }
         assertEquals("a page shows the group it sits in", "设置 › 个性化", settingsSearchSubtitle(appearance, HomePresentationMode.IMMERSIVE))
     }

@@ -109,8 +109,8 @@ class CoverPickerLayoutPolicyTest {
         assertEquals("重新搜索", unreachable.actionLabel)
         val adult = CoverPickerLayoutPolicy.emptyState(allUnreachable = false, includeAdult = false)
         assertEquals("没有找到可用封面", adult.title)
-        assertTrue(adult.message!!.contains("「搜索结果包含成人作品」"))
-        assertTrue("the hint names the row as it is titled", UiSourceFiles.file("SettingsCoverPages.kt").contains("SwitchRow(\"搜索结果包含成人作品\""))
+        assertEquals("换个名称再试试", adult.message)
+        assertFalse("removed adult search option stays hidden", UiSourceFiles.file("SettingsCoverPages.kt").contains("SwitchRow(\"搜索结果包含成人作品\""))
         assertFalse(CoverPickerLayoutPolicy.emptyState(allUnreachable = false, includeAdult = true).message!!.contains("成人"))
 
         val failed = CoverSearchUi(sourceHits = mapOf(CoverSourceMode.BANGUMI to 0, CoverSourceMode.VNDB to 0), sourceFailed = setOf(CoverSourceMode.BANGUMI, CoverSourceMode.VNDB))
@@ -121,15 +121,17 @@ class CoverPickerLayoutPolicyTest {
 
     @Test
     fun coverVersionCaptionsUsePlainWords() {
-        assertEquals("VNDB · 1200×1600 · 全年龄", CoverVariantCaption.text(MetadataCover("u", 1200, 1600, "VNDB", "safe")))
-        assertEquals("Hikarinagi · 轻微暗示", CoverVariantCaption.text(MetadataCover("u", 0, 0, "Hikarinagi", "suggestive")))
-        assertEquals("800×1000", CoverVariantCaption.text(MetadataCover("u", 800, 1000, "", "unknown")))
-        assertEquals("成人向", CoverVariantCaption.rating("explicit"))
-        assertEquals("成人向", CoverVariantCaption.rating("2"))
-        assertEquals("轻微暗示", CoverVariantCaption.rating("1.2"))
-        assertEquals("全年龄", CoverVariantCaption.rating("0"))
-        assertNull(CoverVariantCaption.rating("unknown"))
-        assertEquals("", CoverVariantCaption.text(MetadataCover("u")))
+        assertEquals("VNDB · 1200×1600 · 封面无性暗示", CoverVariantCaption.text(MetadataCover("u", 1200, 1600, "VNDB", "safe")))
+        assertEquals("Hikarinagi · 封面 NSFW · 性暗示", CoverVariantCaption.text(MetadataCover("u", 0, 0, "Hikarinagi", "suggestive")))
+        assertEquals("800×1000 · 封面未评级", CoverVariantCaption.text(MetadataCover("u", 800, 1000, "", "unknown")))
+        assertEquals("封面 NSFW · 露骨", CoverVariantCaption.rating("explicit"))
+        assertEquals("封面 NSFW · 露骨", CoverVariantCaption.rating("2"))
+        assertEquals("封面 NSFW · 性暗示", CoverVariantCaption.rating("1.2"))
+        assertEquals("封面无性暗示", CoverVariantCaption.rating("0"))
+        assertEquals("封面未评级", CoverVariantCaption.rating("unknown"))
+        assertEquals("来源评级未核实 · 不自动模糊", CoverVariantCaption.rating("suggestive", "ai_redraw"))
+        assertEquals("来源评级未核实 · 不自动模糊", CoverVariantCaption.rating("explicit", "bangumi"))
+        assertEquals("封面未评级", CoverVariantCaption.text(MetadataCover("u")))
     }
 
     @Test

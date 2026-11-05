@@ -7,6 +7,45 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class YukiSettingsStoreTest {
+    @Test fun `simplified launcher migrates removed cover choices once without changing manual blur`() {
+        val prefs = fakePrefs()
+        prefs.edit().putString(YukiSettingsStore.KEY_METADATA_SOURCE, "vndb")
+            .putBoolean(YukiSettingsStore.KEY_COVER_HYBRID_AUTO_MATCH, false)
+            .putBoolean(YukiSettingsStore.KEY_COVER_STRICT_L2, true)
+            .putBoolean(YukiSettingsStore.KEY_COVER_AUTO_MATCH_WIFI_ONLY, true).apply()
+        val store = YukiSettingsStore(prefs)
+        store.setNsfwBlurEnabled(false)
+        store.markNsfwDetected(17)
+        store.applySimplifiedCoverDefaults()
+        val first = store.snapshot()
+        assertEquals("nextmoe", first.metadataSource)
+        assertTrue(first.coverHybridAutoMatch)
+        assertFalse(first.coverStrictL2)
+        assertFalse(first.coverAutoMatchWifiOnly)
+        assertFalse(first.nsfwBlurEnabled)
+        assertTrue(store.wasNsfwDetected(17))
+        assertFalse(store.followsAutomaticCoverRating(17))
+        prefs.edit().putString(YukiSettingsStore.KEY_METADATA_SOURCE, "bangumi").apply()
+        store.applySimplifiedCoverDefaults()
+        assertEquals("bangumi", store.snapshot().metadataSource)
+    }
+
+
+    @Test fun `default source is anonymous NextMoe and an explicit Bangumi choice survives`() {
+        val prefs = fakePrefs()
+        assertEquals("nextmoe", YukiSettingsStore(prefs).snapshot().metadataSource)
+        prefs.edit().putString(YukiSettingsStore.KEY_METADATA_SOURCE, "bangumi").apply()
+        assertEquals("bangumi", YukiSettingsStore(prefs).snapshot().metadataSource)
+    }
+    @Test fun `manual nsfw choice overrides automatic image tracking`() {
+        val store = YukiSettingsStore(fakePrefs())
+        store.markAutomaticCoverRating(1)
+        assertTrue(store.followsAutomaticCoverRating(1))
+        store.markNsfwDetected(1)
+        assertFalse(store.followsAutomaticCoverRating(1))
+        assertTrue(store.wasNsfwDetected(1))
+    }
+
     // --- In-memory fake SharedPreferences for JVM round-trip tests ---
 
     private fun fakePrefs(): SharedPreferences {
@@ -131,9 +170,13 @@ class YukiSettingsStoreTest {
         listOf("vndb", "bangumi", "nextmoe", "hikarinagi").forEach {
             assertEquals(it, YukiSettingsStore.normalizeMetadataSource(it))
         }
-        listOf(null, "ymgal", "bangumi_mirror", "unknown").forEach {
+        listOf("ymgal", "bangumi_mirror").forEach {
             assertEquals("bangumi", YukiSettingsStore.normalizeMetadataSource(it))
         }
+    }
+
+    @Test fun unknownSourceUsesNextmoe() {
+        listOf(null, "unknown").forEach { assertEquals("nextmoe", YukiSettingsStore.normalizeMetadataSource(it)) }
     }
 
     @Test

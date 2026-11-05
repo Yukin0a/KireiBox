@@ -30,7 +30,7 @@ import com.yuki.yukihub.sync.PlaytimeSyncStatus
 // 同步游玩时长 (doc §5.6): one row on the NextMoe account card and the overview's 上次同步 tile lead
 // here; the page holds the switch, 立即同步, and the games that wait for the user.
 
-internal const val PLAYTIME_SYNC_TITLE = "同步游玩时长"
+internal const val PLAYTIME_SYNC_TITLE = "自动同步游玩时长"
 
 /** 「3 分钟前」 for the overview tile and the status line; 「未同步」 before the first sync. */
 internal fun lastSyncLabel(
@@ -144,7 +144,7 @@ internal fun PlaytimeSyncSettings(context: SettingsPageContext) {
     val viewModel = context.viewModel
     val status = state.playtimeSync
     val connected = state.nextmoeConnected()
-    LaunchedEffect(Unit) { viewModel.loadPlaytimeAttention() }
+    LaunchedEffect(connected) { viewModel.loadPlaytimeAttention(); if(connected) viewModel.loadPlaytimePrivacy() }
     // Coming back from the cover picker (选择作品): sync at once so the pick takes effect.
     var pickerWasOpen by remember { mutableStateOf(false) }
     LaunchedEffect(state.coverSearch == null) {
@@ -161,20 +161,13 @@ internal fun PlaytimeSyncSettings(context: SettingsPageContext) {
                 viewModel.setPlaytimeSyncEnabled(it)
             }
         }
-        item {
-            val title =
-                when {
-                    !connected -> "登录 NextMoe"
-                    status.running -> "正在同步…"
-                    else -> "立即同步"
-                }
-            KireiListRow(
-                KireiListRowSpec(title = title, tone = KireiRowTone.ACTION, enabled = !status.running && (status.enabled || !connected)),
-                colors,
-                onClick = { if (connected) viewModel.syncPlaytimeNow() else viewModel.openSettingsPage(KireiSettingsPage.COVER_ACCOUNTS) },
-            )
+        if (connected && status.enabled) item {
+            KireiListRow(KireiListRowSpec(title = if (status.running) "正在同步…" else "立即同步", tone = KireiRowTone.ACTION, enabled = !status.running), colors,
+                onClick = { viewModel.syncPlaytimeNow() })
         }
+
     }
+    if (connected) CloudPlaytimeSections(state, colors, viewModel)
     val games = state.playtimeAttention.filter { it.row?.rejected == null }
     val refused = state.playtimeAttention.filter { it.row?.rejected != null }
     if (games.isNotEmpty()) {
@@ -216,7 +209,7 @@ private fun PlaytimeConfirmRow(
                 ) { viewModel.confirmPlaytimeWork(game.gameId, candidate) }
             }
         }
-    val subtitle = if (candidate == null) "没有找到对应作品 · 点按选择" else "NextMoe：${game.row?.candidateTitle?.ifBlank { null } ?: "作品 $candidate"}"
+    val subtitle = "本机 ${game.localMinutes / 60}h ${game.localMinutes % 60}m · 云端 ${game.row?.remoteMinutes ?: 0}m · " + if (candidate == null) game.row?.lastResult?.takeIf { it.startsWith("FAILED:") }?.let { "临时失败，稍后重试 · $it" } ?: "没有找到对应作品 · 点按选择" else "NextMoe：${game.row?.candidateTitle?.ifBlank { null } ?: "作品 $candidate"}"
     PlaytimeGameRow(PlaytimeRow(game, state, subtitle, trailing), colors) { viewModel.pickPlaytimeWork(game.gameId) }
 }
 

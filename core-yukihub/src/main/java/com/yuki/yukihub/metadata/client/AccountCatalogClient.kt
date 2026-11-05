@@ -181,10 +181,11 @@ class AccountCatalogClient(private val accounts: CoverAccounts) {
                 }.build()
             val remaining = (cooldown[source] ?: 0) - System.currentTimeMillis()
             if (remaining > 0) throw IOException("请求受限，请在 ${(remaining + 999) / 1000} 秒后重试")
-            val token = accounts.accessToken(source)
+            val signedIn = accounts.status.value[source]?.let { it.connected && !it.needsReauth } == true
+            val token = if (source == CoverSourceMode.NEXTMOE && !signedIn) null else accounts.accessToken(source)
             val response =
                 try {
-                    client.newCall(Request.Builder().url(url).header("Authorization", "Bearer $token").build()).execute()
+                    client.newCall(Request.Builder().url(url).apply { if (token != null) header("Authorization", "Bearer $token") }.build()).execute()
                 } catch (error: IOException) {
                     if (error is HttpClient.HttpFailure) throw error
                     if (Thread.currentThread().isInterrupted) throw java.util.concurrent.CancellationException()
@@ -205,6 +206,7 @@ class AccountCatalogClient(private val accounts: CoverAccounts) {
                     }
                     throw IOException("该作品已在目录中合并，请重新搜索")
                 }
+                if (it.code == 401 && token == null) throw IOException("NextMoe 匿名搜索暂不可用，请稍后重试")
                 if (it.code == 401 && !refreshed) {
                     accounts.accessToken(source, forceRefresh = true, rejectedToken = token)
                     refreshed = true
@@ -418,16 +420,10 @@ class AccountCatalogClient(private val accounts: CoverAccounts) {
                         .take(NEXTMOE_TAG_LIMIT)
                         .joinToString("  ")
 
-                // covers[] needs an explicit include; the elected `cover`/`banner` slots are the
-                // fallback and add the landscape variant the portrait-first sort would otherwise miss.
-                val images =
-                    objects(row.optJSONArray("covers")) +
-                        listOfNotNull(row.optJSONObject("cover"), row.optJSONObject("banner"))
-                covers +=
-                    images.mapNotNull(MetadataCover::fromJson).distinctBy { it.url }.sortedWith(
-                        compareByDescending<MetadataCover> { it.height > it.width && it.width > 0 }
-                            .thenByDescending { it.width.toLong() * it.height },
-                    )
+                // The elected cover is the site's actual default; gallery order/size is unrelated.
+                val images = listOfNotNull(row.optJSONObject("cover")) +
+                    objects(row.optJSONArray("covers")).sortedWith(compareByDescending<JSONObject> { it.optInt("height") > it.optInt("width") && it.optInt("width") > 0 }.thenByDescending { it.optInt("width").toLong() * it.optInt("height") }) + listOfNotNull(row.optJSONObject("banner"))
+                covers += images.mapNotNull(MetadataCover::fromJson).distinctBy { it.url }
                 covers.firstOrNull()?.let { cover ->
                     coverUrl = cover.url
                     fullCoverUrl = cover.url

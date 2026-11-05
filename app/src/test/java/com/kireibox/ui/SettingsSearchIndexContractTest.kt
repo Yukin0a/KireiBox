@@ -47,7 +47,7 @@ class SettingsSearchIndexContractTest {
         entries.groupBy { it.page }.forEach { (page, onPage) ->
             assertEquals("$page: unique titles", onPage.size, onPage.map { it.title }.toSet().size)
         }
-        KireiSettingsPage.entries.filter { it != KireiSettingsPage.ROOT }.forEach { page ->
+        KireiSettingsPage.entries.filter { it !in setOf(KireiSettingsPage.ROOT, KireiSettingsPage.INTERFACE, KireiSettingsPage.LIBRARY_HUB) }.forEach { page ->
             assertEquals("$page has one page entry", 1, entries.count { it.page == page && it.anchor == null })
         }
         entries.forEach { entry ->
@@ -86,7 +86,7 @@ class SettingsSearchIndexContractTest {
         // The exclusions are real rows, so the list cannot rot.
         val rendered = rows.map { it.second }.toSet()
         excludedRows.keys.forEach { assertTrue("excluded 「$it」 still exists", it in rendered) }
-        assertTrue("the strict-matching switch is indexed by its constant", COVER_STRICT_MATCH_TITLE in indexed)
+        assertFalse("removed strict matching is not searchable", COVER_STRICT_MATCH_TITLE in indexed)
         assertTrue(UiSourceFiles.file("ImmersiveHomeStates.kt").contains("title = \"${SettingsSearchIndex.HOME_STYLE_ANCHOR}\""))
     }
 
@@ -123,7 +123,7 @@ class SettingsSearchIndexContractTest {
     fun resultTilesMatchTheRootCategoryRows() {
         val root = UiSourceFiles.file("SettingsRootPage.kt")
         val rows = Regex("""SettingsCategoryRow\(\s*KireiSettingsPage\.(\w+),\s*SettingsCategoryRowSpec\(\s*Icons\.Rounded\.(\w+),[\s\S]*?KireiTileColor\.(\w+)""").findAll(root).toList()
-        assertEquals("nine root category rows", 9, rows.size)
+        assertEquals("six root category rows", 6, rows.size)
         rows.forEach { row ->
             val (page, icon, tile) = row.destructured
             val (resultIcon, resultTile) = settingsSearchPageVisual(KireiSettingsPage.valueOf(page))
@@ -200,13 +200,13 @@ class SettingsSearchIndexContractTest {
         // View-model members are indented: cut each body at its own closing brace.
         fun member(name: String) = viewModel.substring(viewModel.indexOf("fun $name(")).substringBefore("\n        }\n")
         // The root's 来源账号 row and the cover picker use the same shortcut, so back lands on the root too.
-        assertTrue(member("openSettingsShortcut").contains("settingsShortcutOrigin = page"))
+        assertTrue(member("openSettingsShortcut").contains("settingsShortcutOrigin = KireiBackPolicy.canonicalSettingsPage(page)"))
         assertTrue(member("navigateUpSettings").contains("KireiBackPolicy.settingsBackTarget(mutableState.value.settingsPage, settingsShortcutOrigin)"))
         assertTrue("any other navigation forgets the origin", member("openSettingsPage").contains("settingsShortcutOrigin = null"))
         assertTrue(member("selectTab").contains("settingsShortcutOrigin = null"))
         assertTrue("快速设置 opens its sheet", open.contains("if (entry.anchor == SettingsSearchIndex.QUICK_SETUP_ANCHOR) {"))
         val scaffold = UiSourceFiles.file("SettingsScaffold.kt")
-        assertTrue("each page hosts its anchors", scaffold.contains("CompositionLocalProvider(LocalSettingsAnchorHost provides host)"))
+        assertTrue("each page hosts its anchors", scaffold.contains("CompositionLocalProvider(LocalSettingsAnchorHost provides host, LocalCompactSettingsRows provides true)"))
         assertTrue(UiSourceFiles.file("SettingsPages.kt").contains("onBack = viewModel::navigateUpSettings, page = page)"))
         val anchors = UiSourceFiles.file("SettingsSearchAnchors.kt")
         val anchor = functionBody(anchors, "SettingsAnchor")
@@ -232,7 +232,7 @@ class SettingsSearchIndexContractTest {
         assertTrue("stale targets are dropped", functionBody(anchors, "rememberSettingsAnchorHost").contains("context.reveal.consumeSearchTarget(target)"))
         // 高级选项 opens itself for a detail result, so the row exists to scroll to.
         val panel = functionBody(UiSourceFiles.file("SettingsImmersiveVisual.kt"), "ImmersiveVisualSettingsPanel")
-        assertTrue(panel.contains("if (searchTarget?.page == KireiSettingsPage.INTERFACE && searchTarget.expandAdvanced) advancedOpen = true"))
+        assertTrue(panel.contains("if (searchTarget?.page == KireiSettingsPage.APPEARANCE && searchTarget.expandAdvanced) advancedOpen = true"))
     }
 
     @Test
@@ -281,11 +281,13 @@ class SettingsSearchIndexContractTest {
             KireiSettingsPage.APPEARANCE ->
                 functionBody(UiSourceFiles.file("SettingsAppearancePage.kt"), "AppearanceSettings") +
                     functionBody(UiSourceFiles.file("SettingsComponents.kt"), "MotionModeRow") +
-                    functionBody(UiSourceFiles.file("SettingsComponents.kt"), "OrientationModeRow")
+                    functionBody(UiSourceFiles.file("SettingsComponents.kt"), "OrientationModeRow") +
+                    functionBody(library, "InterfaceSettings") + functionBody(UiSourceFiles.file("ImmersiveHomeStates.kt"), "HomePresentationModeRow") +
+                    UiSourceFiles.file("SettingsHomePage.kt") + UiSourceFiles.file("SettingsImmersiveVisual.kt")
             KireiSettingsPage.INTERFACE ->
                 functionBody(library, "InterfaceSettings") + functionBody(UiSourceFiles.file("ImmersiveHomeStates.kt"), "HomePresentationModeRow") +
                     UiSourceFiles.file("SettingsHomePage.kt") + UiSourceFiles.file("SettingsImmersiveVisual.kt")
-            KireiSettingsPage.LIBRARY_HUB -> functionBody(library, "LibraryHubSettings")
+            KireiSettingsPage.LIBRARY_HUB -> functionBody(library, "PermissionSettings")
             KireiSettingsPage.LIBRARY -> functionBody(library, "LibrarySettings") + functionBody(library, "ScanRootGroup")
             KireiSettingsPage.PERMISSIONS -> functionBody(library, "PermissionSettings")
             KireiSettingsPage.COVERS -> UiSourceFiles.file("SettingsCoverPages.kt")

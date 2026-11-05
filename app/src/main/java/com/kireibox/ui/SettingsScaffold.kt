@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.kireibox.designsystem.KireiColors
 import com.kireibox.designsystem.KireiSpacing
+import com.kireibox.designsystem.components.LocalCompactSettingsRows
 import com.kireibox.designsystem.components.KireiLargeTitle
 import com.kireibox.designsystem.components.KireiLargeTopBar
 import com.kireibox.designsystem.components.KireiTopBarDefaults
@@ -115,7 +116,7 @@ internal data class SettingsLayoutSpec(
 )
 
 /** Vertical rhythm between list groups (spec §4: 24dp). */
-internal val SettingsGroupSpacing: Modifier = Modifier.padding(bottom = KireiSpacing.groupGap)
+internal val SettingsGroupSpacing: Modifier = Modifier.padding(bottom = 16.dp)
 
 /** Extra room between the large title and the first group caption (the title already adds xs). */
 private val SettingsTitleGap = KireiSpacing.sm
@@ -144,7 +145,7 @@ internal fun SettingsPageScaffold(
                 maxContentWidth = adaptiveMetrics.settingsContentWidthDp.dp,
             )
         val host = rememberSettingsAnchorHost(header.page, context, scroll, frame)
-        CompositionLocalProvider(LocalSettingsAnchorHost provides host) {
+        CompositionLocalProvider(LocalSettingsAnchorHost provides host, LocalCompactSettingsRows provides true) {
             SettingsLargeTitleLayout(SettingsLayoutSpec(header, frame, context.haze), context.colors, scroll, content)
         }
     }

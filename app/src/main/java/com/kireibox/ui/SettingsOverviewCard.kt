@@ -61,8 +61,8 @@ internal fun SettingsOverviewCard(
         Modifier.fillMaxWidth()
             .background(colors.surface, KireiShapes.lg)
             .border(KireiElevation.strokeWidth, colors.stroke, KireiShapes.lg)
-            .padding(KireiSpacing.md),
-        verticalArrangement = Arrangement.spacedBy(KireiSpacing.sm),
+            .padding(KireiSpacing.sm),
+        verticalArrangement = Arrangement.spacedBy(KireiSpacing.xs),
     ) {
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             // Narrow cards and large text put 同步数据 under the name, so it never clips the version.

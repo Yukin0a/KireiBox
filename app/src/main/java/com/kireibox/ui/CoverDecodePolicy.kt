@@ -29,7 +29,7 @@ internal object CoverDecodePolicy {
     const val HERO_MAX_WIDTH_PX = 1_080
     const val HERO_MAX_HEIGHT_PX = 1_620
 
-    /** Immersive backdrop caps both dimensions near 720 so the short edge never exceeds it. */
+    /** Baseline backdrop cap; devices with a larger heap may request up to 1080 per edge. */
     const val BACKDROP_MAX_EDGE_PX = 720
     const val MAX_PARALLEL_DECODES = 2
     const val MAX_NETWORK_BYTES = 8L * 1024L * 1024L
@@ -42,20 +42,26 @@ internal object CoverDecodePolicy {
         componentHeightPx: Int,
         blurred: Boolean = false,
         sourceKey: String = "",
+        memoryClassMb: Int = 128,
+        lowRamDevice: Boolean = false,
     ): CoverImageRequest {
+        val highResolution = !lowRamDevice && memoryClassMb >= 256
+        val heroWidth = if (highResolution) 1_440 else HERO_MAX_WIDTH_PX
+        val heroHeight = if (highResolution) 2_160 else HERO_MAX_HEIGHT_PX
+        val backdropEdge = if (highResolution) 1_080 else BACKDROP_MAX_EDGE_PX
         val targetWidth =
             when (role) {
                 CoverImageRole.THUMBNAIL -> TARGET_WIDTH_PX
                 CoverImageRole.LIBRARY_CARD -> componentWidthPx.coerceIn(1, LIBRARY_CARD_MAX_WIDTH_PX)
-                CoverImageRole.HERO -> componentWidthPx.coerceIn(1, HERO_MAX_WIDTH_PX)
-                CoverImageRole.IMMERSIVE_BACKDROP -> componentWidthPx.coerceIn(1, BACKDROP_MAX_EDGE_PX)
+                CoverImageRole.HERO -> componentWidthPx.coerceIn(1, heroWidth)
+                CoverImageRole.IMMERSIVE_BACKDROP -> componentWidthPx.coerceIn(1, backdropEdge)
             }
         val targetHeight =
             when (role) {
                 CoverImageRole.THUMBNAIL -> TARGET_HEIGHT_PX
                 CoverImageRole.LIBRARY_CARD -> componentHeightPx.coerceIn(1, LIBRARY_CARD_MAX_HEIGHT_PX)
-                CoverImageRole.HERO -> componentHeightPx.coerceIn(1, HERO_MAX_HEIGHT_PX)
-                CoverImageRole.IMMERSIVE_BACKDROP -> componentHeightPx.coerceIn(1, BACKDROP_MAX_EDGE_PX)
+                CoverImageRole.HERO -> componentHeightPx.coerceIn(1, heroHeight)
+                CoverImageRole.IMMERSIVE_BACKDROP -> componentHeightPx.coerceIn(1, backdropEdge)
             }
         return CoverImageRequest(
             uri = uri,
@@ -98,7 +104,7 @@ internal object CoverDecodePolicy {
         request: CoverImageRequest
     ): Int? =
         when (request.role) {
-            CoverImageRole.LIBRARY_CARD ->
+            CoverImageRole.LIBRARY_CARD, CoverImageRole.HERO ->
                 coveringSampleSize(
                     width,
                     height,
@@ -179,6 +185,8 @@ internal object CoverDecodePolicy {
             if (width / next < targetWidth || height / next < targetHeight) break
             sample = next
         }
+        // Very wide/tall artwork must not allocate an unbounded crop just to fill its short edge.
+        while ((width / sample).toLong() * (height / sample) > 8_000_000L) sample *= 2
         return sample
     }
 

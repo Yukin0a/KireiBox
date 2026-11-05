@@ -58,7 +58,7 @@ data class HybridCoverProgress(
 )
 
 /** Source-neutral search/save API used by the Compose cover page. */
-class YukiMetadataService(context: Context) {
+class YukiMetadataService(private val context: Context) {
     private val accounts = com.yuki.yukihub.auth.CoverAccounts.get(context)
     private val catalog = AccountCatalogClient(accounts)
     private val repository = com.yuki.yukihub.data.MetadataRepository(context)
@@ -206,7 +206,7 @@ class YukiMetadataService(context: Context) {
         val query = keyword.trim()
         if (query.isEmpty()) return RankedCoverSearchResult(emptyList(), emptyList(), false)
         val searched = sources.toHashSet()
-        val order = CoverSourcePriority.searchOrder(connected).filter { it in searched }
+        val order = CoverSourcePriority.savedOrder(context).filter { it in searched && connected(it) }
         val attempted = LinkedHashSet<CoverSourceMode>()
         val collected = ArrayList<Pair<CoverSourceMode, RankedCoverCandidate>>()
         var lastError: Throwable? = null

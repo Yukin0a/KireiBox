@@ -49,11 +49,12 @@ internal fun rememberHeroCover(
     heightPx: Int,
 ): HeroCoverVisual? {
     if (game == null) return null
+    val context = LocalContext.current.applicationContext
     val uri = game.coverUri
     val blurred = game.nsfw && LocalNsfwBlurEnabled.current
     val cacheKey =
         remember(uri, widthPx, heightPx, blurred) {
-            coverCacheKey(uri, CoverImageRole.IMMERSIVE_BACKDROP, widthPx, heightPx, blurred)
+            coverCacheKey(uri, CoverImageRole.IMMERSIVE_BACKDROP, widthPx, heightPx, blurred, context)
         }
     val bitmap =
         rememberCover(
@@ -238,7 +239,7 @@ internal fun ImmersiveBackdropPrefetch(
         neighbours.forEach { game ->
             val blurred = game.nsfw && nsfwBlurEnabled
             val uri = game.coverUri?.takeIf { it.isNotBlank() } ?: return@forEach
-            val request = CoverDecodePolicy.request(uri, CoverImageRole.IMMERSIVE_BACKDROP, widthPx, heightPx, blurred = blurred)
+            val request = deviceCoverRequest(context, uri, CoverImageRole.IMMERSIVE_BACKDROP, widthPx, heightPx, blurred = blurred)
             val bitmap =
                 withContext(Dispatchers.IO) {
                     CoverLoads.load(request) { CoverDecodeSemaphore.withPermit { decodeSampledCover(context, request) } }

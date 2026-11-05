@@ -85,7 +85,7 @@ internal fun resolveSettingsCategoryRowMetrics(orientation: HomeOrientation): Se
     if (orientation == HomeOrientation.LANDSCAPE) {
         SettingsCategoryRowMetrics(verticalPaddingDp = 4f, minimumHeightDp = 40f, iconSizeDp = 28f)
     } else {
-        SettingsCategoryRowMetrics(verticalPaddingDp = 12f, minimumHeightDp = 64f, iconSizeDp = 34f)
+        SettingsCategoryRowMetrics(verticalPaddingDp = 6f, minimumHeightDp = 48f, iconSizeDp = 30f)
     }
 
 /** Applies the root category metrics to a list row (padding, minimum height and tile size). */

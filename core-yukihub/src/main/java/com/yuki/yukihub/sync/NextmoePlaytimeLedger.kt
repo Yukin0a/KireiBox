@@ -20,6 +20,13 @@ data class PlaytimeLedgerRow(
     val rejected: String? = null,
     /** The manual NextMoe pick this binding came from; stays put when NextMoe merges the work into another id. */
     val boundFrom: String? = null,
+    val remoteMinutes: Int = 0,
+    val lastResult: String? = null,
+    val lastResultAt: Long = 0,
+    val forceWrite: Boolean = false,
+    val retryCount: Int = 0,
+    val retryAfter: Long = 0,
+    val ignoreRemoteAbove: Int? = null,
 )
 
 /** A game with at least one played minute, with its ledger row under the current account (null = never seen). */
@@ -28,6 +35,16 @@ data class PlaytimeGame(
     val title: String,
     val localMinutes: Int,
     val row: PlaytimeLedgerRow?,
+    val cloudImportMs: Long = 0,
+)
+
+data class CloudPlaytimeWork(
+    val workId: String,
+    val minutes: Int,
+    val metadata: com.yuki.yukihub.metadata.model.VnMetadata? = null,
+    val gameId: Long? = null,
+    val match: String = "NONE",
+    val fetchedAt: Long = 0,
 )
 
 /** Counts for the settings status line. */
@@ -40,6 +57,10 @@ data class PlaytimeLedgerSummary(
 
 /** Where sync state lives; [NextmoePlaytimeLedger] in the app, an in-memory fake in tests. */
 interface NextmoePlaytimeStore {
+    fun cloud(account: String): List<CloudPlaytimeWork> = emptyList()
+    fun snapshot(account: String, works: List<CloudPlaytimeWork>) {}
+    fun undoImport(gameId: Long) {}
+
     /** Every game with ≥ 1 played minute, with its row for [account]. */
     fun games(account: String): List<PlaytimeGame>
 
@@ -66,7 +87,7 @@ interface NextmoePlaytimeStore {
         gameId: Long,
         account: String,
     ) {
-        val row = games(account).firstOrNull { it.gameId == gameId }?.row ?: return
+        val row = libraryGames(account).firstOrNull { it.gameId == gameId }?.row ?: return
         save(gameId, account, PlaytimeLedgerRow(uploadedMinutes = row.uploadedMinutes, uploadedWorkId = row.uploadedWorkId, staleWorkId = row.staleWorkId))
     }
 }
@@ -92,8 +113,8 @@ class NextmoePlaytimeLedger(context: Context) : NextmoePlaytimeStore {
     ) {
         // No session row: an imported total must not show up in the play-history trend or ranking.
         helper.writableDatabase.execSQL(
-            "UPDATE games SET total_play_time = MAX(IFNULL(total_play_time, 0), ?), updated_at = ? WHERE id = ?",
-            arrayOf<Any>(minutes * 60_000L, System.currentTimeMillis(), gameId),
+            "UPDATE games SET cloud_import_ms = cloud_import_ms + MAX(0, ? - IFNULL(total_play_time,0)), total_play_time = MAX(IFNULL(total_play_time, 0), ?), updated_at = ? WHERE id = ?",
+            arrayOf<Any>(minutes * 60_000L, minutes * 60_000L, System.currentTimeMillis(), gameId),
         )
     }
 
@@ -103,7 +124,7 @@ class NextmoePlaytimeLedger(context: Context) : NextmoePlaytimeStore {
     ): List<PlaytimeGame> =
         helper.readableDatabase.rawQuery(
             "SELECT g.id, g.title, g.total_play_time, s.work_id, s.candidate_id, s.candidate_title, s.uploaded_minutes, " +
-                "s.uploaded_work_id, s.stale_work_id, s.rejected, s.game_id, s.bound_from " +
+                "s.uploaded_work_id, s.stale_work_id, s.rejected, s.game_id, s.bound_from, s.remote_minutes, s.last_result, s.last_result_at, s.force_write, s.retry_count, s.retry_after, s.ignore_remote_above, g.cloud_import_ms " +
                 "FROM games g LEFT JOIN nextmoe_playtime_sync s ON s.game_id = g.id AND s.account_id = ? " +
                 // Inlined, not bound: a bound arg is TEXT and never compares as a number against an expression.
                 "WHERE IFNULL(g.total_play_time, 0) >= $minPlayTimeMs ORDER BY g.id",
@@ -124,9 +145,12 @@ class NextmoePlaytimeLedger(context: Context) : NextmoePlaytimeStore {
                                 staleWorkId = c.getStringOrNull(8),
                                 rejected = c.getStringOrNull(9),
                                 boundFrom = c.getStringOrNull(11),
+                                remoteMinutes = c.getInt(12), lastResult = c.getStringOrNull(13), lastResultAt = c.getLong(14),
+                                forceWrite = c.getInt(15) != 0, retryCount = c.getInt(16), retryAfter = c.getLong(17),
+                                ignoreRemoteAbove = if (c.isNull(18)) null else c.getInt(18),
                             )
                         }
-                    add(PlaytimeGame(c.getLong(0), c.getString(1).orEmpty(), localMinutes(c.getLong(2)), row))
+                    add(PlaytimeGame(c.getLong(0), c.getString(1).orEmpty(), localMinutes(c.getLong(2)), row, c.getLong(19)))
                 }
             }
         }
@@ -167,8 +191,37 @@ class NextmoePlaytimeLedger(context: Context) : NextmoePlaytimeStore {
                 put("stale_work_id", row.staleWorkId)
                 put("rejected", row.rejected)
                 put("bound_from", row.boundFrom)
+                put("remote_minutes", row.remoteMinutes)
+                put("last_result", row.lastResult)
+                put("last_result_at", row.lastResultAt)
+                put("force_write", if (row.forceWrite) 1 else 0)
+                put("retry_count", row.retryCount)
+                put("retry_after", row.retryAfter)
+                put("ignore_remote_above", row.ignoreRemoteAbove)
             }
         helper.writableDatabase.insertWithOnConflict(TABLE, null, values, SQLiteDatabase.CONFLICT_REPLACE)
+    }
+
+    override fun cloud(account: String): List<CloudPlaytimeWork> = helper.readableDatabase.rawQuery(
+        "SELECT work_id, minutes, metadata, game_id, match, fetched_at FROM nextmoe_cloud_works WHERE account_id=? ORDER BY minutes DESC", arrayOf(account)
+    ).use { c -> buildList { while(c.moveToNext()) add(CloudPlaytimeWork(c.getString(0), c.getInt(1), com.yuki.yukihub.metadata.model.VnMetadata.fromJson(c.getStringOrNull(2)), if(c.isNull(3)) null else c.getLong(3), c.getString(4), c.getLong(5))) } }
+
+    override fun snapshot(account: String, works: List<CloudPlaytimeWork>) {
+        val db = helper.writableDatabase
+        db.beginTransaction()
+        try {
+            db.delete("nextmoe_cloud_works", "account_id=?", arrayOf(account))
+            works.forEach { work -> db.insertOrThrow("nextmoe_cloud_works", null, ContentValues().apply {
+                put("account_id", account); put("work_id", work.workId); put("minutes", work.minutes)
+                put("metadata", work.metadata?.toJson()?.toString()); put("game_id", work.gameId)
+                put("match", work.match); put("fetched_at", work.fetchedAt)
+            }) }
+            db.setTransactionSuccessful()
+        } finally { db.endTransaction() }
+    }
+
+    override fun undoImport(gameId: Long) {
+        helper.writableDatabase.execSQL("UPDATE games SET total_play_time=MAX(0,IFNULL(total_play_time,0)-cloud_import_ms), cloud_import_ms=0 WHERE id=?", arrayOf(gameId))
     }
 
     companion object {
@@ -185,8 +238,9 @@ class NextmoePlaytimeLedger(context: Context) : NextmoePlaytimeStore {
             games.forEach { game ->
                 val row = game.row
                 when {
-                    row?.rejected != null -> rejected++
+                    row?.rejected != null || row?.lastResult?.startsWith("FAILED:") == true -> rejected++
                     row != null && row.workId == null -> confirm++
+                    row?.forceWrite == true -> waiting++
                     row?.workId != null && game.localMinutes <= row.uploadedMinutes -> synced++
                     else -> waiting++
                 }

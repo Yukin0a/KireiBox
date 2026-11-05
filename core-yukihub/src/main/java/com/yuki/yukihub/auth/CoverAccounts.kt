@@ -93,7 +93,7 @@ class CoverAccounts private constructor(context: Context) {
      * source hides them while this is off, so the default-off behaviour made the cover picker look
      * broken (e.g. Riddle Joker returned nothing). NSFW covers are still blurred by default.
      */
-    fun includesAdult() = settings.getBoolean("cover_include_adult", true)
+    fun includesAdult() = true
 
     fun setIncludesAdult(value: Boolean) {
         settings.edit().putBoolean("cover_include_adult", value).apply()
@@ -188,7 +188,7 @@ class CoverAccounts private constructor(context: Context) {
         accountId: String = "",
         avatarUrl: String = "",
     ) {
-        require(source.requiresLogin && token.isNotBlank() && refresh.isNotBlank()) { "授权响应缺少令牌，请重新登录" }
+        require(source.supportsOAuth && token.isNotBlank() && refresh.isNotBlank()) { "授权响应缺少令牌，请重新登录" }
         synchronized(locks.getValue(source)) {
             checkGeneration(source, epoch)
             // A token refresh preserves the identity/avatar already stored; only a fresh login passes them.

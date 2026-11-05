@@ -139,7 +139,7 @@ class CoverLoginActivity : ComponentActivity() {
             return
         }
         val id = CoverOAuthConfig.clientId(source)
-        if (!source.requiresLogin || id.isBlank()) {
+        if (!source.supportsOAuth || id.isBlank()) {
             complete(false, "此测试包尚未配置 ${source.label} 客户端，暂不能登录")
             return
         }

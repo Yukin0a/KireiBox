@@ -43,7 +43,7 @@ class SettingsIaStructureTest {
 
     @Test
     fun everyAppWideSettingIsWiredFromExactlyOnePageAndThatPageIsAppearance() {
-        listOf("setThemeMode", "setAccentChoice", "setMotionMode", "setReducedTransparency", "setContrast", "setOrientationMode").forEach { setter ->
+        listOf("setThemeMode", "setAccentChoice", "setMotionMode", "setOrientationMode").forEach { setter ->
             val sites = pageSources.flatMap { (name, text) -> List(occurrences(text, "viewModel::$setter")) { name } }
             assertEquals("viewModel::$setter is wired from exactly one settings page: $sites", listOf("SettingsAppearancePage.kt"), sites)
             assertTrue("$setter lives in AppearanceSettings", appearancePage.contains("viewModel::$setter"))
@@ -78,13 +78,13 @@ class SettingsIaStructureTest {
         val root = UiSourceFiles.file("SettingsRootPage.kt")
         val personal = functionBody(root, "SettingsPersonalGroup")
         assertEquals(
-            listOf("APPEARANCE", "INTERFACE"),
+            listOf("APPEARANCE"),
             Regex("""SettingsCategoryRow\(\s*KireiSettingsPage\.([A-Z_]+),""").findAll(personal).map { it.groupValues[1] }.toList(),
         )
         assertFalse("no inline setting on the root", Regex("""viewModel::set""").containsMatchIn(root))
         assertEquals(KireiSettingsPage.ROOT, KireiBackPolicy.settingsParent(KireiSettingsPage.INTERFACE))
         assertEquals(1, KireiBackPolicy.settingsDepth(KireiSettingsPage.INTERFACE))
-        assertTrue(UiSourceFiles.all().contains("KireiSettingsPage.INTERFACE -> InterfaceSettings(state, colors, viewModel)"))
+        assertTrue(UiSourceFiles.all().contains("KireiSettingsPage.INTERFACE -> AppearanceSettings(state, colors, viewModel)"))
         listOf("SettingsGamesGroup(", "SettingsSystemGroup(", "SettingsAboutGroup(").forEach { assertTrue(it, root.contains(it)) }
     }
 

@@ -6,9 +6,9 @@ import org.junit.Test
 
 class CoverSourcePriorityTest {
     @Test
-    fun anonymousOnlySourcesAreBangumiThenVndb() {
+    fun anonymousNextmoeLeadsBangumiAndVndb() {
         assertEquals(
-            listOf(CoverSourceMode.BANGUMI, CoverSourceMode.VNDB),
+            listOf(CoverSourceMode.NEXTMOE, CoverSourceMode.BANGUMI, CoverSourceMode.VNDB),
             CoverSourcePriority.searchOrder { false },
         )
     }

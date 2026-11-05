@@ -28,7 +28,7 @@ class Alpha15V23ContractTest {
         val hub = source.substringAfter("fun LibraryHubSettings(").substringBefore("fun InterfaceSettings(")
         val scan = source.substringAfter("fun LibrarySettings(").substringBefore("fun PermissionSettings(")
 
-        assertTrue(hub.contains("\"游戏库顺序\""))
+        assertFalse(source.contains("fun LibraryHubSettings("))
         assertFalse(scan.contains("\"游戏库顺序\""))
         assertTrue(source.split("LibraryEditSortMenu(").size >= 4)
         assertTrue(source.contains("依次点按卡片，设置 1、2、3… 顺序"))

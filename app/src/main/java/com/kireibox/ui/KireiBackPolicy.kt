@@ -32,6 +32,12 @@ object KireiBackPolicy {
             else -> KireiLibraryBackAction.PAGE
         }
 
+    fun canonicalSettingsPage(page: KireiSettingsPage): KireiSettingsPage = when (page) {
+        KireiSettingsPage.INTERFACE -> KireiSettingsPage.APPEARANCE
+        KireiSettingsPage.LIBRARY_HUB -> KireiSettingsPage.PERMISSIONS
+        else -> page
+    }
+
     fun settingsParent(page: KireiSettingsPage): KireiSettingsPage? =
         when (page) {
             KireiSettingsPage.ROOT -> null
@@ -43,7 +49,7 @@ object KireiBackPolicy {
             KireiSettingsPage.PERMISSIONS,
             KireiSettingsPage.DIAGNOSTICS,
             KireiSettingsPage.ABOUT -> KireiSettingsPage.ROOT
-            KireiSettingsPage.LIBRARY -> KireiSettingsPage.LIBRARY_HUB
+            KireiSettingsPage.LIBRARY -> KireiSettingsPage.PERMISSIONS
             KireiSettingsPage.COVER_ACCOUNTS -> KireiSettingsPage.COVERS
             KireiSettingsPage.PLAYTIME_SYNC -> KireiSettingsPage.COVER_ACCOUNTS
             KireiSettingsPage.KRKR,

@@ -7,6 +7,18 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AccountCatalogClientTest {
+    @Test fun reportedNormalCoversDoNotBorrowVndbTrustFromTheNextmoeCatalog() {
+        val rows = org.json.JSONArray(javaClass.getResourceAsStream("/metadata/nsfw-reported-covers.json")!!.bufferedReader().use { it.readText() })
+        for (i in 0 until rows.length()) {
+            val row = rows.getJSONObject(i)
+            val parsed = AccountCatalogClient.parseNextmoe(row.getJSONObject("work"))
+            val restored = VnMetadata.fromJson(parsed.toJson().toString())!!
+            assertEquals(parsed.chineseTitle, row.getBoolean("shouldBlur"),
+                com.yuki.yukihub.metadata.policy.NsfwCoverPolicy.shouldAutoMark(
+                    com.yuki.yukihub.metadata.model.CoverSourceMode.NEXTMOE, restored))
+        }
+    }
+
     @Test fun nextmoeKeepsLargeIdsAndCoverProvenanceThroughPersistence() {
         val parsed =
             AccountCatalogClient.parseNextmoe(
@@ -85,7 +97,7 @@ class AccountCatalogClientTest {
         assertEquals("评分：6.9/10（1065人） · Bangumi", parsed.ratingText)
         assertEquals("奇幻  搞笑", parsed.tagsText)
         assertEquals("vndb:v19658,bangumi:302835,dlsite:RJ01012345", parsed.externalRefs)
-        assertEquals("https://example.com/portrait.jpg", parsed.coverUrl)
+        assertEquals("https://example.com/base.jpg", parsed.coverUrl)
         assertEquals(2, parsed.covers.size)
     }
 
@@ -183,5 +195,19 @@ class AccountCatalogClientTest {
                 fromWorks = listOf("947"),
             )
         assertEquals(listOf("12", "947"), merged)
+    }
+
+    @Test fun nextmoeCoverRatingFollowsElectedImageAndNeverTheWorkAgeRating() {
+        val parsed = AccountCatalogClient.parseNextmoe(JSONObject("""{
+          "id":"9","content_rating":"r18","content_limit":"nsfw",
+          "cover":{"url":"https://example.com/safe.jpg","sexual":"safe"},
+          "covers":[{"url":"https://example.com/adult.jpg","width":2000,"height":3000,"sexual":"explicit"}]
+        }"""))
+        assertEquals("https://example.com/safe.jpg", parsed.coverUrl)
+        assertEquals(0.0, parsed.coverSexual, 0.0)
+        assertEquals("explicit", parsed.covers.last().sexual)
+        val unknown = AccountCatalogClient.parseNextmoe(JSONObject("""{"id":"10","content_rating":"r18","cover":{"url":"https://example.com/unknown.jpg","sexual":null}}"""))
+        assertEquals(0.0, unknown.coverSexual, 0.0)
+        assertTrue(unknown.covers.single().sexual in listOf("null", "unknown"))
     }
 }

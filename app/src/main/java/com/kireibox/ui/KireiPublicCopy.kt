@@ -14,7 +14,7 @@ https://github.com/Yukin0a/KireiBox"""
 
     fun coverSourceDescription(source: CoverSourceMode): String =
         when (source) {
-            CoverSourceMode.NEXTMOE -> "需登录 NextMoe 账号"
+            CoverSourceMode.NEXTMOE -> "无需登录即可搜索 · 登录后可同步时长"
             CoverSourceMode.VNDB -> "公开数据，无需登录"
             CoverSourceMode.BANGUMI -> "可匿名搜索"
             CoverSourceMode.BANGUMI_MIRROR -> "历史镜像，已停止联网"

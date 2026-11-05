@@ -409,10 +409,15 @@ fun KireiBoxApp(
                                 }
                             )
                         }
+                        LaunchedEffect(showLibraryOverview) { if(showLibraryOverview) viewModel.loadPlaytimeAttention() }
                         if (showLibraryOverview) {
                             LibraryOverviewSheet(
                                 games = state.games,
                                 sort = libraryOverviewSort,
+                                playtimes = state.playtimeLibrary,
+                                cloud = state.cloudPlaytimes,
+                                blurCloudCovers = state.settings?.nsfwBlurEnabled != false,
+                                onCloud = { showLibraryOverview = false; viewModel.openSettingsPage(KireiSettingsPage.PLAYTIME_SYNC) },
                                 colors = colors,
                                 onSortChange = { libraryOverviewSort = it },
                                 onDismiss = { showLibraryOverview = false },

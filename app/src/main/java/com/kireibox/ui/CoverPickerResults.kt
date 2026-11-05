@@ -196,6 +196,9 @@ private fun CoverCandidateText(
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
+        val selectedCover = metadata.covers.firstOrNull { it.url == metadata.coverUrl }
+        val sexual = selectedCover?.sexual ?: if (candidate.source == com.yuki.yukihub.metadata.model.CoverSourceMode.VNDB) metadata.coverSexual.toString() else "unknown"
+        Text(CoverVariantCaption.rating(sexual, selectedCover?.source ?: candidate.source.key).orEmpty(), color = colors.secondary, style = AppleTypography.labelLarge)
         if (candidate.matchBadges.isNotEmpty()) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(KireiSpacing.xxs), verticalArrangement = Arrangement.spacedBy(KireiSpacing.xxs)) {
                 candidate.matchBadges.forEach { badge ->

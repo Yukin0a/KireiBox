@@ -21,6 +21,7 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -118,6 +119,8 @@ internal data class KireiListRowSpec(
     val verticalPadding: Dp = KireiSpacing.rowVerticalPadding,
 )
 
+internal val LocalCompactSettingsRows = compositionLocalOf { false }
+
 /** Metrics shared by rows and their dividers (spec §4). */
 internal object KireiListRowDefaults {
     fun minHeight(spec: KireiListRowSpec): Dp = spec.minHeight ?: if (spec.subtitle.isNullOrBlank()) KireiSpacing.rowMinHeightSingleLine else KireiSpacing.rowMinHeightTwoLine
@@ -154,6 +157,12 @@ internal fun KireiListRow(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
 ) {
+    val rowSpec = spec
+    val spec = if (LocalCompactSettingsRows.current) rowSpec.copy(
+        verticalPadding = 6.dp,
+        minHeight = if (rowSpec.subtitle.isNullOrBlank()) 48.dp else 60.dp,
+        tileSize = minOf(rowSpec.tileSize, 30.dp),
+    ) else rowSpec
     val interaction = remember { MutableInteractionSource() }
     val press = rememberPressProgress(interaction)
     val focused by interaction.collectIsFocusedAsState()

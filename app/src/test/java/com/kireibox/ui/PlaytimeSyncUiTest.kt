@@ -40,7 +40,7 @@ class PlaytimeSyncUiTest {
     @Test
     fun thePageSitsUnderTheAccountsPage() {
         assertEquals(KireiSettingsPage.COVER_ACCOUNTS, KireiBackPolicy.settingsParent(KireiSettingsPage.PLAYTIME_SYNC))
-        assertEquals("同步游玩时长", settingsPageTitle(KireiSettingsPage.PLAYTIME_SYNC))
+        assertEquals("封面", settingsPageTitle(KireiSettingsPage.PLAYTIME_SYNC))
         assertEquals("NextMoe 上找不到这部作品", playtimeRejectionReason("NOT_FOUND"))
     }
 

@@ -70,14 +70,9 @@ class KireiCoverStore(context: Context) {
                     game.coverSourceType = 1
                     game.vndbBindingMode = bindingMode
                     game.vndbMatchScore = matchScore.coerceIn(0.0, 100.0)
-                    val autoMarkedNsfw =
-                        NsfwCoverPolicy.shouldAutoMark(
-                            source = source,
-                            coverSexual = candidate.coverSexual,
-                            alreadyNsfw = game.nsfw,
-                            detectionHandled = settings.wasNsfwDetected(gameId),
-                        )
-                    if (autoMarkedNsfw) game.nsfw = true
+                    val followsImageRating = settings.followsAutomaticCoverRating(gameId) ||
+                        (!game.nsfw && !settings.wasNsfwDetected(gameId))
+                    if (followsImageRating) game.nsfw = NsfwCoverPolicy.shouldAutoMark(source, candidate)
                     game.updatedAt = System.currentTimeMillis()
                     try {
                         check(repository.update(game) == 1) { "Cover record commit failed" }
@@ -87,7 +82,7 @@ class KireiCoverStore(context: Context) {
                         final.delete()
                         throw error
                     }
-                    if (autoMarkedNsfw) settings.markNsfwDetected(gameId)
+                    if (followsImageRating) settings.markAutomaticCoverRating(gameId)
                     cleanup(directory, final, previous.coverUri)
                     uri
                 } finally {
@@ -103,11 +98,13 @@ class KireiCoverStore(context: Context) {
                 val previous = game.coverUri
                 game.coverUri = null
                 game.coverPersistUri = null
+                if (settings.followsAutomaticCoverRating(gameId)) game.nsfw = false
                 game.coverSourceType = 0
                 game.vndbBindingMode = "DISABLED"
                 game.vndbMatchScore = 0.0
                 game.updatedAt = System.currentTimeMillis()
                 check(repository.update(game) == 1) { "Default cover setting failed" }
+                if (!settings.wasNsfwDetected(gameId) || settings.followsAutomaticCoverRating(gameId)) settings.markAutomaticCoverRating(gameId)
                 val managedRoot = File(app.filesDir, "covers/yukihub").canonicalFile
                 val oldFile = previous?.let { Uri.parse(it).path }?.let(::File)
                 if (oldFile != null && oldFile.exists() && oldFile.canonicalFile.path.startsWith(managedRoot.path)) {
@@ -164,6 +161,7 @@ class KireiCoverStore(context: Context) {
                     game.coverUri = uri
                     game.coverPersistUri = uri
                     game.coverSourceType = 1
+                    if (settings.followsAutomaticCoverRating(gameId)) game.nsfw = false
                     game.vndbBindingMode = "MANUAL"
                     game.vndbMatchScore = 0.0
                     game.updatedAt = System.currentTimeMillis()
@@ -174,6 +172,7 @@ class KireiCoverStore(context: Context) {
                         final.delete()
                         throw error
                     }
+                    if (!settings.wasNsfwDetected(gameId) || settings.followsAutomaticCoverRating(gameId)) settings.markAutomaticCoverRating(gameId)
                     cleanup(directory, final, previous.coverUri)
                     uri
                 } finally {

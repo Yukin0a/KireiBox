@@ -42,7 +42,7 @@ internal class KireiCoverPickerController(host: KireiViewModel) : KireiViewModel
         val previous = mutableState.value.coverSearch?.takeIf { it.game?.id == game.id }
         val originalMode = previous?.originalBindingMode ?: game.vndbBindingMode
         val hadCover = previous?.hadCoverOnEntry ?: !game.coverUri.isNullOrBlank()
-        val primary = mutableState.value.coverSearch?.source ?: CoverSourceMode.BANGUMI
+        val primary = mutableState.value.coverSearch?.source ?: CoverSourceMode.selected(mutableState.value.settings?.metadataSource)
         // A user-opened search must always probe: the background auto-match may have parked a
         // source for its health cooldown, which would otherwise leave the picker showing every
         // source as idle and no results until the cooldown expired.
@@ -52,7 +52,7 @@ internal class KireiCoverPickerController(host: KireiViewModel) : KireiViewModel
         val hybridAutoMatch = mutableState.value.settings?.coverHybridAutoMatch != false
         val order =
             if (hybridAutoMatch) {
-                CoverSourcePriority.searchOrder { accounts.canSearch(it) }
+                CoverSourcePriority.savedOrder(hostApplication).filter { accounts.canSearch(it) }
             } else {
                 CoverSourceMode.active
             }

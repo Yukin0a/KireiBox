@@ -390,6 +390,7 @@ class PlaySessionRepository(
             }
             val v = ContentValues()
             v.put("total_play_time", safeDuration)
+            v.put("cloud_import_ms", 0L)
             v.put("last_played_at", lastPlayed)
             v.put("playtime_reset_at", now)
             v.put("updated_at", now)

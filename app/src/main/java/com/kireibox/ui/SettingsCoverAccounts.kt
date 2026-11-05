@@ -58,7 +58,7 @@ import com.yuki.yukihub.metadata.model.CoverSourceMode
 // account-backed cover source with its avatar, status chip and the 登录 / 设置令牌 / 退出 buttons.
 // Signing out always asks first.
 
-/** Cover sources that have an account (Bangumi works anonymously; the others need a login). */
+/** Cover sources that have an account (Bangumi and NextMoe work anonymously; Hikarinagi needs a login). */
 internal val CoverAccountSources = listOf(CoverSourceMode.BANGUMI, CoverSourceMode.NEXTMOE, CoverSourceMode.HIKARINAGI)
 
 internal enum class CoverAccountState { SIGNED_IN, NEEDS_REAUTH, ANONYMOUS, SIGNED_OUT }
@@ -70,7 +70,7 @@ internal fun coverAccountState(
     when {
         status?.needsReauth == true -> CoverAccountState.NEEDS_REAUTH
         status?.connected == true -> CoverAccountState.SIGNED_IN
-        source == CoverSourceMode.BANGUMI -> CoverAccountState.ANONYMOUS
+        !source.requiresLogin -> CoverAccountState.ANONYMOUS
         else -> CoverAccountState.SIGNED_OUT
     }
 
@@ -102,7 +102,7 @@ internal fun coverAccountButtons(
         when {
             bangumi && state == CoverAccountState.ANONYMOUS -> "设置令牌"
             bangumi -> "更换令牌"
-            state == CoverAccountState.SIGNED_OUT -> "登录"
+            state == CoverAccountState.SIGNED_OUT || state == CoverAccountState.ANONYMOUS -> "登录"
             else -> "重新登录"
         }
     return when (state) {
@@ -171,12 +171,7 @@ private fun CoverAccountCard(
                 )
             }
         }
-        // NextMoe also keeps the playtime (doc §5.6): its sync lives with the account it uses.
-        if (source == CoverSourceMode.NEXTMOE && status?.connected == true) {
-            item(key = "nextmoe-playtime-sync") {
-                NextmoePlaytimeSyncRow(state, colors) { viewModel.openSettingsPage(KireiSettingsPage.PLAYTIME_SYNC) }
-            }
-        }
+
     }
     if (editToken) BangumiTokenDialog(colors, viewModel) { editToken = false }
     if (confirmSignOut) CoverSignOutDialog(source, colors, onConfirm = { viewModel.disconnectCoverAccount(source) }) { confirmSignOut = false }

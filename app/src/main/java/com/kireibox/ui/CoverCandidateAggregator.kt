@@ -123,6 +123,9 @@ internal object CoverCandidateAggregator {
         order: List<CoverSourceMode>
     ): Int = order.indexOf(source).let { if (it < 0) Int.MAX_VALUE else it }
 
+    private fun hasImageRating(value: String): Boolean =
+        value.trim().lowercase() in setOf("safe", "suggestive", "explicit") || value.toDoubleOrNull()?.isFinite() == true
+
     private fun merge(
         members: List<Int>,
         candidates: List<CoverCandidateUi>,
@@ -160,6 +163,18 @@ internal object CoverCandidateAggregator {
                 coverSources.putIfAbsent(url, candidate.source)
             }
         }
+        // NextMoe labels may use VNDB evidence only for the same anchored work AND
+        // the exact same image URL. A work's age rating or a different edition's cover is no proof.
+        ordered.filter { it.source == CoverSourceMode.NEXTMOE }.forEach { nextmoe ->
+            val refs = nextmoe.metadata.externalRefs.split(',').map(String::trim).toSet()
+            ordered.filter { it.source == CoverSourceMode.VNDB && "vndb:${it.metadata.id}" in refs }.forEach { vndb ->
+                nextmoe.metadata.covers.forEach { unknown ->
+                    val evidence = vndb.metadata.covers.firstOrNull { it.url == unknown.url && hasImageRating(it.sexual) }
+                    if (evidence != null)
+                        covers[unknown.url] = unknown.copy(source = "vndb", sexual = evidence.sexual)
+                }
+            }
+        }
         val sortedCovers =
             covers.values.sortedWith(
                 compareByDescending<MetadataCover> { it.height > it.width && it.width > 0 }
@@ -174,6 +189,10 @@ internal object CoverCandidateAggregator {
             }
         }
         if (merged.coverUrl.isNotBlank()) coverSources.putIfAbsent(merged.coverUrl, representative.source)
+
+        merged.covers.firstOrNull { it.url == merged.coverUrl && hasImageRating(it.sexual) }?.let {
+            merged.coverSexual = com.yuki.yukihub.metadata.client.AccountCatalogClient.sexualScore(it.sexual)
+        }
 
         // Keep every upstream anchor: the merged card is a better bridge seed than any one source.
         val refs = LinkedHashSet<String>()

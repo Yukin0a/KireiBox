@@ -19,7 +19,7 @@ class YukiMetadataController(context: Context) {
 
     fun source(): CoverSourceMode =
         CoverSourceMode.selected(
-            prefs.getString(KEY_METADATA_SOURCE, CoverSourceMode.BANGUMI.key),
+            prefs.getString(KEY_METADATA_SOURCE, CoverSourceMode.NEXTMOE.key),
         )
 
     fun setSource(source: CoverSourceMode) {

@@ -20,7 +20,7 @@
   <a href="https://github.com/Yukin0a/KireiBox/releases">
     <img src="https://img.shields.io/badge/Download-Releases-8B5CF6?logo=github&logoColor=white" alt="Download" />
   </a>
-  <img src="https://img.shields.io/badge/Version-0.5.0--alpha.18-F59E0B" alt="Version" />
+  <img src="https://img.shields.io/badge/Version-0.5.0--alpha.19-F59E0B" alt="Version" />
   <img src="https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white" alt="Android 8.0+" />
   <a href="./LICENSE">
     <img src="https://img.shields.io/badge/License-GPL--3.0-E11D48" alt="GPL-3.0" />
@@ -118,7 +118,7 @@ KireiBox 使用 Kotlin、Jetpack Compose、Coroutines / Flow 与 MVVM 架构构�
 ## 构建信息
 
 - Application ID：`com.kireibox.app`
-- 当前版本：`0.5.0-alpha.18`
+- 当前版本：`0.5.0-alpha.19`
 - Version Code：`25`
 - Min SDK：`26`
 - Target SDK：`29`

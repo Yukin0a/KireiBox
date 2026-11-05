@@ -54,7 +54,7 @@ class NsfwCoverWiringTest {
         assertTrue(backdrop.contains("blurred = blurred"))
         // Plan §6.3: the blurred backdrop (BLUR_COVER / AURORA) is a second pixel path. It must be
         // built from the already NSFW-blurred cover, under a cache key that carries the blur flag.
-        assertTrue(backdrop.contains("coverCacheKey(uri, CoverImageRole.IMMERSIVE_BACKDROP, widthPx, heightPx, blurred)"))
+        assertTrue(backdrop.contains("coverCacheKey(uri, CoverImageRole.IMMERSIVE_BACKDROP, widthPx, heightPx, blurred, context)"))
         assertTrue(backdrop.contains("rememberBackdropBlur(toneCacheKey, bitmap)"))
         val blurLoader = between(immersive, "private fun rememberBackdropBlur(", "\n}\n")
         assertTrue(blurLoader.contains("computeImmersiveBlur("))
@@ -68,7 +68,7 @@ class NsfwCoverWiringTest {
         val prefetch = between(immersive, "internal fun ImmersiveBackdropPrefetch(", "\n}\n")
         assertTrue(prefetch.contains("val nsfwBlurEnabled = LocalNsfwBlurEnabled.current"))
         assertTrue(prefetch.contains("val blurred = game.nsfw && nsfwBlurEnabled"))
-        assertTrue(prefetch.contains("CoverDecodePolicy.request(uri, CoverImageRole.IMMERSIVE_BACKDROP, widthPx, heightPx, blurred = blurred)"))
+        assertTrue(prefetch.contains("deviceCoverRequest(context, uri, CoverImageRole.IMMERSIVE_BACKDROP, widthPx, heightPx, blurred = blurred)"))
         assertTrue(prefetch.contains("computeImmersiveBlur(immersiveBlurCacheKey(request.cacheKey, it), bitmap, it)"))
         assertEquals(
             "computeImmersiveBlur is only called from rememberBackdropBlur and the prefetch (both fed by the NSFW-aware cover)",

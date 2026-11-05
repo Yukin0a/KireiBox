@@ -27,7 +27,7 @@ internal object CoverSourcePresentationPolicy {
         source: CoverSourceMode,
         selectedSource: CoverSourceMode?
     ): CoverSourcePresentation {
-        val isSelected = source == (selectedSource ?: CoverSourceMode.BANGUMI)
+        val isSelected = source == (selectedSource ?: CoverSourceMode.NEXTMOE)
         val muted = source != CoverSourceMode.BANGUMI && !isSelected
         return CoverSourcePresentation(
             source = source,

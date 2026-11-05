@@ -67,47 +67,6 @@ import kotlinx.coroutines.withContext
 internal val LibrarySortOptions =
     listOf(YukiSettingsStore.SORT_RECENT, YukiSettingsStore.SORT_NEWEST, YukiSettingsStore.SORT_NAME, YukiSettingsStore.SORT_MANUAL)
 
-@Composable
-internal fun LibraryHubSettings(
-    state: KireiUiState,
-    colors: KireiColors,
-    viewModel: KireiViewModel,
-) {
-    val sortMode = state.settings?.sortMode ?: YukiSettingsStore.SORT_RECENT
-    KireiListGroup(colors, SettingsGroupSpacing, title = "目录") {
-        item {
-            KireiListRow(
-                KireiListRowSpec(
-                    title = "扫描目录",
-                    icon = Icons.Rounded.Folder,
-                    tile = KireiTileColor.BLUE,
-                    trailing = KireiRowTrailing.Value("${state.settings?.scanRoots?.size ?: 0} 个"),
-                ),
-                colors,
-                onClick = { viewModel.openSettingsPage(KireiSettingsPage.LIBRARY) },
-            )
-        }
-    }
-    KireiListGroup(
-        colors,
-        SettingsGroupSpacing,
-        title = "游戏卡片",
-        footer = "长按游戏卡片后依次编号。".takeIf { sortMode == YukiSettingsStore.SORT_MANUAL },
-    ) {
-        item {
-            SettingsSegmentedRow(
-                SettingsSegmentedRowSpec(
-                    title = "游戏库顺序",
-                    segments = LibrarySortOptions.map { KireiSegment(it, choiceLabel(it)) },
-                    selected = sortMode,
-                ),
-                colors,
-                viewModel::setSortMode,
-            )
-        }
-    }
-}
-
 /**
  * 首页 (KireiSettingsPage.INTERFACE, r4 S1): the home style, then — immersive only — 展示内容 (which
  * games, 显示游玩时长) and 视觉效果 (preset cards, 高级选项). 动画效果 / 减少透明度 / 增强对比度 /
@@ -121,7 +80,7 @@ internal fun InterfaceSettings(
 ) {
     val homeMode = state.settings?.homePresentationMode ?: HomePresentationMode.IMMERSIVE
     // The page is titled 首页, so its first group carries no caption of its own.
-    KireiListGroup(colors, SettingsGroupSpacing, footer = homeStyleFooter(homeMode)) {
+    KireiListGroup(colors, SettingsGroupSpacing, title = "首页", footer = homeStyleFooter(homeMode)) {
         item {
             HomePresentationModeRow(
                 value = homeMode,
@@ -301,11 +260,20 @@ private fun ScanRootRemovalDialog(
 internal fun PermissionSettings(
     state: KireiUiState,
     colors: KireiColors,
+    viewModel: KireiViewModel,
     actions: KireiActions
 ) {
     val context = LocalContext.current
     val roots = state.settings?.scanRoots.orEmpty()
     val access = rememberStorageAccess(roots)
+    KireiListGroup(colors, SettingsGroupSpacing, title = "目录管理") {
+        item {
+            SettingsAnchor("扫描目录") {
+                KireiListRow(KireiListRowSpec(title = "扫描目录", trailing = KireiRowTrailing.Value("${roots.size} 个")), colors,
+                    onClick = { viewModel.openSettingsPage(KireiSettingsPage.LIBRARY) })
+            }
+        }
+    }
     KireiListGroup(colors, SettingsGroupSpacing, title = "KRKR 原生引擎") {
         item {
             // One search anchor for the status row and its button (the title depends on the API level).
@@ -328,7 +296,7 @@ internal fun PermissionSettings(
     KireiListGroup(colors, SettingsGroupSpacing, title = "扫描目录") {
         if (roots.isEmpty()) {
             item(key = "no-roots") {
-                KireiListRow(KireiListRowSpec("还没有扫描目录", "在「游戏库 › 扫描目录」添加", icon = Icons.Rounded.Folder, tile = KireiTileColor.BLUE), colors)
+                KireiListRow(KireiListRowSpec("还没有扫描目录", "点按上方「扫描目录」添加", icon = Icons.Rounded.Folder, tile = KireiTileColor.BLUE), colors)
             }
         }
         roots.forEach { root ->

@@ -148,7 +148,7 @@ data class CoverCandidateUi(
 
 data class CoverSearchUi(
     val game: Game? = null,
-    val source: CoverSourceMode = CoverSourceMode.BANGUMI,
+    val source: CoverSourceMode = CoverSourceMode.NEXTMOE,
     val keyword: String = "",
     val candidates: List<CoverCandidateUi> = emptyList(),
     val loading: Boolean = false,
@@ -268,6 +268,10 @@ data class KireiUiState(
     val coverAccounts: Map<CoverSourceMode, com.yuki.yukihub.auth.CoverAccountStatus> = emptyMap(),
     val playtimeSync: com.yuki.yukihub.sync.PlaytimeSyncStatus = com.yuki.yukihub.sync.PlaytimeSyncStatus(),
     /** Games whose NextMoe work the user must confirm or pick, and games NextMoe refused (loaded by the sync page). */
+    val playRecordsPrivate: Boolean? = null,
+    val cloudPlaytimes: List<com.yuki.yukihub.sync.CloudPlaytimeWork> = emptyList(),
+    val playtimeLibrary: List<com.yuki.yukihub.sync.PlaytimeGame> = emptyList(),
+    val playtimeHistory: List<String> = emptyList(),
     val playtimeAttention: List<com.yuki.yukihub.sync.PlaytimeGame> = emptyList(),
     val accountBusy: Boolean = false,
     val includeAdult: Boolean = false,

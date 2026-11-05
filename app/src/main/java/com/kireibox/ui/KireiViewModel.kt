@@ -202,6 +202,7 @@ class KireiViewModel
 
         init {
             if (!isTestMode) {
+                core.settings.applySimplifiedCoverDefaults()
                 mutableState.value =
                     mutableState.value.copy(
                         diagnosticLoggingEnabled = DevLogger.isEnabled(),
@@ -254,13 +255,13 @@ class KireiViewModel
 
         fun openSettingsPage(page: KireiSettingsPage) {
             settingsShortcutOrigin = null
-            mutableState.value = mutableState.value.copy(tab = KireiTab.SETTINGS, settingsPage = page)
+            mutableState.value = mutableState.value.copy(tab = KireiTab.SETTINGS, settingsPage = KireiBackPolicy.canonicalSettingsPage(page))
         }
 
         /** A second-level page reached without its parent (search result, root row, cover picker): back goes straight to the root. */
         fun openSettingsShortcut(page: KireiSettingsPage) {
             openSettingsPage(page)
-            settingsShortcutOrigin = page
+            settingsShortcutOrigin = KireiBackPolicy.canonicalSettingsPage(page)
         }
 
         fun navigateUpSettings() {
@@ -572,6 +573,41 @@ class KireiViewModel
             gameId: Long,
             workId: String,
         ) = playtimeSyncController.confirm(gameId, workId)
+
+        fun loadPlaytimePrivacy() = viewModelScope.launch {
+            val value = withContext(Dispatchers.IO) { runCatching { playtimeSync.privacy() }.getOrNull() }
+            mutableState.value = mutableState.value.copy(playRecordsPrivate = value)
+        }
+
+        fun setPlaytimePrivacy(value: Boolean) = viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) { runCatching { playtimeSync.setPrivacy(value) } }
+            if(result.isSuccess) mutableState.value = mutableState.value.copy(playRecordsPrivate = value)
+            else mutableState.value = mutableState.value.withNotice("隐私设置未保存，请稍后重试", NoticeTone.ERROR)
+        }
+
+        fun ignoreCloudPlaytime(workId: String) = viewModelScope.launch {
+            withContext(Dispatchers.IO) { playtimeSync.ignoreCloud(workId) }
+            reload(); loadPlaytimeAttention()
+        }
+
+        fun undoCloudPlaytime(gameId: Long) = viewModelScope.launch {
+            withContext(Dispatchers.IO) { playtimeSync.undo(gameId) }
+            reload(); loadPlaytimeAttention()
+        }
+
+        fun adjustPlaytime(gameId: Long, minutes: Int, add: Boolean) = viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    playtimeSync.editLocal(gameId) {
+                        val old = repository.findById(gameId)?.totalPlayTime ?: 0L
+                        if(add) repository.addManualPlayTime(gameId, minutes * 60_000L)
+                        else repository.setManualPlayTimeForGame(gameId, minutes * 60_000L)
+                        !add && minutes * 60_000L < old
+                    }
+                }
+            }.onFailure { mutableState.value = mutableState.value.withNotice("调整时长失败，请重试", NoticeTone.ERROR) }
+            reload(); loadPlaytimeAttention()
+        }
 
         fun pickPlaytimeWork(gameId: Long) = playtimeSyncController.pickWork(gameId)
 

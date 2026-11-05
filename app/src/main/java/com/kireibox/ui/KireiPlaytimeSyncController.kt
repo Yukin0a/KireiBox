@@ -3,6 +3,8 @@ package com.kireibox.ui
 import androidx.lifecycle.viewModelScope
 import com.yuki.yukihub.metadata.model.CoverSourceMode
 import com.yuki.yukihub.sync.NextmoePlaytimeSync
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -22,11 +24,16 @@ internal class KireiPlaytimeSyncController(host: KireiViewModel) : KireiViewMode
                 // A finished sync may have changed which games wait for the user.
                 if (!status.running && mutableState.value.settingsPage == KireiSettingsPage.PLAYTIME_SYNC) loadAttention()
                 // Time played on another device was brought in: show the new totals.
-                if (wasRunning && !status.running && status.pulled > 0) {
+                if (wasRunning && !status.running && status.problem == null) {
                     reload()
-                    showNotice("已从 NextMoe 同步 ${status.pulled} 款游戏的时长")
+                    showNotice("已同步：上传 ${status.uploaded} 款，拉取 ${status.pulled} 款，${status.summary.needsConfirm + status.summary.rejected} 款需要处理")
                 }
                 wasRunning = status.running
+            }
+        }
+        viewModelScope.launch {
+            host.state.map { state -> state.games.map { Triple(it.id, it.coverUri, it.title) } to state.coverQueue.toString() }.distinctUntilChanged().collect {
+                if(connected()) sync.schedule(3_000L)
             }
         }
         sync.refreshSummary()
@@ -52,8 +59,11 @@ internal class KireiPlaytimeSyncController(host: KireiViewModel) : KireiViewMode
 
     fun loadAttention() {
         viewModelScope.launch {
+            val accountId = accounts.status.value[CoverSourceMode.NEXTMOE]?.id
             val games = withContext(Dispatchers.IO) { runCatching { sync.attention() }.getOrDefault(emptyList()) }
-            mutableState.value = mutableState.value.copy(playtimeAttention = games)
+            val details = withContext(Dispatchers.IO) { Triple(sync.cloud(), sync.library(), sync.history()) }
+            if(accountId != accounts.status.value[CoverSourceMode.NEXTMOE]?.id) return@launch
+            mutableState.value = mutableState.value.copy(playtimeAttention = games, cloudPlaytimes = details.first, playtimeLibrary = details.second, playtimeHistory = details.third)
         }
     }
 
@@ -62,7 +72,8 @@ internal class KireiPlaytimeSyncController(host: KireiViewModel) : KireiViewMode
         workId: String,
     ) {
         viewModelScope.launch {
-            withContext(Dispatchers.IO) { runCatching { sync.confirm(gameId, workId) } }
+            val result = withContext(Dispatchers.IO) { runCatching { sync.confirm(gameId, workId) } }
+            showNotice(if (result.isSuccess) "作品绑定成功" else "绑定失败，请稍后重试")
             loadAttention()
         }
     }
@@ -79,6 +90,7 @@ internal class KireiPlaytimeSyncController(host: KireiViewModel) : KireiViewMode
     /** After a NextMoe login the first sync runs at once; after a sign-out the status line is re-read. */
     fun onAccountChanged(source: CoverSourceMode) {
         if (source != CoverSourceMode.NEXTMOE) return
+        mutableState.value = mutableState.value.copy(cloudPlaytimes = emptyList(), playtimeLibrary = emptyList(), playtimeAttention = emptyList(), playtimeHistory = emptyList(), playRecordsPrivate = null)
         if (connected()) sync.syncNow() else sync.refreshSummary()
     }
 

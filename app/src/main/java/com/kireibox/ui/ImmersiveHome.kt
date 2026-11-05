@@ -589,16 +589,33 @@ internal fun ImmersiveHome(
                         gapPx = with(density) { playTimeSpec.anchorGapDp.dp.toPx() },
                     )
                 playTimeAnchor?.let { anchor ->
-                    ImmersivePlayTimeIndicator(
-                        game = currentGame,
-                        orientation = orientation,
-                        anchor = anchor,
-                        density = density,
-                        visualSpec = playTimeSpec,
-                        palette = palette,
-                        reducedMotion = reducedMotion,
-                        onClick = onOpenPlayTime,
-                    )
+                    // Follow the same continuous track as the covers, including a cancelled swipe.
+                    val timeTrack = if (orientation == HomeOrientation.PORTRAIT && !reducedMotion) {
+                        listOf(
+                            Triple(backdropTrack.leftIndex, (1f - 2f * backdropTrack.fraction).coerceIn(0f, 1f), -24f * backdropTrack.fraction),
+                            Triple(backdropTrack.rightIndex, (2f * backdropTrack.fraction - 1f).coerceIn(0f, 1f), 24f * (1f - backdropTrack.fraction)),
+                        ).filter { it.second > 0f }.distinctBy { it.first }
+                    } else {
+                        listOf(Triple(currentIndex, 1f, 0f))
+                    }
+                    timeTrack.forEach { (index, alpha, offset) ->
+                        val timeGame = orderedGames.getOrNull(index) ?: return@forEach
+                        key(timeGame.id) {
+                            ImmersivePlayTimeIndicator(
+                                game = timeGame,
+                                orientation = orientation,
+                                anchor = anchor,
+                                density = density,
+                                visualSpec = playTimeSpec,
+                                palette = palette,
+                                reducedMotion = reducedMotion,
+                                onClick = onOpenPlayTime,
+                                trackAlpha = alpha,
+                                trackOffsetDp = offset,
+                                trackInteractive = !galleryInteractionBlocked,
+                            )
+                        }
+                    }
                 }
             }
             ImmersivePager(orderedGames, currentIndex, orientation, layout, density, visualScale, palette) { index ->

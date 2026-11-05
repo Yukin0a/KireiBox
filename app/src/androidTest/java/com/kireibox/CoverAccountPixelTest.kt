@@ -18,6 +18,7 @@ import com.yuki.yukihub.data.MetadataRepository
 import com.yuki.yukihub.metadata.client.BangumiClient
 import com.yuki.yukihub.metadata.model.CoverSourceMode
 import com.yuki.yukihub.metadata.model.VnMetadata
+import com.yuki.yukihub.model.EngineType
 import com.yuki.yukihub.model.Game
 import com.yuki.yukihub.settings.YukiSettingsStore
 import kotlinx.coroutines.runBlocking
@@ -74,7 +75,7 @@ class CoverAccountPixelTest {
         val previous = prefs.getString(key, null)
         try {
             prefs.edit().remove(key).commit()
-            assertEquals("bangumi", YukiSettingsStore(context).snapshot().metadataSource)
+            assertEquals("nextmoe", YukiSettingsStore(context).snapshot().metadataSource)
             listOf("vndb", "hikarinagi", "nextmoe", "bangumi").forEach {
                 prefs.edit().putString(key, it).commit()
                 assertEquals(it, YukiSettingsStore(context).snapshot().metadataSource)

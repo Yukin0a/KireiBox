@@ -235,7 +235,7 @@ class DesignSystemComponentContractTest {
     fun appearancePageUsesTheSharedListComponents() {
         val page = UiSourceFiles.file("SettingsAppearancePage.kt")
         assertTrue(page.contains("KireiListGroup("))
-        assertTrue(page.contains("KireiRowTrailing.Toggle("))
+        assertTrue(page.contains("MotionModeRow("))
         assertFalse("the private group style is gone", page.contains("AppearanceGroup("))
         assertFalse(page.contains("HorizontalDivider("))
         assertTrue("switch rows use the Kirei switch", functionBody(all, "SwitchRow").contains("KireiRowTrailing.Toggle("))

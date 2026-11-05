@@ -18,12 +18,13 @@ enum class CoverSourceMode(val key: String, val label: String) {
         get() = this == BANGUMI || this == BANGUMI_MIRROR
 
     val isActive: Boolean get() = this in active
-    val requiresLogin: Boolean get() = this == NEXTMOE || this == HIKARINAGI
+    val supportsOAuth: Boolean get() = this == NEXTMOE || this == HIKARINAGI
+    val requiresLogin: Boolean get() = this == HIKARINAGI
 
     companion object {
         val active = listOf(BANGUMI, NEXTMOE, HIKARINAGI, VNDB)
 
-        fun selected(value: String?): CoverSourceMode = fromStored(value).takeIf { it.isActive } ?: BANGUMI
+        fun selected(value: String?): CoverSourceMode = fromStored(value).takeIf { it.isActive } ?: NEXTMOE
 
         @JvmStatic
         fun fromStored(value: String?): CoverSourceMode {
@@ -31,7 +32,7 @@ enum class CoverSourceMode(val key: String, val label: String) {
             return entries.firstOrNull {
                 it.key.equals(raw, ignoreCase = true) ||
                     it.name.equals(raw, ignoreCase = true)
-            } ?: BANGUMI
+            } ?: NEXTMOE
         }
 
         @JvmStatic

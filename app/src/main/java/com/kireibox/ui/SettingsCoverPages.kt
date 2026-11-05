@@ -53,15 +53,8 @@ import com.yuki.yukihub.model.Game
 import com.yuki.yukihub.settings.MotionMode
 import kotlin.math.roundToInt
 
-// 封面与元数据 (plan §5 P3): 「来源与匹配」, one 自动匹配 group (switches + 清除无结果记录), 成人内容
-// and 「封面管理」 (待确认 / 已设置: five rows, then 显示更多 adds pages of twenty). No footers or
-// subtitles that only repeat a title (r5): a line stays only for a value or a consequence.
-
-/**
- * Plain-language name of the stored coverStrictL2 setting: only lexical evidence (the game name
- * matching the title, or nearly matching with a clear lead) may bind automatically; several sources
- * agreeing on a work no longer does (CoverMatchConfidence).
- */
+// Fixed NextMoe-first defaults, the two privacy/search switches, accounts and per-game covers.
+// Retained for compatibility with older settings/search callers; this option is no longer shown.
 internal const val COVER_STRICT_MATCH_TITLE = "仅标题一致时自动设置"
 
 @Composable
@@ -72,34 +65,21 @@ internal fun CoverSettings(
     val state = context.state
     val colors = context.colors
     val viewModel = context.viewModel
-    var editBangumiBase by remember { mutableStateOf(false) }
-    CoverSourceGroup(state, colors, viewModel) { editBangumiBase = true }
-    CoverMatchingGroups(state, colors, viewModel)
-    CoverManagementGroups(context, scroll)
-    if (editBangumiBase) BangumiBaseDialog(state, colors, viewModel) { editBangumiBase = false }
-}
-
-/** 来源与匹配: default source (sheet with descriptions), the accounts sub-page and the Bangumi address. */
-@Composable
-private fun CoverSourceGroup(
-    state: KireiUiState,
-    colors: KireiColors,
-    viewModel: KireiViewModel,
-    onEditBangumiBase: () -> Unit,
-) {
-    val source = CoverSourceMode.selected(state.settings?.metadataSource)
-    KireiListGroup(colors, SettingsGroupSpacing, title = "来源与匹配") {
+    var sourceOrderOpen by remember { mutableStateOf(false) }
+    KireiListGroup(colors, SettingsGroupSpacing, title = "封面") {
         item {
-            SettingsChoiceRow(
-                SettingsChoiceSpec(
-                    title = "默认来源",
-                    options = CoverSourceMode.active.map { SettingsChoiceOption(it, it.label, KireiPublicCopy.coverSourceDescription(it)) },
-                    selected = source,
-                ),
-                colors,
-                viewModel::setMetadataSource,
-            )
+            SettingsAnchor("封面来源") {
+                KireiListRow(KireiListRowSpec(title = "封面来源", trailing = KireiRowTrailing.Value(com.yuki.yukihub.metadata.match.CoverSourcePriority.savedOrder(LocalContext.current).first().label)), colors, onClick = { sourceOrderOpen = true })
+            }
         }
+        item {
+            SettingsToggleRow("模糊成人内容封面", state.settings?.nsfwBlurEnabled != false, colors,
+                subtitle = "按封面图片评级判断，手动选择优先", onCheckedChange = viewModel::setNsfwBlurEnabled)
+        }
+
+    }
+    if (sourceOrderOpen) CoverSourceOrderDialog(colors) { sourceOrderOpen = false }
+    KireiListGroup(colors, SettingsGroupSpacing) {
         item {
             KireiListRow(
                 KireiListRowSpec(title = "封面来源账号", trailing = KireiRowTrailing.Value(coverAccountSummary(state))),
@@ -107,46 +87,9 @@ private fun CoverSourceGroup(
                 onClick = { viewModel.openSettingsPage(KireiSettingsPage.COVER_ACCOUNTS) },
             )
         }
-        item {
-            SettingsAnchor("Bangumi 镜像地址") {
-                KireiListRow(KireiListRowSpec(title = "Bangumi 镜像地址", trailing = KireiRowTrailing.Value(bangumiBaseLabel(state))), colors, onClick = onEditBangumiBase)
-            }
-        }
     }
-}
-
-/** 自动匹配: the three switches and the 清除无结果记录 command in one group, then 成人内容. */
-@Composable
-private fun CoverMatchingGroups(
-    state: KireiUiState,
-    colors: KireiColors,
-    viewModel: KireiViewModel,
-) {
-    val settings = state.settings
-    KireiListGroup(colors, SettingsGroupSpacing, title = "自动匹配") {
-        item {
-            SettingsToggleRow("同时查找多个来源", settings?.coverHybridAutoMatch != false, colors, subtitle = "关闭后只查默认来源") {
-                viewModel.setCoverHybridAutoMatch(it)
-            }
-        }
-        item {
-            SettingsToggleRow("仅 Wi-Fi 自动匹配", settings?.coverAutoMatchWifiOnly == true, colors) {
-                viewModel.setCoverAutoMatchWifiOnly(it)
-            }
-        }
-        item {
-            SettingsToggleRow(COVER_STRICT_MATCH_TITLE, settings?.coverStrictL2 == true, colors, onCheckedChange = viewModel::setCoverStrictL2)
-        }
-        item {
-            SettingsAnchor("清除无结果记录") {
-                KireiListRow(KireiListRowSpec(title = "清除无结果记录", tone = KireiRowTone.ACTION), colors, onClick = viewModel::clearCoverNoMatchStore)
-            }
-        }
-    }
-    KireiListGroup(colors, SettingsGroupSpacing, title = "成人内容") {
-        item { SwitchRow("模糊成人内容封面", settings?.nsfwBlurEnabled != false, colors, viewModel::setNsfwBlurEnabled) }
-        item { SwitchRow("搜索结果包含成人作品", state.includeAdult, colors, viewModel::setIncludeAdult) }
-    }
+    PlaytimeSyncSettings(context)
+    CoverManagementGroups(context, scroll)
 }
 
 /** 「已登录 n 个」 style summary of the three account-backed sources. */
@@ -157,43 +100,6 @@ internal fun coverAccountSummary(state: KireiUiState): String {
         statuses.any { it.needsReauth } -> "需要重新授权"
         connected > 0 -> "$connected 个已登录"
         else -> "未登录"
-    }
-}
-
-private fun bangumiBaseLabel(state: KireiUiState): String {
-    val base = state.settings?.bangumiApiBase?.takeIf(String::isNotBlank) ?: return "自动"
-    return runCatching { Uri.parse(base).host }.getOrNull()?.takeIf(String::isNotBlank) ?: base
-}
-
-@Composable
-private fun BangumiBaseDialog(
-    state: KireiUiState,
-    colors: KireiColors,
-    viewModel: KireiViewModel,
-    onClose: () -> Unit,
-) {
-    var bangumiBaseInput by remember { mutableStateOf(state.settings?.bangumiApiBase.orEmpty()) }
-    KireiDialog(
-        spec =
-            KireiDialogSpec(
-                title = "Bangumi 镜像地址",
-                message = "留空则自动选择：先试官方 api.bgm.tv，失败再用社区镜像。",
-                confirm =
-                    KireiDialogAction("保存", {
-                        viewModel.setBangumiApiBase(bangumiBaseInput)
-                        onClose()
-                    }),
-                dismiss = KireiDialogAction("取消", onClose, style = KireiButtonStyle.PLAIN),
-            ),
-        colors = colors,
-        onDismissRequest = onClose,
-    ) {
-        KireiTextField(
-            bangumiBaseInput,
-            { bangumiBaseInput = it },
-            colors,
-            options = KireiTextFieldOptions(label = "镜像地址", placeholder = "例如 https://api.bangumi.vip", keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri)),
-        )
     }
 }
 
@@ -421,3 +327,20 @@ private fun coverBindingStatus(
         game.vndbBindingMode == "DISABLED" -> "使用引擎默认封面"
         else -> "尚未匹配"
     }
+
+@Composable
+private fun CoverSourceOrderDialog(colors: KireiColors, onClose: () -> Unit) {
+    val androidContext = LocalContext.current
+    var order by remember { mutableStateOf(com.yuki.yukihub.metadata.match.CoverSourcePriority.savedOrder(androidContext)) }
+    KireiDialog(KireiDialogSpec(title = "封面来源排序", message = "点按来源上移一位，优先使用排在前面的来源。",
+        confirm = KireiDialogAction("完成", onClose)), colors, onClose) {
+        order.forEachIndexed { index, source ->
+            KireiListRow(KireiListRowSpec(title = "${index + 1}. ${source.label}", trailing = if (index > 0) KireiRowTrailing.Glyph(Icons.Rounded.ExpandLess) else KireiRowTrailing.Value("优先", chevron = false)), colors, onClick = {
+                if (index > 0) {
+                    order = order.toMutableList().apply { removeAt(index); add(index - 1, source) }
+                    com.yuki.yukihub.metadata.match.CoverSourcePriority.saveOrder(androidContext, order)
+                }
+            })
+        }
+    }
+}

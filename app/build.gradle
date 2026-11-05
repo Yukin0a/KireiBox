@@ -41,8 +41,8 @@ android {
         // takes effect when targetSdk <= 29; Android 11+ still enforces scoped
         // storage and keeps using MANAGE_EXTERNAL_STORAGE instead.
         targetSdk 29
-        versionCode 25
-        versionName "0.5.0-alpha.18"
+        versionCode 26
+        versionName "0.5.0-alpha.19"
 
         // Update-test override (see UpdateInstalledVersion): empty here, filled only by the debug build type.
         buildConfigField "String", "DEBUG_OVERRIDE_VERSION_NAME", "\"\""

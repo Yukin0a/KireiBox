@@ -46,7 +46,7 @@ class KireiA11yContractTest {
         assertTrue(components.contains("if (colors.isDark || colors.highContrast) colors.secondary else KireiTokens.PlaceholderLight"))
         // One term for Bangumi's credential everywhere: 令牌 (r3 review).
         assertTrue(UiSourceFiles.file("SettingsCoverPages.kt").contains("KireiTextFieldOptions(label = \"个人令牌\""))
-        assertTrue(UiSourceFiles.file("SettingsCoverPages.kt").contains("KireiTextFieldOptions(label = \"镜像地址\""))
+        assertFalse("removed mirror customization has no orphan field", UiSourceFiles.file("SettingsCoverPages.kt").contains("KireiTextFieldOptions(label = \"镜像地址\""))
         assertTrue(UiSourceFiles.file("SheetsPages.kt").contains("KireiTextFieldOptions(label = \"游戏名称\""))
     }
 

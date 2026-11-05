@@ -41,7 +41,7 @@ class SettingsP3StructureTest {
         // so the ten rows share nine hues: no two rows of one group share a hue (检查更新 and 来源账号
         // are INDIGO, in different groups).
         val tiles = Regex("""KireiTileColor\.([A-Z]+)""").findAll(root).map { it.groupValues[1] }.toList()
-        assertEquals("10 category rows on the root: $tiles", 10, tiles.size)
+        assertEquals("7 rows on the root including check update: $tiles", 7, tiles.size)
         assertFalse("red stays reserved for warnings", tiles.contains("RED"))
         root.split("KireiListGroup(").drop(1).forEach { group ->
             val groupTiles = Regex("""KireiTileColor\.([A-Z]+)""").findAll(group.substringBefore("\n}\n")).map { it.groupValues[1] }.toList()
@@ -49,7 +49,7 @@ class SettingsP3StructureTest {
         }
         assertFalse("屏幕方向 is no longer a root row", root.contains("OrientationModeRow("))
         // Every category the root restores focus to has a row that opens it.
-        listOf("APPEARANCE", "INTERFACE", "LIBRARY_HUB", "COVERS", "COVER_ACCOUNTS", "ENGINES", "PERMISSIONS", "DIAGNOSTICS", "ABOUT").forEach { page ->
+        listOf("APPEARANCE", "COVERS", "ENGINES", "PERMISSIONS", "DIAGNOSTICS", "ABOUT").forEach { page ->
             assertTrue("root row for $page", Regex("""SettingsCategoryRow\(\s*KireiSettingsPage\.$page,""").containsMatchIn(root))
         }
         assertTrue("the root also offers 检查更新", functionBody(root, "SettingsAboutGroup").contains("viewModel.checkForUpdates(manual = true)"))
@@ -110,45 +110,20 @@ class SettingsP3StructureTest {
     }
 
     @Test
-    fun coverPageSplitsSourcesMatchingAndManagementAndLinksTheAccountsSubPage() {
+    fun coverPageKeepsOnlyEssentialControlsAndManagement() {
         val covers = UiSourceFiles.file("SettingsCoverPages.kt")
-        var previous = -1
-        listOf("title = \"来源与匹配\"", "title = \"自动匹配\"", "COVER_STRICT_MATCH_TITLE,", "title = \"成人内容\"", "title = \"待确认封面\"", "title = \"已设置封面\"").forEach { marker ->
-            val at = covers.indexOf(marker, previous + 1)
-            assertTrue("$marker follows the previous cover group", at > previous)
-            previous = at
-        }
-        // r3 review: 「仅凭标题精确匹配」 read as "match using only the title"; the setting limits when
-        // automatic binding applies (lexical evidence only, CoverMatchConfidence strict mode).
-        assertEquals("仅标题一致时自动设置", COVER_STRICT_MATCH_TITLE)
-        assertTrue("the plain-language switch still writes the stored strict setting", covers.contains("onCheckedChange = viewModel::setCoverStrictL2"))
-        // r5: no footers and no subtitle that only repeats a title on the cover page; the one
-        // subtitle left is the consequence that points at 默认来源.
-        listOf("COVER_STRICT_MATCH_SUBTITLE", "COVER_MATCHING_FOOTER", "footer =").forEach { assertFalse("the cover page has no $it", covers.contains(it)) }
-        assertTrue("同时查找多个来源 says what turning it off does", covers.contains("subtitle = \"关闭后只查默认来源\""))
-        // One 自动匹配 group: the three switches, then the 清除无结果记录 command, all before 成人内容.
-        val matching = functionBody(covers, "CoverMatchingGroups")
-        val autoGroup = matching.substring(matching.indexOf("title = \"自动匹配\""), matching.indexOf("title = \"成人内容\""))
-        listOf("\"同时查找多个来源\"", "\"仅 Wi-Fi 自动匹配\"", "COVER_STRICT_MATCH_TITLE,", "\"清除无结果记录\"").forEach { row ->
-            assertTrue("$row sits in the 自动匹配 group", autoGroup.contains(row))
-        }
-        assertEquals("no single-row groups between 自动匹配 and 成人内容: only the 成人内容 group opens", 1, Regex("""KireiListGroup\(""").findAll(autoGroup).count())
-        assertFalse("no engineering jargon left", all.contains("严格 L2"))
-        assertTrue(covers.contains("viewModel.openSettingsPage(KireiSettingsPage.COVER_ACCOUNTS)"))
-        assertTrue(all.contains("KireiSettingsPage.COVER_ACCOUNTS -> CoverAccountSettings(state, colors, viewModel)"))
-        assertEquals("封面来源账号", settingsPageTitle(KireiSettingsPage.COVER_ACCOUNTS))
+        listOf("title = \"封面\"", "title = \"待确认封面\"", "title = \"已设置封面\"").forEach { assertTrue(covers.contains(it)) }
+        val page = functionBody(covers, "CoverSettings")
+        listOf("setMetadataSource", "setBangumiApiBase", "setCoverHybridAutoMatch", "setCoverAutoMatchWifiOnly", "setCoverStrictL2", "clearCoverNoMatchStore").forEach { assertFalse(page.contains(it)) }
+        assertTrue(page.contains("viewModel::setNsfwBlurEnabled"))
+        assertFalse(page.contains("viewModel::setIncludeAdult"))
+        assertTrue(page.contains("viewModel.openSettingsPage(KireiSettingsPage.COVER_ACCOUNTS)"))
+        assertFalse(page.contains("CoverAccountSettings(state, colors, viewModel)"))
+        assertTrue(page.contains("CoverSourcePriority.savedOrder"))
         assertEquals(KireiSettingsPage.COVERS, KireiBackPolicy.settingsParent(KireiSettingsPage.COVER_ACCOUNTS))
-        // r5: 来源账号 is also a row of the root's 游戏 group (one tap, showing the sign-in summary) that
-        // opens it as a shortcut: back returns to the root, while the row on this page keeps back here.
         val games = functionBody(UiSourceFiles.file("SettingsRootPage.kt"), "SettingsGamesGroup")
-        assertTrue(Regex("""SettingsCategoryRow\(\s*KireiSettingsPage\.COVER_ACCOUNTS,""").containsMatchIn(games))
-        assertTrue(games.contains("value = coverAccountSummary(state)"))
-        assertTrue(UiSourceFiles.file("SettingsRootPage.kt").contains("viewModel.openSettingsShortcut(page)"))
-        assertEquals(KireiSettingsPage.ROOT, KireiBackPolicy.settingsBackTarget(KireiSettingsPage.COVER_ACCOUNTS, KireiSettingsPage.COVER_ACCOUNTS))
-        assertEquals(KireiSettingsPage.COVERS, KireiBackPolicy.settingsBackTarget(KireiSettingsPage.COVER_ACCOUNTS, null))
-        assertTrue("default source is a sheet of described options", functionBody(covers, "CoverSourceGroup").contains("SettingsChoiceRow("))
-        assertTrue("the overview card's shortcut scrolls to 待确认封面", covers.contains("reveal.consumePendingCovers()"))
-        assertTrue(UiSourceFiles.file("SettingsRootPage.kt").contains("context.reveal.requestPendingCovers()"))
+        assertFalse(games.contains("KireiSettingsPage.COVER_ACCOUNTS"))
+        assertFalse(games.contains("KireiSettingsPage.LIBRARY_HUB"))
     }
 
     @Test
@@ -179,7 +154,7 @@ class SettingsP3StructureTest {
         assertTrue(covers.contains("KireiListRowSpec(\"没有待确认的封面\""))
         assertTrue(covers.contains("KireiListRowSpec(\"还没有已设置的封面\""))
         // Each source's one-line description lives in its 默认来源 sheet option, not in a footer.
-        assertFalse(functionBody(covers, "CoverSourceGroup").contains("footer = \"\${KireiPublicCopy"))
+        assertFalse(functionBody(covers, "CoverSettings").contains("footer = \"\${KireiPublicCopy"))
     }
 
     @Test
@@ -218,7 +193,7 @@ class SettingsP3StructureTest {
         }
         // r4 S1: the 首页 page's first group has no caption (the page is titled 首页); it still spaces
         // itself from below like every other group.
-        assertTrue(functionBody(all, "InterfaceSettings").contains("KireiListGroup(colors, SettingsGroupSpacing, footer = homeStyleFooter(homeMode))"))
+        assertTrue(functionBody(all, "InterfaceSettings").contains("KireiListGroup(colors, SettingsGroupSpacing, title = \"首页\", footer = homeStyleFooter(homeMode))"))
         assertTrue(functionBody(all, "HomeContentSettingsGroup").contains("KireiListGroup(colors, SettingsGroupSpacing, title = \"展示内容\""))
         assertTrue(functionBody(all, "ImmersiveVisualSettingsPanel").contains("val groupSpacing = SettingsGroupSpacing"))
         // The 扫描目录 page names its list instead of repeating the page title as a caption.
@@ -232,7 +207,7 @@ class SettingsP3StructureTest {
         val bangumi = CoverSourceMode.BANGUMI
         val nextMoe = CoverSourceMode.NEXTMOE
         assertEquals(CoverAccountState.ANONYMOUS, coverAccountState(bangumi, null))
-        assertEquals(CoverAccountState.SIGNED_OUT, coverAccountState(nextMoe, CoverAccountStatus()))
+        assertEquals(CoverAccountState.ANONYMOUS, coverAccountState(nextMoe, CoverAccountStatus()))
         assertEquals(CoverAccountState.SIGNED_IN, coverAccountState(nextMoe, CoverAccountStatus(connected = true, name = "yuki")))
         assertEquals(CoverAccountState.NEEDS_REAUTH, coverAccountState(nextMoe, CoverAccountStatus(connected = true, needsReauth = true)))
 
@@ -301,8 +276,8 @@ class SettingsP3StructureTest {
                 assertTrue("$labels: short labels", labels.all { it.length <= 6 })
             }
         assertEquals(listOf("最近游玩", "添加时间", "名称", "自定义"), LibrarySortOptions.map(::choiceLabel))
-        assertTrue(functionBody(all, "LibraryHubSettings").contains("SettingsSegmentedRow("))
-        assertTrue(functionBody(all, "LibraryHubSettings").contains("viewModel::setSortMode"))
+        assertFalse("removed library settings are not rendered", all.contains("fun LibraryHubSettings("))
+        assertTrue("home is part of appearance", functionBody(all, "AppearanceSettings").contains("InterfaceSettings(state, colors, viewModel)"))
         val krkr = UiSourceFiles.file("SettingsKrkrPages.kt")
         assertTrue(functionBody(krkr, "KrkrSettings").contains("SettingsSegmentedRow("))
         assertTrue(functionBody(krkr, "KrkrSettings").contains("viewModel::setKrEngineVersion"))

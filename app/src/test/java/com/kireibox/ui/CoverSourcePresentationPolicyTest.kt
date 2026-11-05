@@ -24,11 +24,11 @@ class CoverSourcePresentationPolicyTest {
     }
 
     @Test
-    fun optionsUseBangumiAsTheFallbackAndHighlightOnlyTheSelectedSource() {
+    fun optionsUseNextmoeAsTheFallbackAndHighlightOnlyTheSelectedSource() {
         val fallback = CoverSourcePresentationPolicy.options(null)
         assertEquals(CoverSourceMode.active, fallback.map { it.source })
         assertFalse(fallback.first().muted)
-        assertTrue(fallback.first().isHighlighted)
+        assertTrue(fallback.first { it.source == CoverSourceMode.NEXTMOE }.isHighlighted)
 
         val selected = CoverSourcePresentationPolicy.options(CoverSourceMode.BANGUMI)
         val bySource = selected.associateBy { it.source }

@@ -60,7 +60,7 @@ internal fun settingsSearchTarget(
 ): SettingsSearchTarget {
     val scope = entry.location.scope
     return if (scope != SettingsSearchScope.ALWAYS && homeMode == HomePresentationMode.COMPONENTS) {
-        SettingsSearchTarget(KireiSettingsPage.INTERFACE, SettingsSearchIndex.HOME_STYLE_ANCHOR)
+        SettingsSearchTarget(KireiSettingsPage.APPEARANCE, SettingsSearchIndex.HOME_STYLE_ANCHOR)
     } else {
         SettingsSearchTarget(entry.page, entry.anchor, expandAdvanced = scope == SettingsSearchScope.IMMERSIVE_ADVANCED)
     }

@@ -35,7 +35,7 @@ class KireiBackPolicyTest {
                 KireiSettingsPage.ROOT to null,
                 KireiSettingsPage.APPEARANCE to KireiSettingsPage.ROOT,
                 KireiSettingsPage.LIBRARY_HUB to KireiSettingsPage.ROOT,
-                KireiSettingsPage.LIBRARY to KireiSettingsPage.LIBRARY_HUB,
+                KireiSettingsPage.LIBRARY to KireiSettingsPage.PERMISSIONS,
                 KireiSettingsPage.COVERS to KireiSettingsPage.ROOT,
                 // P3: 来源账号 is a sub-page of 封面与元数据, so back returns to the cover page (a root
                 // shortcut opens it with the root as its back target instead, see below).
@@ -65,7 +65,7 @@ class KireiBackPolicyTest {
         assertEquals(KireiSettingsPage.ROOT, KireiBackPolicy.settingsBackTarget(KireiSettingsPage.LIBRARY, KireiSettingsPage.LIBRARY))
         assertEquals(KireiSettingsPage.ROOT, KireiBackPolicy.settingsBackTarget(KireiSettingsPage.COVER_ACCOUNTS, KireiSettingsPage.COVER_ACCOUNTS))
         // Pages reached normally (or below the result's page) keep their parent.
-        assertEquals(KireiSettingsPage.LIBRARY_HUB, KireiBackPolicy.settingsBackTarget(KireiSettingsPage.LIBRARY, null))
+        assertEquals(KireiSettingsPage.PERMISSIONS, KireiBackPolicy.settingsBackTarget(KireiSettingsPage.LIBRARY, null))
         assertEquals(KireiSettingsPage.COVERS, KireiBackPolicy.settingsBackTarget(KireiSettingsPage.COVER_ACCOUNTS, KireiSettingsPage.COVERS))
         assertEquals(KireiSettingsPage.ROOT, KireiBackPolicy.settingsBackTarget(KireiSettingsPage.ROOT, null))
     }

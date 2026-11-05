@@ -8,6 +8,28 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CoverDecodePolicyTest {
+
+    @Test
+    fun immersiveTargetsAdaptToDeviceMemoryAndMeasuredPixels() {
+        val high = CoverDecodePolicy.request("cover", CoverImageRole.HERO, 1440, 2160, memoryClassMb = 256)
+        val low = CoverDecodePolicy.request("cover", CoverImageRole.HERO, 1440, 2160, memoryClassMb = 256, lowRamDevice = true)
+        assertEquals(1440, high.targetWidthPx)
+        assertEquals(1080, low.targetWidthPx)
+        assertFalse(high.cacheKey == low.cacheKey)
+        assertEquals(1080, CoverDecodePolicy.request("cover", CoverImageRole.IMMERSIVE_BACKDROP, 1440, 3200, memoryClassMb = 256).targetWidthPx)
+        assertEquals(600, CoverDecodePolicy.request("cover", CoverImageRole.HERO, 600, 900, memoryClassMb = 256).targetWidthPx)
+    }
+
+    @Test
+    fun heroPreservesCropDetailForLandscapeAndPortraitCoversWithBoundedAllocation() {
+        val target = CoverDecodePolicy.request("cover", CoverImageRole.HERO, 800, 1200)
+        assertEquals(1, CoverDecodePolicy.sampleSize(1920, 1080, target))
+        assertEquals(2, CoverDecodePolicy.sampleSize(2048, 3072, target))
+        assertEquals(1, CoverDecodePolicy.sampleSize(400, 600, target))
+        val sample = CoverDecodePolicy.sampleSize(30000, 1000, target)!!
+        assertTrue((30000 / sample).toLong() * (1000 / sample) <= 8_000_000L)
+    }
+
     @Test
     fun usesBoundedMemoryAndConcurrency() {
         assertEquals(256, CoverDecodePolicy.TARGET_WIDTH_PX)
@@ -230,7 +252,7 @@ class CoverDecodePolicyTest {
         val small = CoverDecodePolicy.request("cover", CoverImageRole.HERO, 800, 1_200)
         val medium = CoverDecodePolicy.request("cover", CoverImageRole.HERO, 1_024, 1_536)
 
-        assertEquals(4, CoverDecodePolicy.sampleSize(2_048, 3_072, small))
+        assertEquals(2, CoverDecodePolicy.sampleSize(2_048, 3_072, small))
         assertEquals(2, CoverDecodePolicy.sampleSize(2_048, 3_072, medium))
         assertFalse(small.cacheKey == medium.cacheKey)
     }

@@ -4,12 +4,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.CollectionsBookmark
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.Gamepad
-import androidx.compose.material.icons.rounded.GridView
-import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Terminal
@@ -40,7 +37,7 @@ import java.util.Date
 import java.util.Locale
 
 // Settings root (plan §5 P3 IA, r4 S1/S2): large title, the search capsule, overview card, the
-// one-time 快速设置 suggestion, then 个性化 (外观 · 首页) / 游戏 / 系统 / 关于. Every category row
+// one-time 快速设置 suggestion, then 外观 / 封面 / 引擎 / 存储 / 诊断 / 关于. Every category row
 // has its own tile hue (spec §2.3), so no two rows on the root look alike. A query replaces the
 // overview and groups with search results (SettingsSearchPage.kt).
 
@@ -54,10 +51,7 @@ internal fun SettingsRootPage(context: SettingsPageContext) {
         remember {
             listOf(
                 KireiSettingsPage.APPEARANCE,
-                KireiSettingsPage.INTERFACE,
-                KireiSettingsPage.LIBRARY_HUB,
                 KireiSettingsPage.COVERS,
-                KireiSettingsPage.COVER_ACCOUNTS,
                 KireiSettingsPage.ENGINES,
                 KireiSettingsPage.PERMISSIONS,
                 KireiSettingsPage.DIAGNOSTICS,
@@ -127,11 +121,7 @@ internal fun SettingsRootPage(context: SettingsPageContext) {
     }
 }
 
-/**
- * 个性化 (r4 S1): 外观 (theme, accent, display and orientation; the current theme as its value) and
- * 首页 (home style, shown games and immersive effects; the current home style as its value). Each
- * setting lives on exactly one of the two pages (SettingsIaStructureTest).
- */
+/** Appearance owns both app-wide display and Home controls. */
 @Composable
 private fun SettingsPersonalGroup(
     state: KireiUiState,
@@ -145,17 +135,10 @@ private fun SettingsPersonalGroup(
                 rows,
             )
         }
-        item {
-            SettingsCategoryRow(
-                KireiSettingsPage.INTERFACE,
-                SettingsCategoryRowSpec(Icons.Rounded.Home, "首页", null, KireiTileColor.PURPLE, value = state.settings?.homePresentationMode?.displayName),
-                rows,
-            )
-        }
     }
 }
 
-/** 游戏: 游戏库, 封面与元数据 (with the attention badge), 来源账号 (a shortcut to its page) and 全局引擎设置. */
+/** 游戏: cover management and global engine settings. Accounts live inside the cover page. */
 @Composable
 private fun SettingsGamesGroup(
     state: KireiUiState,
@@ -166,25 +149,15 @@ private fun SettingsGamesGroup(
     // No footer: the attention badge explains itself whenever it shows.
     KireiListGroup(rows.colors, SettingsGroupSpacing, title = "游戏") {
         item {
-            SettingsCategoryRow(KireiSettingsPage.LIBRARY_HUB, SettingsCategoryRowSpec(Icons.Rounded.GridView, "游戏库", null, KireiTileColor.BLUE), rows)
-        }
-        item {
             SettingsCategoryRow(
                 KireiSettingsPage.COVERS,
                 SettingsCategoryRowSpec(
                     Icons.Rounded.CollectionsBookmark,
-                    "封面与元数据",
+                    "封面",
                     if (attention > 0) "$attention 个封面待处理" else null,
                     KireiTileColor.TEAL,
                     badgeCount = attention,
                 ),
-                rows,
-            )
-        }
-        item {
-            SettingsCategoryRow(
-                KireiSettingsPage.COVER_ACCOUNTS,
-                SettingsCategoryRowSpec(Icons.Rounded.AccountCircle, "封面来源账号", null, KireiTileColor.INDIGO, value = coverAccountSummary(state)),
                 rows,
             )
         }

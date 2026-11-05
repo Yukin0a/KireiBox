@@ -88,6 +88,20 @@ internal suspend fun releaseLauncherCoverResources() {
     CoverToneExtractor.clearCache()
 }
 
+/** Use the same device limits for display, prefetch and tone/blur cache identity. */
+internal fun deviceCoverRequest(
+    context: Context,
+    uri: String,
+    role: CoverImageRole,
+    widthPx: Int,
+    heightPx: Int,
+    blurred: Boolean = false,
+    sourceKey: String = "",
+): CoverImageRequest {
+    val memory = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+    return CoverDecodePolicy.request(uri, role, widthPx, heightPx, blurred, sourceKey, memory.memoryClass, memory.isLowRamDevice)
+}
+
 @Composable
 internal fun rememberCover(
     uri: String?,
@@ -101,7 +115,7 @@ internal fun rememberCover(
     val request =
         remember(uri, role, componentWidthPx, componentHeightPx, blurred, sourceKey) {
             uri?.takeIf { it.isNotBlank() }?.let {
-                CoverDecodePolicy.request(it, role, componentWidthPx, componentHeightPx, blurred, sourceKey)
+                deviceCoverRequest(context, it, role, componentWidthPx, componentHeightPx, blurred, sourceKey)
             }
         }
 
@@ -128,9 +142,11 @@ internal fun coverCacheKey(
     componentWidthPx: Int,
     componentHeightPx: Int,
     blurred: Boolean = false,
+    context: Context? = null,
 ): String? =
     uri?.takeIf { it.isNotBlank() }?.let {
-        CoverDecodePolicy.request(it, role, componentWidthPx, componentHeightPx, blurred).cacheKey
+        (context?.let { ctx -> deviceCoverRequest(ctx, it, role, componentWidthPx, componentHeightPx, blurred) }
+            ?: CoverDecodePolicy.request(it, role, componentWidthPx, componentHeightPx, blurred)).cacheKey
     }
 
 @Composable
@@ -147,11 +163,12 @@ internal fun HeroCoverPrefetch(
             SpotlightCarouselPolicy.prefetchIndexes(currentPage, pages.size).drop(1).forEach { index ->
                 val source = pages[index].coverUri ?: return@forEach
                 val request =
-                    CoverDecodePolicy.request(
+                    deviceCoverRequest(
+                        context = context,
                         uri = source,
                         role = CoverImageRole.HERO,
-                        componentWidthPx = componentWidthPx,
-                        componentHeightPx = componentHeightPx,
+                        widthPx = componentWidthPx,
+                        heightPx = componentHeightPx,
                         blurred = pages[index].nsfw && nsfwBlurEnabled,
                     )
                 CoverLoads.load(request) {
@@ -188,7 +205,7 @@ internal fun constrainDecodedCover(
     bitmap: Bitmap?,
     request: CoverImageRequest
 ): Bitmap? {
-    if (bitmap == null || request.role != CoverImageRole.LIBRARY_CARD) return bitmap
+    if (bitmap == null || request.role !in setOf(CoverImageRole.LIBRARY_CARD, CoverImageRole.HERO)) return bitmap
     val size =
         CoverDecodePolicy.libraryCardScaledSize(
             decodedWidthPx = bitmap.width,
@@ -253,30 +270,38 @@ internal suspend fun decodeNetworkCover(
     context: Context,
     coverRequest: CoverImageRequest
 ): Bitmap? {
-    val temporary =
-        downloadCoverPreview(
-            client = CoverPreviewClient,
-            url = coverRequest.uri,
-            directory = File(context.cacheDir, "cover-previews"),
-            maxBytes = CoverDecodePolicy.MAX_NETWORK_BYTES,
-            sourceKey = coverRequest.sourceKey,
-        ) ?: return null
+    val disk = if (coverRequest.sourceKey == "nextmoe") CloudCoverDiskCache(File(context.cacheDir, "cloud-covers")) else null
+    val cached = disk?.find(coverRequest.sourceKey, coverRequest.uri)
+    if (cached != null) {
+        decodeNetworkCoverFile(context, cached, coverRequest)?.let { return it }
+        cached.delete()
+    }
+    val temporary = downloadCoverPreview(
+        client = CoverPreviewClient,
+        url = coverRequest.uri,
+        directory = File(context.cacheDir, "cover-previews"),
+        maxBytes = CoverDecodePolicy.MAX_NETWORK_BYTES,
+        sourceKey = coverRequest.sourceKey,
+    ) ?: return null
     return try {
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        BitmapFactory.decodeFile(temporary.path, bounds)
-        currentCoroutineContext().ensureActive()
-        val sample = CoverDecodePolicy.sampleSize(bounds.outWidth, bounds.outHeight, coverRequest) ?: return null
-        val bitmap =
-            BitmapFactory.decodeFile(
-                temporary.path,
-                BitmapFactory.Options().apply {
-                    inSampleSize = sample
-                    inPreferredConfig = Bitmap.Config.ARGB_8888
-                }
-            )
-        currentCoroutineContext().ensureActive()
-        finishDecodedCover(context, bitmap, coverRequest)
+        decodeNetworkCoverFile(context, temporary, coverRequest)?.also {
+            // Cache failures must not hide an otherwise valid image.
+            runCatching { disk?.put(coverRequest.sourceKey, coverRequest.uri, temporary) }
+        }
     } finally {
         temporary.delete()
     }
+}
+
+private suspend fun decodeNetworkCoverFile(context: Context, file: File, request: CoverImageRequest): Bitmap? {
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeFile(file.path, bounds)
+    currentCoroutineContext().ensureActive()
+    val sample = CoverDecodePolicy.sampleSize(bounds.outWidth, bounds.outHeight, request) ?: return null
+    val bitmap = BitmapFactory.decodeFile(file.path, BitmapFactory.Options().apply {
+        inSampleSize = sample
+        inPreferredConfig = Bitmap.Config.ARGB_8888
+    })
+    currentCoroutineContext().ensureActive()
+    return finishDecodedCover(context, bitmap, request)
 }

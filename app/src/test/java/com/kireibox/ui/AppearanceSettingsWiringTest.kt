@@ -17,7 +17,7 @@ class AppearanceSettingsWiringTest {
         assertTrue(all.contains("KireiSettingsPage.APPEARANCE -> AppearanceSettings(state, colors, viewModel)"))
         assertEquals("外观", settingsPageTitle(KireiSettingsPage.APPEARANCE))
         // r4 S1: the INTERFACE page id is kept (back stack, saved state) but the page is now 「首页」.
-        assertEquals("首页", settingsPageTitle(KireiSettingsPage.INTERFACE))
+        assertEquals("外观", settingsPageTitle(KireiSettingsPage.INTERFACE))
     }
 
     @Test
@@ -28,8 +28,8 @@ class AppearanceSettingsWiringTest {
         val appearanceRow = root.indexOf("\"外观\"")
         assertTrue("root has the 外观 row", appearanceRow >= 0)
         // r4 S1: 屏幕方向 left the root for 外观, so 外观 now leads the 首页 row (and everything else).
-        assertTrue("外观 is the first row of the root list", appearanceRow < root.indexOf("\"首页\""))
-        assertTrue(appearanceRow < root.indexOf("\"游戏库\""))
+        assertTrue("外观 is the first row of the root list", appearanceRow < root.indexOf("\"封面\""))
+        assertFalse(root.contains("\"游戏库\""))
         assertTrue("the 外观 row opens the APPEARANCE page", Regex("""SettingsCategoryRow\(\s*KireiSettingsPage\.APPEARANCE,""").containsMatchIn(root))
         assertTrue("category rows open their page", functionBody(root, "SettingsCategoryRow").contains("onClick = { context.open(page) }"))
         // context.open must be openCategory (not viewModel::openSettingsPage): openCategory records
@@ -42,7 +42,7 @@ class AppearanceSettingsWiringTest {
         assertTrue("pink category tile from the tokens", Regex("""Icons\.Rounded\.Palette, "外观", null, KireiTileColor\.PINK""").containsMatchIn(root))
         assertTrue("trailing value is the current theme mode", root.contains("value = state.settings?.themeMode?.displayName"))
         assertTrue("focus restore covers the new row", Regex("""listOf\(\s*KireiSettingsPage\.APPEARANCE,""").containsMatchIn(root))
-        assertTrue(Regex("""SettingsCategoryRow\(\s*KireiSettingsPage\.INTERFACE,\s*SettingsCategoryRowSpec\(Icons\.Rounded\.Home, "首页",""").containsMatchIn(root))
+        assertFalse("Home is merged into Appearance", root.contains("KireiSettingsPage.INTERFACE,"))
         assertFalse(root.contains("\"界面与辅助\""))
         assertFalse(root.contains("\"首页与沉浸式\""))
         assertEquals("首页 does not reuse the 外观 palette icon", 1, Regex("""Icons\.Rounded\.Palette\b""").findAll(root).count())
@@ -96,10 +96,6 @@ class AppearanceSettingsWiringTest {
         listOf(
             "MotionModeRow(",
             "viewModel::setMotionMode",
-            "viewModel::setReducedTransparency",
-            "viewModel::setContrast",
-            "\"减少透明度\"",
-            "\"增强对比度\"",
             "OrientationModeRow(",
             "viewModel::setOrientationMode",
         ).forEach { assertTrue("外观 contains $it", appearance.contains(it)) }
@@ -113,7 +109,7 @@ class AppearanceSettingsWiringTest {
         assertTrue(interfacePage.contains("viewModel::setImmersivePlayTimeVisible"))
 
         // Alpha15V23ContractTest slices between these functions; their order must stay put.
-        val order = listOf("fun LibraryHubSettings(", "fun InterfaceSettings(", "fun LibrarySettings(", "fun PermissionSettings(").map(library::indexOf)
+        val order = listOf("fun InterfaceSettings(", "fun LibrarySettings(", "fun PermissionSettings(").map(library::indexOf)
         assertTrue(order.all { it >= 0 })
         assertEquals(order.sorted(), order)
     }

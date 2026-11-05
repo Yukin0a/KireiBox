@@ -109,7 +109,7 @@ internal fun AppearanceSettings(
 ) {
     val settings = state.settings
     val accent = settings?.accentChoice ?: AccentChoice.DEFAULT
-    val groupSpacing = Modifier.padding(bottom = KireiSpacing.groupGap)
+    val groupSpacing = SettingsGroupSpacing
     KireiListGroup(colors, groupSpacing, title = "主题") {
         item {
             SettingsAnchor("主题") {
@@ -135,29 +135,9 @@ internal fun AppearanceSettings(
             )
         }
         item { OrientationModeRow(value = settings?.orientationMode ?: OrientationMode.AUTO, colors = colors, onChange = viewModel::setOrientationMode) }
-        item {
-            SettingsAnchor("减少透明度") {
-                KireiListRow(
-                    KireiListRowSpec(
-                        title = "减少透明度",
-                        trailing = KireiRowTrailing.Toggle(settings?.reducedTransparency == true, viewModel::setReducedTransparency),
-                    ),
-                    colors,
-                )
-            }
-        }
-        item {
-            SettingsAnchor("增强对比度") {
-                KireiListRow(
-                    KireiListRowSpec(
-                        title = "增强对比度",
-                        trailing = KireiRowTrailing.Toggle(settings?.increasedContrast == true, viewModel::setContrast),
-                    ),
-                    colors,
-                )
-            }
-        }
+
     }
+    InterfaceSettings(state, colors, viewModel)
 }
 
 internal fun selectionSpec(reducedMotion: Boolean): AnimationSpec<Float> = if (reducedMotion) snap() else AppleMotion.Spring.Emphasized

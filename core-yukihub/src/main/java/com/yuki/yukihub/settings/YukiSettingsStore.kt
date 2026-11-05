@@ -184,6 +184,18 @@ class YukiSettingsStore internal constructor(
             .apply()
     }
 
+    /** One-time migration when the launcher removes source/matching customization. */
+    fun applySimplifiedCoverDefaults() {
+        if (prefs.getBoolean("simple_cover_defaults_v1", false)) return
+        prefs.edit()
+            .putString(KEY_METADATA_SOURCE, "nextmoe")
+            .putBoolean(KEY_COVER_HYBRID_AUTO_MATCH, true)
+            .putBoolean(KEY_COVER_STRICT_L2, false)
+            .putBoolean(KEY_COVER_AUTO_MATCH_WIFI_ONLY, false)
+            .putBoolean("simple_cover_defaults_v1", true)
+            .apply()
+    }
+
     fun snapshot(): Snapshot {
         val legacyReduced = prefs.getBoolean(KEY_REDUCED_MOTION, false)
         val motionMode =
@@ -211,7 +223,7 @@ class YukiSettingsStore internal constructor(
             autoScanOnStartup = prefs.getBoolean(KEY_AUTO_SCAN_ON_STARTUP, true),
             sortMode = prefs.getString(KEY_SORT_MODE, SORT_RECENT) ?: SORT_RECENT,
             engineLabelPosition = prefs.getString(KEY_ENGINE_LABEL_POSITION, "title") ?: "title",
-            metadataSource = normalizeMetadataSource(prefs.getString(KEY_METADATA_SOURCE, SOURCE_BANGUMI)),
+            metadataSource = normalizeMetadataSource(prefs.getString(KEY_METADATA_SOURCE, "nextmoe")),
             // Credentials never enter UI snapshots.
             bangumiToken = "",
             krEngineVersion = prefs.getString(KEY_KR_ENGINE_VERSION, "auto") ?: "auto",
@@ -463,7 +475,17 @@ class YukiSettingsStore internal constructor(
     fun wasNsfwDetected(gameId: Long): Boolean = gameId > 0L && prefs.getBoolean(nsfwDetectionKey(gameId), false)
 
     fun markNsfwDetected(gameId: Long) {
-        if (gameId > 0L) prefs.edit().putBoolean(nsfwDetectionKey(gameId), true).apply()
+        if (gameId > 0L) prefs.edit().putBoolean(nsfwDetectionKey(gameId), true).putBoolean("nsfw_auto_cover_$gameId", false).apply()
+    }
+
+    /** False is an explicit manual decision; absence identifies pre-provenance installs. */
+    fun hasCoverRatingDecision(gameId: Long): Boolean = prefs.contains("nsfw_auto_cover_$gameId")
+
+    /** Automatic decisions follow replacement images; an explicit user toggle clears this flag. */
+    fun followsAutomaticCoverRating(gameId: Long): Boolean = prefs.getBoolean("nsfw_auto_cover_$gameId", false)
+
+    fun markAutomaticCoverRating(gameId: Long) {
+        if (gameId > 0L) prefs.edit().putBoolean(nsfwDetectionKey(gameId), true).putBoolean("nsfw_auto_cover_$gameId", true).apply()
     }
 
     /** Persists the theme mode and mirrors explicit modes into the legacy dark-mode key. */
@@ -732,7 +754,7 @@ class YukiSettingsStore internal constructor(
                 SOURCE_YMGAL -> SOURCE_BANGUMI
                 SOURCE_HIKARINAGI -> SOURCE_HIKARINAGI
                 "nextmoe" -> "nextmoe"
-                else -> SOURCE_BANGUMI
+                else -> "nextmoe"
             }
     }
 }

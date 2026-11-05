@@ -12,17 +12,24 @@ import org.junit.Test
 class NextmoePlaytimeSyncTest {
     private class FakeStore : NextmoePlaytimeStore {
         val minutes = linkedMapOf<Long, Int>()
+        val names = mutableMapOf<Long, String>()
+        val imported = mutableMapOf<Long, Long>()
+        var clouds = emptyList<CloudPlaytimeWork>()
+        override fun cloud(account: String) = clouds
+        override fun snapshot(account: String, works: List<CloudPlaytimeWork>) { clouds = works }
+        override fun undoImport(gameId: Long) { minutes[gameId] = (minutes[gameId] ?: 0) - ((imported.remove(gameId) ?: 0) / 60000).toInt() }
         val bindings = mutableMapOf<Long, GameBinding>()
         val rows = mutableMapOf<Pair<String, Long>, PlaytimeLedgerRow>()
 
         override fun games(account: String) = libraryGames(account).filter { it.localMinutes >= 1 }
 
-        override fun libraryGames(account: String) = minutes.map { (id, local) -> PlaytimeGame(id, "game $id", local, rows[account to id]) }
+        override fun libraryGames(account: String) = minutes.map { (id, local) -> PlaytimeGame(id, names[id] ?: "game $id", local, rows[account to id], imported[id] ?: 0) }
 
         override fun raiseLocal(
             gameId: Long,
             minutes: Int,
         ) {
+            imported[gameId] = (imported[gameId] ?: 0) + (minutes - (this.minutes[gameId] ?: 0)).coerceAtLeast(0) * 60000L
             this.minutes[gameId] = maxOf(this.minutes[gameId] ?: 0, minutes)
         }
 
@@ -39,6 +46,16 @@ class NextmoePlaytimeSyncTest {
 
     private class FakeRemote : NextmoePlaytimeRemote {
         val remote = mutableMapOf<String, Int>()
+        val catalogWorks = mutableListOf<VnMetadata>()
+        val resolvedWorks = mutableListOf<VnMetadata>()
+        val puts = mutableListOf<Pair<String, Int>>()
+        var otherAppMinutes = 0
+        override fun catalog(workIds: List<String>) = catalogWorks.filter { it.id in workIds }
+        override fun put(workId: String, minutes: Int): PlaytimeWriteResult {
+            puts += workId to minutes
+            remote[workId] = maxOf(minutes, otherAppMinutes)
+            return PlaytimeWriteResult(workId, true)
+        }
         val writes = mutableListOf<List<Pair<String, Int>>>()
         val deletes = mutableListOf<String>()
         val refs = mutableMapOf<String, String>()
@@ -74,7 +91,7 @@ class NextmoePlaytimeSyncTest {
 
         override fun resolveRefs(refs: List<String>): List<VnMetadata> {
             calls++
-            return refs.mapNotNull { ref -> this.refs[ref]?.let { work -> VnMetadata(id = work, externalRefs = ref, chineseTitle = "work $work") } }
+            return resolvedWorks.filter { work -> work.externalRefs.split(',').any { it in refs } } + refs.mapNotNull { ref -> this.refs[ref]?.let { work -> VnMetadata(id = work, externalRefs = ref, chineseTitle = "work $work") } }
         }
     }
 
@@ -93,6 +110,24 @@ class NextmoePlaytimeSyncTest {
 
     private fun row(gameId: Long) = store.rows["sub-1" to gameId]
 
+
+    @Test fun aUniqueIdAndExactLocalizedAliasBindWithoutIndividualConfirmation() = runBlocking {
+        store.minutes[1]=60; store.names[1]="[v17]【汉化版】Riddle Joker (KRKR)"
+        store.bindings[1]=GameBinding(1,"vndb","AUTO",null,"v17",null)
+        remote.resolvedWorks += VnMetadata(id="200", externalRefs="vndb:v17", chineseTitle="千变万化", titleAliases=arrayListOf("Riddle Joker"))
+        sync.runOnce()
+        assertEquals("200", row(1)?.workId)
+        assertEquals(listOf(listOf("200" to 60)), remote.writes)
+    }
+
+    @Test fun conflictingRefResponsesNeverLastWinEvenWhenTitlesAgree() = runBlocking {
+        store.minutes[1]=60; store.names[1]="Exact Title"
+        store.bindings[1]=GameBinding(1,"vndb","AUTO",null,"v17","302")
+        remote.resolvedWorks += listOf(VnMetadata(id="200",externalRefs="vndb:v17,bangumi:302",originalTitle="Exact Title"), VnMetadata(id="201",externalRefs="vndb:v17",originalTitle="Other Title"))
+        sync.runOnce()
+        assertNull(row(1)?.workId)
+        assertTrue(remote.writes.isEmpty())
+    }
     @Test
     fun aSmallerLocalTotalNeverLowersNextmoe() =
         runBlocking {
@@ -119,6 +154,7 @@ class NextmoePlaytimeSyncTest {
             remote.remote["100"] = 500
             sync.runOnce()
             assertEquals(listOf(listOf("100" to 600)), remote.writes)
+            assertEquals("new uploads appear immediately", 600, store.clouds.single().minutes)
             remote.calls = 0
             sync.runOnce()
             assertEquals("nothing changed: only the list read, nothing written", 1, remote.calls)
@@ -239,42 +275,124 @@ class NextmoePlaytimeSyncTest {
         }
 
     @Test
-    fun aNewDevicePullsTimeForUnplayedGamesButNeverAsksAboutThem() =
-        runBlocking {
-            // Fresh install: nothing played here yet, NextMoe has time from the old phone.
-            store.minutes[1] = 0
-            store.minutes[2] = 0
-            manualNextmoe(1, "100")
-            store.bindings[2] = GameBinding(2, "vndb", "AUTO", null, "v17", null)
-            remote.refs["vndb:v17"] = "200"
-            remote.remote["100"] = 500
-            remote.remote["200"] = 300
-            assertNull(sync.runOnce())
-            assertEquals(500, store.minutes[1])
-            assertEquals("a lone automatic match is not trusted for a pull", 0, store.minutes[2])
-            assertNull("an unplayed game's weak match is not kept, so it is tried again later", row(2))
-            assertTrue(sync.attention().isEmpty())
-            assertTrue(remote.writes.isEmpty())
-            // Its cover gets a second source that agrees: the next sync binds and pulls it.
-            store.bindings[2] = GameBinding(2, "vndb", "AUTO", null, "v17", "302")
-            remote.refs["bangumi:302"] = "200"
-            sync.runOnce()
-            assertEquals(300, store.minutes[2])
-            assertEquals(1, sync.status.value.pulled)
-            assertTrue(remote.writes.isEmpty())
-        }
+    fun newDeviceImportsSingleRefAndTracksUndo() = runBlocking {
+        store.minutes[1] = 0
+        store.bindings[1] = GameBinding(1, "vndb", "AUTO", null, "v17", null)
+        remote.catalogWorks += VnMetadata(id = "200", externalRefs = "vndb:v17")
+        remote.remote["200"] = 300
+        sync.runOnce()
+        assertEquals(300, store.minutes[1])
+        assertEquals(18_000_000L, store.imported[1])
+        assertEquals("BOUND", store.clouds.single().match)
+        sync.undo(1)
+        assertEquals(0, store.minutes[1])
+        sync.runOnce()
+        assertEquals("undo survives another sync", 0, store.minutes[1])
+        assertTrue(remote.deletes.isEmpty())
+    }
+
+    @Test
+    fun cloudWorksAreVisibleWithoutALibraryAndTitleNeedsConfirmation() = runBlocking {
+        remote.remote["200"] = 300
+        remote.catalogWorks += VnMetadata(id = "200", chineseTitle = "ＧＡＭＥ １")
+        sync.runOnce()
+        assertEquals("NONE", store.clouds.single().match)
+        store.minutes[1] = 0
+        sync.runOnce()
+        assertEquals(0, store.minutes[1])
+        assertEquals("200", row(1)?.candidateId)
+        assertEquals("SUGGESTED", store.clouds.single().match)
+        assertEquals(1, sync.attention().size)
+        store.save(1, "sub-1", NextmoePlaytimeSync.rebind(row(1)!!, "200"))
+        sync.runOnce()
+        assertEquals(300, store.minutes[1])
+    }
+
+    @Test
+    fun temporaryFailuresRetryAfterBackoff() = runBlocking {
+        store.minutes[1] = 60; manualNextmoe(1, "100")
+        remote.problems["100"] = PlaytimeWriteResult("100", false, "HTTP_500")
+        sync.runOnce()
+        assertNull(row(1)?.rejected)
+        assertEquals(1, row(1)?.retryCount)
+        remote.problems.clear(); remote.writes.clear()
+        sync.runOnce()
+        assertTrue(remote.writes.isEmpty())
+        now = 40_000L
+        sync.runOnce()
+        assertEquals(listOf(listOf("100" to 60)), remote.writes)
+    }
+
+    @Test
+    fun lowerTotalUsesPutAndOtherAppsCannotRaiseItBack() = runBlocking {
+        store.minutes[1] = 300; manualNextmoe(1, "100")
+        remote.remote["100"] = 300
+        sync.runOnce()
+        store.minutes[1] = 20
+        store.save(1, "sub-1", row(1)!!.copy(forceWrite = true))
+        remote.otherAppMinutes = 300
+        sync.runOnce()
+        assertEquals(listOf("100" to 20), remote.puts)
+        assertEquals(20, store.minutes[1])
+        assertEquals("SKIPPED_REMOTE_HIGHER", row(1)?.lastResult)
+        sync.runOnce()
+        assertEquals(20, store.minutes[1])
+        remote.remote["100"] = 400
+        sync.runOnce()
+        assertEquals("a newer website increase can import again", 400, store.minutes[1])
+    }
+
+    @Test
+    fun conflictingCloudRefsNeverAutoBind() = runBlocking {
+        store.minutes[1] = 0
+        store.bindings[1] = GameBinding(1, "vndb", "AUTO", null, "v17", null)
+        remote.remote.putAll(mapOf("1" to 20, "2" to 30))
+        remote.catalogWorks += listOf(VnMetadata(id="1", externalRefs="vndb:v17"), VnMetadata(id="2", externalRefs="vndb:v17"))
+        sync.runOnce()
+        assertNull(row(1)?.workId)
+        assertEquals(0, store.minutes[1])
+    }
 
     @Test
     fun theWriteResultParserReadsPlaytimesAndProblems() {
         assertTrue(NextmoeUserApi.parseWrite("1", org.json.JSONObject("""{"status":200,"object":"playtime","work_id":"1","minutes":5}""")).ok)
         assertTrue(NextmoeUserApi.parseWrite("1", org.json.JSONObject("""{"object":"playtime","work_id":"1","minutes":5}""")).ok)
-        val merged = NextmoeUserApi.parseWrite("1", org.json.JSONObject("""{"status":404,"code":"ENTITY_MERGED","current_id":"9"}"""))
+        val merged = NextmoeUserApi.parseWrite("1", org.json.JSONObject("""{"status":404,"problem":{"code":"ENTITY_MERGED","current_id":"9"}}"""))
         assertEquals(PlaytimeWriteResult("1", false, "ENTITY_MERGED", "9"), merged)
+        for(status in listOf(404, 429, 500)) assertEquals("HTTP_$status", NextmoeUserApi.parseWrite("1", org.json.JSONObject("""{"status":$status,"problem":{}}""")).code)
         assertEquals("MISSING", NextmoeUserApi.parseWrite("1", null).code)
         val quota = NextmoeUserApi.limit("""{"code":"QUOTA_EXCEEDED"}""", "30", now = 0L)
         assertTrue(quota.dailyQuota)
         assertEquals(86_400_000L, quota.untilMillis)
         assertEquals(30_000L, NextmoeUserApi.limit("""{"code":"RATE_LIMITED"}""", "30", now = 0L).untilMillis)
+    }
+
+    @Test
+    fun aRateLimitedItemCanRetryAndDoesNotBecomePermanent() = runBlocking {
+        store.minutes[1] = 60; manualNextmoe(1, "100")
+        remote.problems["100"] = PlaytimeWriteResult("100", false, "RATE_LIMITED")
+        sync.runOnce()
+        assertNull(row(1)?.rejected)
+        remote.problems.clear(); remote.writes.clear(); now = 40_000L
+        sync.runOnce()
+        assertEquals(listOf(listOf("100" to 60)), remote.writes)
+    }
+
+    @Test
+    fun ambiguousCloudEvidenceAlsoStopsStrictAutomaticBinding() = runBlocking {
+        store.minutes[1] = 0
+        store.bindings[1] = GameBinding(1, "vndb", "AUTO", null, "v17", "302")
+        remote.refs.putAll(mapOf("vndb:v17" to "1", "bangumi:302" to "1"))
+        remote.remote.putAll(mapOf("1" to 20, "2" to 30))
+        remote.catalogWorks += listOf(VnMetadata(id="1", externalRefs="vndb:v17,bangumi:302"), VnMetadata(id="2", externalRefs="vndb:v17"))
+        sync.runOnce()
+        assertNull(row(1)?.workId)
+        assertEquals(0, store.minutes[1])
+    }
+
+    @Test
+    fun duplicateCloudRowsKeepLargestValue() {
+        assertEquals(mapOf("1" to 300), NextmoeUserApi.maxPlaytimes(org.json.JSONArray("""[{"work_id":"1","minutes":300},{"work_id":"1","minutes":20}]""")))
     }
 
     @Test

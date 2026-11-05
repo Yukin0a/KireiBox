@@ -39,6 +39,7 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -318,6 +319,9 @@ internal fun ImmersivePlayTimeIndicator(
     palette: ImmersivePalette,
     reducedMotion: Boolean,
     onClick: () -> Unit,
+    trackAlpha: Float = 1f,
+    trackOffsetDp: Float = 0f,
+    trackInteractive: Boolean = true,
 ) {
     val target = game.id to LibraryOverviewPolicy.immersivePlayTime(game.totalPlayTime)
     if (orientation == HomeOrientation.PORTRAIT) {
@@ -327,12 +331,17 @@ internal fun ImmersivePlayTimeIndicator(
                 pxDp(anchor.yPx, density),
             ).width(pxDp(anchor.maxWidthPx, density))
                 .height(visualSpec.minimumHeightDp.dp)
+                .graphicsLayer {
+                    alpha = trackAlpha
+                    translationX = trackOffsetDp * density.density
+                }
+                .then(if (trackInteractive) Modifier else Modifier.clearAndSetSemantics { })
                 .zIndex(9f),
             contentAlignment = Alignment.Center,
         ) {
             Crossfade(
                 targetState = target,
-                animationSpec = tween(if (reducedMotion) 0 else 150),
+                animationSpec = tween(0),
                 label = "immersivePlayTime",
             ) { (_, label) ->
                 Row(
@@ -343,7 +352,7 @@ internal fun ImmersivePlayTimeIndicator(
                             immersivePlayTimeBorderColor(palette, orientation, game.totalPlayTime),
                             CircleShape,
                         )
-                        .clickable(onClick = onClick)
+                        .clickable(enabled = trackInteractive, onClick = onClick)
                         .heightIn(min = visualSpec.minimumHeightDp.dp)
                         .widthIn(max = pxDp(anchor.maxWidthPx, density))
                         .padding(

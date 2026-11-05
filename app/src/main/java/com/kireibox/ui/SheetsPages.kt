@@ -250,12 +250,16 @@ internal fun LibraryOverviewSheet(
     colors: KireiColors,
     onSortChange: (LibraryOverviewSort) -> Unit,
     onDismiss: () -> Unit,
-    onGame: (Game) -> Unit
+    onGame: (Game) -> Unit,
+    playtimes: List<com.yuki.yukihub.sync.PlaytimeGame> = emptyList(),
+    cloud: List<com.yuki.yukihub.sync.CloudPlaytimeWork> = emptyList(),
+    blurCloudCovers: Boolean = true,
+    onCloud: () -> Unit = {},
 ) {
-    val orderedGames = remember(games, sort) { LibraryOverviewPolicy.sorted(games, sort) }
+    val orderedGames = remember(games, playtimes, cloud, sort) { LibraryOverviewPolicy.records(games, playtimes, cloud, sort) }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
-    LaunchedEffect(sort) {
+    LaunchedEffect(sort, cloud.map { it.workId }) {
         listState.scrollToItem(0)
     }
     val selectSort: (LibraryOverviewSort) -> Unit = { target ->
@@ -268,7 +272,7 @@ internal fun LibraryOverviewSheet(
     val screenHeight = LocalConfiguration.current.screenHeightDp.dp
     val listHeight = (screenHeight * .52f).coerceIn(280.dp, 430.dp)
     KireiActionSheet(
-        title = "游玩记录 · ${games.size} 部游戏",
+        title = "游玩记录 · ${orderedGames.size} 部游戏",
         colors = colors,
         onDismiss = onDismiss,
         scrollableContent = false
@@ -292,21 +296,28 @@ internal fun LibraryOverviewSheet(
                 state = listState,
                 contentPadding = PaddingValues(vertical = KireiSpacing.xs),
             ) {
-                itemsIndexed(orderedGames, key = { _, game -> game.id }) { index, game ->
+                itemsIndexed(orderedGames, key = { _, entry -> entry.key }) { index, entry ->
+                    val game = entry.game
                     KireiListRow(
-                        spec =
-                            KireiListRowSpec(
-                                title = game.title.orEmpty(),
-                                subtitle = game.engine?.displayName ?: "游戏",
-                                trailing = KireiRowTrailing.Value(LibraryOverviewPolicy.compactPlayTime(game.totalPlayTime), chevron = false),
-                                tileSize = OverviewRankWidth + SheetCoverWidth,
-                                horizontalPadding = KireiSpacing.xl,
-                                subtitleMaxLines = 1,
-                                verticalPadding = KireiSpacing.xs,
-                                leading = { OverviewLeading(index + 1, game, colors) },
-                            ),
+                        spec = KireiListRowSpec(
+                            title = entry.title,
+                            subtitle = if(game == null) "仅云端 · 本机未绑定" else entry.cloud?.let { "云端 ${it.minutes} 分钟 · 已绑定" }
+                                ?: entry.sync?.let { if(it.workId == null) "未匹配云端" else if(it.lastResult == "WAITING_UPLOAD") "待上传" else "已绑定" } ?: "未匹配云端",
+                            trailing = KireiRowTrailing.Value(LibraryOverviewPolicy.compactPlayTime(entry.milliseconds), chevron = false),
+                            tileSize = OverviewRankWidth + SheetCoverWidth,
+                            horizontalPadding = KireiSpacing.xl,
+                            subtitleMaxLines = 1,
+                            verticalPadding = KireiSpacing.xs,
+                            leading = {
+                                if(game != null) OverviewLeading(index + 1, game, colors)
+                                else Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text((index + 1).toString(), color = colors.secondary, style = AppleTypography.numericSmall, modifier = Modifier.width(OverviewRankWidth))
+                                    entry.cloud?.let { CloudWorkArtwork(it, Modifier.size(SheetCoverWidth, SheetCoverHeight), blurCloudCovers, colors) }
+                                }
+                            },
+                        ),
                         colors = colors,
-                        onClick = { onGame(game) },
+                        onClick = { if(game != null) onGame(game) else onCloud() },
                     )
                 }
             }
@@ -348,6 +359,8 @@ internal fun GameActionSheet(
     onRemove: () -> Unit
 ) {
     val context = LocalContext.current
+    var editPlaytime by remember(game.id) { mutableStateOf(false) }
+    if(editPlaytime) GamePlaytimeDialog(game, state, colors, viewModel) { editPlaytime = false }
     var artemisVersionMenuExpanded by remember(game.id) { mutableStateOf(false) }
     val selectedArtemisVersion = com.yuki.yukihub.launcher.ArtemisVersion.fromStored(game.emulatorPackage)
     KireiActionSheet(game.title ?: "游戏操作", colors, onDismiss, expanded = true, grouped = true) {
@@ -463,6 +476,11 @@ internal fun GameActionSheet(
                     }
                 }
             }
+        }
+        SheetRowGroup(colors, title = "游玩记录") {
+            item { SheetActionRow(Icons.Rounded.Edit, "游玩时长", "本机 ${game.totalPlayTime / 60_000L} 分钟 · 查看云端、补录或调整", colors) {
+                viewModel.loadPlaytimeAttention(); editPlaytime = true
+            } }
         }
         SheetRowGroup(colors, title = "封面与信息") {
             item { SheetActionRow(Icons.Rounded.Edit, "游戏名称", "只修改 KireiBox 中的显示名称", colors, onClick = onRename) }

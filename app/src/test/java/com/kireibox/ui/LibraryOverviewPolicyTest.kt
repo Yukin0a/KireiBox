@@ -9,6 +9,27 @@ import org.junit.Test
 import java.io.File
 
 class LibraryOverviewPolicyTest {
+
+    @Test fun cloudOnlyWorksAreListedWithoutCreatingGamesAndBoundWorksAreNotDuplicated() {
+        val game = Game(id=1, title="本地作品", totalPlayTime=60_000L)
+        val rows = listOf(com.yuki.yukihub.sync.PlaytimeGame(1, "本地作品", 1, com.yuki.yukihub.sync.PlaytimeLedgerRow(workId="100")))
+        val works = listOf(com.yuki.yukihub.sync.CloudPlaytimeWork("100", 120), com.yuki.yukihub.sync.CloudPlaytimeWork("200", 30, com.yuki.yukihub.metadata.model.VnMetadata(chineseTitle="云端作品")))
+        val records = LibraryOverviewPolicy.records(listOf(game), rows, works, LibraryOverviewSort.PLAY_TIME)
+        assertEquals(2, records.size)
+        assertEquals(7_200_000L, records.first().milliseconds)
+        assertEquals("云端作品", records.last().title)
+        assertEquals(null, records.last().game)
+        assertEquals(1_800_000L, records.last().milliseconds)
+        assertEquals(2, LibraryOverviewPolicy.records(emptyList(), emptyList(), works, LibraryOverviewSort.RECENT).size)
+    }
+
+    @Test fun suggestedOrIgnoredCloudWorksRemainVisibleAndFetchTimeDoesNotInventAPlayDate() {
+        val game = Game(id=1, title="本地", lastPlayedAt=2)
+        val works = listOf(com.yuki.yukihub.sync.CloudPlaytimeWork("100", 30, gameId=1, match="SUGGESTED", fetchedAt=99999), com.yuki.yukihub.sync.CloudPlaytimeWork("200", 45, match="IGNORED"))
+        val records = LibraryOverviewPolicy.records(listOf(game), emptyList(), works, LibraryOverviewSort.RECENT)
+        assertEquals(3, records.size)
+        assertEquals(game, records.first().game)
+    }
     @Test fun recentSortPutsPlayedGamesFirstThenUsesTitle() {
         val never = Game(id = 1, title = "Never", lastPlayedAt = 0)
         val beta = Game(id = 2, title = "Beta", lastPlayedAt = 20)
@@ -76,11 +97,11 @@ class LibraryOverviewPolicyTest {
                 .substringBefore("@OptIn(ExperimentalMaterial3Api::class)")
 
         assertTrue(sheet.contains("val listState = rememberLazyListState()"))
-        assertTrue(sheet.contains("LaunchedEffect(sort)"))
+        assertTrue(sheet.contains("LaunchedEffect(sort, cloud.map { it.workId })"))
         assertTrue(sheet.contains("scope.launch { listState.scrollToItem(0) }"))
         assertTrue(sheet.contains("state = listState"))
-        assertTrue(sheet.contains("itemsIndexed(orderedGames, key = { _, game -> game.id })"))
-        assertTrue(sheet.contains("游玩记录 · \${games.size} 部游戏"))
+        assertTrue(sheet.contains("itemsIndexed(orderedGames, key = { _, entry -> entry.key })"))
+        assertTrue(sheet.contains("游玩记录 · \${orderedGames.size} 部游戏"))
     }
 
     @Test fun dockPaddingIncludesInsetsAndClearance() {

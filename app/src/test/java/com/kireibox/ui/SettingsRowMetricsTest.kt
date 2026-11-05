@@ -35,7 +35,7 @@ class SettingsRowMetricsTest {
         assertTrue(root.contains("withCategoryMetrics(resolveSettingsCategoryRowMetrics(context.orientation))"))
         // Pinned per orientation: the orientation row no longer mirrors these, so nothing else holds them.
         assertEquals(
-            SettingsCategoryRowMetrics(verticalPaddingDp = 12f, minimumHeightDp = 64f, iconSizeDp = 34f),
+            SettingsCategoryRowMetrics(verticalPaddingDp = 6f, minimumHeightDp = 48f, iconSizeDp = 30f),
             resolveSettingsCategoryRowMetrics(HomeOrientation.PORTRAIT),
         )
         assertEquals(
